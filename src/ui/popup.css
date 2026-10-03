@@ -1,0 +1,31 @@
+body { width: 380px; }
+#app { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+header h1 { font-size: 16px; }
+header button { padding: 2px 6px; }
+.banner { font-size: 14px; }
+
+.slot.free { display: flex; flex-direction: column; gap: 6px; border-color: var(--accent); }
+.slot.free.ignored { opacity: .6; border-style: dashed; }
+.slot .main strong { font-size: 14px; }
+.slot .price { font-size: 18px; font-weight: 700; color: var(--accent-dark); display: flex; align-items: center; gap: 4px; }
+.slot .detail { margin-top: -4px; }
+.slot .actions select { flex: 1; min-width: 0; }
+.pill.est { background: transparent; border: 1px dashed var(--accent); }
+.slot.busy { padding: 4px 2px; border-bottom: 1px solid var(--border); }
+.num { font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.tools { flex-wrap: wrap; margin-top: 4px; }
+footer { margin-top: 4px; text-align: center; }
+.autotag { display: flex; flex-direction: column; gap: 6px; border-style: dashed; }
+.plan { margin: 4px 0 0; padding-left: 18px; max-height: 140px; overflow: auto; }
+.embed body { width: auto; }
+.embed #app { padding: 10px 12px; }
+.embed header img, .embed header h1 { display: none; }
+.embed header { justify-content: flex-end; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-top: 2px; }
+.tabs .tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 8px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.tabs .tab:hover { color: var(--text); }
+.tabs .tab.active { color: var(--accent-dark); border-bottom-color: var(--accent); }
+.panel { display: flex; flex-direction: column; gap: 8px; }
+.empty { text-align: center; padding: 16px 0; margin: 0; }
+button.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

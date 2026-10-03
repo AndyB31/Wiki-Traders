@@ -1,0 +1,39 @@
+<!-- Fixture hypothétique (structure Next.js + Tailwind) : à remplacer par un vrai relevé via « Diagnostic ». -->
+<header><nav><a href="/collection">Collection</a><a href="/marketplace">Marché</a></nav></header>
+<main>
+  <div role="tablist">
+    <button role="tab" aria-selected="false">Toutes les enchères</button>
+    <button role="tab" aria-selected="true" data-state="active">Mes ventes</button>
+  </div>
+  <div class="grid grid-cols-4 gap-4">
+    <div class="rounded-xl border">
+      <a href="/marketplace/0f8c2a1e-aaaa-4bbb-8ccc-111111111111">
+        <div class="relative" style="background-image:url(/super_rare.png)">
+          <img alt="Nikola Tesla" src="/_next/image?url=%2Fcards%2Fnikola-tesla.jpg&w=256&q=75" width="200" />
+        </div>
+      </a>
+      <div class="p-2">
+        <a href="/marketplace/0f8c2a1e-aaaa-4bbb-8ccc-111111111111"><h3 class="font-bold">Nikola Tesla</h3></a>
+        <span class="text-xs" style="color:var(--color-rarity-sr)">Super Rare</span>
+        <div class="flex"><span>Enchère actuelle</span><span>1 250</span></div>
+        <div><span>Mise à prix : 900</span></div>
+        <div class="text-xs"><span>Fin dans</span> <span>1 h 12 min</span></div>
+      </div>
+    </div>
+    <div class="rounded-xl border">
+      <a href="/marketplace/0f8c2a1e-aaaa-4bbb-8ccc-222222222222">
+        <img alt="Chat" src="/cards/chat.jpg" />
+      </a>
+      <span>Commun</span>
+      <span>20-50</span>
+      <div><span>Prix</span> <span>30 💰</span></div>
+      <time datetime="2026-10-03T14:00:00Z">2 h</time>
+    </div>
+    <div class="rounded-xl border">
+      <a href="/marketplace/0f8c2a1e-aaaa-4bbb-8ccc-333333333333"><img alt="Hibou" src="/cards/hibou.jpg" /></a>
+      <span>Peu Commun</span>
+      <div><span>Enchère actuelle</span> <span>48</span></div>
+      <span>Vendue</span>
+    </div>
+  </div>
+</main>

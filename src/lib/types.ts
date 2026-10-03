@@ -1,0 +1,180 @@
+export type Rarity = 'C' | 'PC' | 'R' | 'SR' | 'UR' | 'L';
+
+/** F1 – règle de répartition pour une étiquette. */
+export interface TagRule {
+  id: string;
+  /** Nom de l'étiquette tel qu'affiché sur le site (ex. « 20-50 »). */
+  tag: string;
+  /** Nombre de slots que l'étiquette doit occuper en permanence. */
+  quota: number;
+  /** Pourcentage du prix moyen (70 = 70 %). */
+  pct: number;
+  floor: number | null;
+  ceiling: number | null;
+  /** Nombre d'exemplaires à toujours garder (1 = seuls les doublons sont vendables). */
+  keepMin: number;
+  active: boolean;
+  /**
+   * `tag` : la carte doit porter l'étiquette sur le site.
+   * `price` : la carte appartient à l'étiquette si son prix moyen est entre plancher et plafond
+   * (utile si les étiquettes ne sont pas lisibles dans la page).
+   */
+  match: 'tag' | 'price';
+}
+
+export interface Card {
+  /** Identifiant stable (slug du nom par défaut). */
+  id: string;
+  /** Identifiant interne du site, s'il est lisible. */
+  siteId?: string;
+  name: string;
+  rarity: Rarity | null;
+  /** Version brillante (« shiny »), cotée à part. */
+  shiny?: boolean;
+  tags: string[];
+  quantity: number;
+  favorite: boolean;
+  /** Prix moyen affiché par le site, s'il existe. */
+  sitePrice: number | null;
+  sitePriceAt: number | null;
+  updatedAt: number;
+}
+
+export interface PriceObs {
+  cardId: string;
+  price: number;
+  /** `sold` = vente terminée, `listing` = enchère en cours. */
+  type: 'sold' | 'listing';
+  at: number;
+  auctionId?: string;
+  /** Rareté de la carte vendue : sert au prix de référence par rareté. */
+  rarity?: Rarity | null;
+  shiny?: boolean;
+}
+
+export interface MyAuction {
+  id: string;
+  cardId: string;
+  cardName: string;
+  tag: string | null;
+  startPrice: number | null;
+  currentPrice: number | null;
+  /** Timestamp (ms) de fin, null si inconnu. */
+  endsAt: number | null;
+  seenAt: number;
+}
+
+/** Palier de durée : prix de départ entre `from` et `to` (inclus) → durée en minutes. */
+export interface DurationRule {
+  from: number | null;
+  to: number | null;
+  minutes: number;
+}
+
+export interface Settings {
+  slots: number;
+  windowDays: number;
+  stat: 'mean' | 'median';
+  rounding: number;
+  /** Classement à doublons égaux : prix le plus haut d'abord, ou le plus bas (pour écouler). */
+  sortPrice: 'desc' | 'asc';
+  /** Autoriser à proposer une carte déjà en vente. */
+  allowDuplicateListing: boolean;
+  /** Prendre aussi en compte les enchères en cours dans le prix moyen. */
+  includeListings: boolean;
+  fallbackTag: string | null;
+  blacklist: string[];
+  notifications: boolean;
+  quietStart: string | null;
+  quietEnd: string | null;
+  /** URL (sans origine) de la page « mes enchères », enregistrée depuis la popup. */
+  myAuctionsPath: string | null;
+  /** Page ouverte par le bouton « Ouvrir » (la collection, où se trouve « Mettre en vente »). */
+  sellPath: string;
+  /** Durée de l'enchère selon le prix de départ (vide = durée par défaut du site). */
+  durationRules: DurationRule[];
+  /** V4 : ouvre la fenêtre de vente et remplit le prix (le clic final reste humain). */
+  prefill: boolean;
+  /** Étiquetage automatique des cartes sur le site selon leur prix moyen. */
+  autoTag: boolean;
+  /** Retirer les autres étiquettes gérées lors de l'étiquetage automatique. */
+  autoTagRemoveOthers: boolean;
+  /** Surcharges des sélecteurs CSS (voir content/parsers/selectors.ts). */
+  selectorOverrides: Record<string, string>;
+}
+
+export type JournalType = 'proposed' | 'created' | 'finished';
+
+export interface JournalEntry {
+  id: string;
+  type: JournalType;
+  at: number;
+  cardId: string;
+  cardName: string;
+  tag: string | null;
+  startPrice: number | null;
+  finalPrice: number | null;
+  /** Prix moyen de référence au moment de l'événement. */
+  avgPrice: number | null;
+  auctionId?: string;
+}
+
+export type PageKind = 'myAuctions' | 'market' | 'auctionDetail' | 'collection' | 'other';
+
+export interface PageStatus {
+  kind: PageKind;
+  url: string;
+  recognized: boolean;
+  message: string;
+  /** Source des données : props React de la page ou lecture du texte. */
+  source?: 'react' | 'dom';
+  at: number;
+}
+
+export interface Meta {
+  lastAuctionsScan: number | null;
+  lastCollectionScan: number | null;
+  lastPage: PageStatus | null;
+}
+
+/** Carte que l'utilisateur vient d'ouvrir depuis la popup. */
+export interface PendingFocus {
+  cardId: string;
+  cardName: string;
+  price: number | null;
+  detail: string;
+  at: number;
+  /** Durée conseillée (minutes), selon les paliers. */
+  durationMin?: number | null;
+  /** V4 : ouvrir la vente et remplir le prix à l'arrivée sur la page. */
+  autoOpen?: boolean;
+  prefilledAt?: number;
+  /** Arrivée sur la collection (la navigation n'a lieu qu'une fois). */
+  arrivedAt?: number;
+  /** Onglet ouvert par « Ouvrir » (le seul à pré-remplir). */
+  tabId?: number;
+}
+
+/** Action de navigation demandée depuis la fenêtre, exécutée par le content script de l'onglet. */
+export interface Intent {
+  type: 'refreshSales';
+  at: number;
+  tabId: number | null;
+}
+
+export interface StoreShape {
+  rules: TagRule[];
+  settings: Settings;
+  cards: Record<string, Card>;
+  priceObs: PriceObs[];
+  myAuctions: MyAuction[];
+  journal: JournalEntry[];
+  manualPrices: Record<string, number>;
+  /** Carte choisie à la main pour un slot : clé `${ruleId}:${index}`. */
+  slotOverrides: Record<string, string>;
+  /** Slots ignorés : clé `${ruleId}:${index}`. */
+  ignoredSlots: string[];
+  meta: Meta;
+  pendingFocus: PendingFocus | null;
+  intent: Intent | null;
+}
