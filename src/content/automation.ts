@@ -5,7 +5,8 @@
  */
 import type { TagChange } from '../lib/autotag';
 import { durationLabel } from '../lib/duration';
-import { ActionError, fillInput, findByText, findExact, isChecked, pause, pressEscape, realClick, topDialog, waitFor } from './actions';
+import { sameTag } from '../lib/text';
+import { ActionError, fillInput, filledInputs, findByText, findExact, pause, pressEscape, realClick, topDialog, waitFor } from './actions';
 import { qsa, re, type SelectorConfig } from './parsers/selectors';
 
 export type Log = (step: string) => void;
@@ -29,6 +30,7 @@ export function openSellDialog(cfg: SelectorConfig): { dialog: Element; input: H
 export function fillSellPrice(cfg: SelectorConfig, price: number): boolean {
   const open = openSellDialog(cfg);
   if (!open) return false;
+  filledInputs.add(open.input);
   fillInput(open.input, String(price));
   return true;
 }
@@ -74,45 +76,80 @@ export async function prefillSale(tile: Element, price: number | null, cfg: Sele
   }
 }
 
-async function setTag(tag: string, wanted: boolean, cfg: SelectorConfig, log: Log): Promise<void> {
-  const scope = () => topDialog(`${cfg.sellDialog}, [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]`);
-  const option = findExact(document, tag, cfg.tagOption);
-  if (option) {
-    if (isChecked(option) !== wanted) {
-      log(`${wanted ? 'ajout' : 'retrait'} « ${tag} »`);
-      realClick(option);
-      await pause();
-    }
-    return;
-  }
-  if (!wanted) return;
-  // Pas d'option existante : champ de saisie d'étiquette.
-  const input = qsa<HTMLInputElement>(scope(), cfg.tagInput)[0] ?? qsa<HTMLInputElement>(document, cfg.tagInput)[0];
-  if (!input) throw new ActionError(`introuvable : option ou champ pour l'étiquette « ${tag} »`);
-  log(`saisie « ${tag} »`);
+/** Bouton « × » d'une pastille d'étiquette (« Retirer l'étiquette X »). */
+function removeButton(scope: ParentNode, tag: string, cfg: SelectorConfig): HTMLElement | null {
+  const rx = re(cfg.tagRemoveRe);
+  return (
+    qsa<HTMLElement>(scope, 'button[aria-label]').find((b) => {
+      const m = b.getAttribute('aria-label')?.match(rx);
+      return !!m && sameTag(m[1], tag);
+    }) ?? null
+  );
+}
+
+function tagInputIn(cfg: SelectorConfig): HTMLInputElement | null {
+  return qsa<HTMLInputElement>(topDialog(cfg.sellDialog), cfg.tagInput)[0] ?? qsa<HTMLInputElement>(document, cfg.tagInput)[0] ?? null;
+}
+
+async function addTag(tag: string, cfg: SelectorConfig, log: Log): Promise<void> {
+  if (removeButton(document, tag, cfg)) return;
+  const input = await waitFor(() => tagInputIn(cfg), 'champ « Ajouter une étiquette… »');
+  log(`ajout « ${tag} »`);
   fillInput(input, tag);
-  await pause(150, 300);
-  const created = findExact(document, tag, cfg.tagOption);
-  if (created && created !== input) realClick(created);
-  else for (const type of ['keydown', 'keypress', 'keyup'] as const) input.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+  // La liste de suggestions s'ouvre ; on choisit l'option exacte (ou « créer » si l'étiquette n'existe pas encore).
+  const option = await waitFor(
+    () => findExact(document, tag, cfg.tagOption) ?? findByText(document, /cr[ée]er|nouvelle [ée]tiquette/i, '[role="option"] button, [role="option"]'),
+    `option « ${tag} » dans la liste`,
+    3000,
+  );
+  // Sur le site, le clic est géré par le bouton à l'intérieur de l'option.
+  realClick(option.matches('button') ? option : option.querySelector('button') ?? option);
+  await waitFor(() => removeButton(document, tag, cfg), `étiquette « ${tag} » ajoutée`, 4000);
   await pause();
 }
 
-/** Applique les étiquettes d'une carte via l'interface du site. */
+async function removeTag(tag: string, cfg: SelectorConfig, log: Log): Promise<void> {
+  const button = removeButton(document, tag, cfg);
+  if (!button) return;
+  log(`retrait « ${tag} »`);
+  realClick(button);
+  await waitFor(() => !removeButton(document, tag, cfg), `étiquette « ${tag} » retirée`, 4000);
+  await pause();
+}
+
+/** Ferme la fiche de la carte (bouton « Fermer », sinon Échap). */
+async function closeCard(cfg: SelectorConfig): Promise<void> {
+  const close = findByText(topDialog(cfg.sellDialog), /^fermer$/i, 'button[aria-label], button[title]');
+  if (close) realClick(close);
+  else pressEscape();
+  await pause(300, 500);
+}
+
+/** Applique les étiquettes d'une carte : fiche de la carte → champ « Ajouter une étiquette… » / « × ». */
 export async function applyTags(tile: Element, change: TagChange, cfg: SelectorConfig, log: Log): Promise<void> {
-  const tagRe = re(cfg.tagButtonRe);
-  let button = findByText(tile, tagRe);
-  if (!button) {
+  if (!tagInputIn(cfg)) {
     log('ouverture de la carte');
     realClick(qsa(tile, cfg.openCard)[0] ?? tile);
     await pause();
-    button = await waitFor(() => findByText(topDialog(cfg.sellDialog), tagRe) ?? findByText(document, tagRe), 'bouton « Étiquettes »');
+    await waitFor(() => tagInputIn(cfg), 'champ « Ajouter une étiquette… » dans la fiche');
   }
-  realClick(button);
-  await pause();
-  for (const tag of change.add) await setTag(tag, true, cfg, log);
-  for (const tag of change.remove) await setTag(tag, false, cfg, log);
-  pressEscape();
-  await pause(200, 400);
-  pressEscape();
+  try {
+    // Dans la fiche aussi, l'étoile « Retirer des favoris » signale un favori : on n'y touche pas.
+    if (findByText(topDialog(cfg.sellDialog), /^retirer des favoris$/i, 'button[aria-label]')) {
+      throw new ActionError('carte en favori, ignorée');
+    }
+    for (const tag of change.add) await addTag(tag, cfg, log);
+    for (const tag of change.remove) await removeTag(tag, cfg, log);
+  } finally {
+    await closeCard(cfg);
+  }
+}
+
+/** Fait apparaître une carte absente de l'écran via le champ de recherche de la collection. */
+export async function searchCollection(name: string, cfg: SelectorConfig): Promise<boolean> {
+  const search = qsa<HTMLInputElement>(document, cfg.collectionSearch).find((i) => !i.closest('[data-wiky]'));
+  if (!search) return false;
+  fillInput(search, name);
+  await pause(500, 800);
+  return true;
 }

@@ -19,18 +19,19 @@ describe('computePrice', () => {
     expect(r.estimate).toBe(false);
   });
 
-  it('applique plancher et plafond', () => {
-    const low = computePrice(card('a'), rule, ctx(sales('a', [40, 40, 40])));
-    expect(low.price).toBe(50);
-    expect(low.detail).toContain('→ plancher 50');
+  it('plancher et plafond ne bornent pas le prix (ils servent seulement à l\'étiquetage)', () => {
+    const low = computePrice(card('a'), rule, ctx(sales('a', [40, 40, 40]), { settings: { ...DEFAULT_SETTINGS, stat: 'mean' } }));
+    expect(low.price).toBe(30);
+    expect(low.detail).toBe('moyenne 40 (3 ventes) × 70 % = 30');
     const high = computePrice(card('b'), rule, ctx(sales('b', [500, 500, 500])));
-    expect(high.price).toBe(100);
-    expect(high.detail).toContain('→ plafond 100');
+    expect(high.price).toBe(350);
+    expect(high.detail).not.toContain('plafond');
   });
 
   it('le prix affiché par le site est prioritaire', () => {
     const r = computePrice(card('a', { sitePrice: 120 }), rule, ctx(sales('a', [10, 10, 10])));
-    expect(r.price).toBe(80);
+    // 120 × 70 % = 84 → arrondi automatique au pas de 5 → 85.
+    expect(r.price).toBe(85);
     expect(r.base.source).toBe('site');
   });
 
@@ -94,7 +95,13 @@ describe('utilitaires', () => {
     expect(roundTo(63, 10)).toBe(60);
     expect(roundTo(65, 10)).toBe(70);
     expect(roundTo(3, 10)).toBe(10);
-    expect(roundTo(63.4, 0)).toBe(63);
+    // 0 = automatique : unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà ; jamais sous 1.
+    expect(roundTo(63.4, 0)).toBe(65);
+    expect(roundTo(14, 0)).toBe(14);
+    expect(roundTo(2.1, 0)).toBe(2);
+    expect(roundTo(0.3, 0)).toBe(1);
+    expect(roundTo(432, 0)).toBe(430);
+    expect(roundTo(1234, 0)).toBe(1250);
   });
   it('median', () => {
     expect(median([3, 1, 2])).toBe(2);
@@ -111,7 +118,7 @@ describe('prix de référence par rareté', () => {
   it('médiane des ventes de même rareté quand la carte n\'a pas d\'historique', () => {
     const r = computePrice(card('a', { rarity: 'SR' }), { ...rule, floor: null, ceiling: null }, ctx(soldOf('SR', [10, 15, 15, 20, 2000])));
     expect(r.base).toMatchObject({ source: 'rarity', value: 15, samples: 5 });
-    expect(r.detail).toBe('médiane Super Rare 15 (5 ventes) × 70 % = 10');
+    expect(r.detail).toBe('médiane Super Rare 15 (5 ventes) × 70 % = 11');
     expect(r.estimate).toBe(false);
   });
 

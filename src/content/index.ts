@@ -5,18 +5,22 @@ import type { DiagnosticResult, ScanMessage, ScannedCard, ToContent } from '../l
 import { load, onStoreChange, save } from '../lib/storage';
 import type { MyAuction, PageKind, PageStatus, PriceObs, StoreShape } from '../lib/types';
 import type { BridgeItem } from './bridge';
-import { ActionError, findByText, pause, realClick } from './actions';
-import { applyTags, prefillSale } from './automation';
+import { ActionError, findByText, pause, realClick, waitFor } from './actions';
+import { fetchCardAuctions, fetchMarketSales, fetchMyBids, fetchMyCollection, fetchMySales } from './api';
+import { applyTagsViaApi } from './api-tags';
+import { readFamilies } from './families';
+import { applyTags, prefillSale, searchCollection } from './automation';
 import { domOutline } from './diagnostic';
-import { endProgress, showProgress, updateOverlay } from './overlay';
+import { endProgress, lastChipCount, showProgress, updateOverlay } from './overlay';
 import { initWindow, toggleWindow } from './window';
 import { auctionIdFromHref, hasEmptyState, parseAuctionDetail, parseAuctionList, type ParsedAuction } from './parsers/auctions';
 import { collectionTiles, parseCollection } from './parsers/collection';
+import { isFavorite } from './parsers/dom';
 import { activeTabLabel, detectPage, rootOf, slotsFromTabs } from './parsers/page';
-import { auctionFromItem, cardFromItem, refElement, requestBridge, tagDictionary } from './parsers/react';
+import { auctionFromItem, cardFromItem, refElement, requestBridge, tagColors, tagDictionary } from './parsers/react';
 import { re, resolveSelectors, type SelectorConfig } from './parsers/selectors';
 
-type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent'>;
+type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta'>;
 
 let store: Store | null = null;
 let lastPayload = '';
@@ -39,7 +43,7 @@ function log(step: string): void {
 }
 
 async function refreshStore(): Promise<void> {
-  store = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent');
+  store = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta');
 }
 
 function toObs(a: ParsedAuction, now: number): PriceObs | null {
@@ -60,7 +64,7 @@ interface Extracted {
 }
 
 /** Données React de la page (prioritaires), avec leurs éléments. */
-function fromBridge(items: BridgeItem[], knownTags: string[], now: number): Extracted {
+function fromBridge(items: BridgeItem[], knownTags: string[], now: number, cfg: SelectorConfig): Extracted {
   const tagNames = tagDictionary(items);
   const auctions: ParsedAuction[] = [];
   const cards: ScannedCard[] = [];
@@ -75,6 +79,8 @@ function fromBridge(items: BridgeItem[], knownTags: string[], now: number): Extr
     } else if (item.kind === 'card') {
       const c = cardFromItem(item, now, tagNames);
       if (!c?.id || cards.some((x) => x.id === c.id)) continue;
+      // Le favori n'est pas dans les données de la carte : on lit l'étoile affichée sur sa tuile.
+      if (c.favorite == null && el) c.favorite = isFavorite(el, cfg);
       cards.push({ ...c, tagsExact: c.tags != null });
       if (el && !tiles.has(c.id)) tiles.set(c.id, el);
     }
@@ -111,7 +117,8 @@ async function scan(force = false): Promise<void> {
     let data: Extracted | null = null;
     if (kind !== 'other') {
       lastBridge = await requestBridge();
-      const react = lastBridge ? fromBridge(lastBridge, knownTags, now) : null;
+      if (lastBridge) for (const [name, color] of tagColors(lastBridge)) colors.set(name, color);
+      const react = lastBridge ? fromBridge(lastBridge, knownTags, now, cfg) : null;
       const wanted = kind === 'collection' ? react?.cards.length : react?.auctions.length;
       data = react && wanted ? react : fromDom(kind, root, cfg, knownTags, now);
       // Sur la collection, ce que les données React ne donnent pas est complété par la lecture du texte.
@@ -154,6 +161,7 @@ async function scan(force = false): Promise<void> {
       status.message = data.auctions.length ? `${data.auctions.length} enchère(s) observée(s)` : 'Aucune enchère reconnue sur cette page.';
       lastParsed = data.auctions;
     } else if (kind === 'collection' && data) {
+      dropStaleTags(data.cards);
       msg.cards = data.cards;
       status.recognized = data.cards.length > 0;
       status.message = data.cards.length
@@ -176,7 +184,9 @@ async function scan(force = false): Promise<void> {
     }
 
     lastStatus = status;
-    updateOverlay({ store, cfg, kind, root, tiles: lastTiles });
+    syncFamilies();
+    maybeReloadCollection(kind);
+    updateOverlay({ store, cfg, kind, root, tiles: lastTiles, tagColors: colors });
     void maybePrefill(cfg);
     maybeRefreshSales(cfg);
   } finally {
@@ -207,6 +217,47 @@ function navigateTo(path: string, key: string): void {
 }
 
 let lastStatus: PageStatus | null = null;
+let lastFamilies = '';
+/** Chargement de la page : ses données React datent de ce moment (ou d'une action faite depuis). */
+const pageStart = Date.now();
+/** Étiquettes vues sur la page pour chaque carte (pour repérer les vrais changements). */
+const pageTags = new Map<string, string>();
+
+/**
+ * Après un rechargement par l'API plus récent que la page, les étiquettes de la page sont périmées :
+ * on ne les envoie que pour les cartes dont l'étiquetage a changé sur la page (action faite à la main).
+ */
+function dropStaleTags(cards: ScannedCard[]): void {
+  const apiNewer = (store?.meta?.lastCollectionApi ?? 0) > pageStart;
+  for (const c of cards) {
+    if (!c.id || !c.tags) continue;
+    const key = JSON.stringify([...c.tags].sort());
+    const prev = pageTags.get(c.id);
+    pageTags.set(c.id, key);
+    if (apiNewer && (prev === undefined || prev === key)) {
+      delete c.tags;
+      delete c.tagsExact;
+    }
+  }
+}
+let lastApiCollection = 0;
+
+/** Sur la collection, avec l'API activée : rechargement complet au plus toutes les 2 minutes. */
+function maybeReloadCollection(kind: PageKind): void {
+  if (kind !== 'collection' || !store?.settings.apiRead || Date.now() - lastApiCollection < 120_000) return;
+  lastApiCollection = Date.now();
+  void runApi('collection').catch((e) => log(`[api] collection : ${(e as Error).message}`));
+}
+let colors = new Map<string, string>();
+
+/** Recopie les familles de l'autre extension (si elles ont changé). */
+function syncFamilies(): void {
+  const list = readFamilies();
+  const key = JSON.stringify(list);
+  if (key === lastFamilies) return;
+  lastFamilies = key;
+  if (list.length || store?.families) void save({ families: { at: Date.now(), list } });
+}
 
 /** 🔄 Actualiser mes ventes : Marché → onglet « Mes ventes » → relevé. */
 function maybeRefreshSales(cfg: SelectorConfig): void {
@@ -257,13 +308,23 @@ async function maybePrefill(cfg: SelectorConfig): Promise<void> {
   }
   if (!store?.settings.prefill || !p.autoOpen) return skip('pré-remplissage (V4) désactivé dans les réglages');
   if (lastKind !== 'collection') return skip(`page ${lastKind}, pas la collection`);
-  const tile = lastTiles?.get(p.cardId);
-  if (!tile) {
+  let tile = lastTiles?.get(p.cardId) ?? null;
+  if (!tile && (lastTiles?.size ?? 0) === 0) {
     // Les cartes arrivent après le chargement de la page : on relit dans un instant.
     schedule(1000);
-    return skip(`carte « ${p.cardName} » pas encore affichée (${lastTiles?.size ?? 0} cartes à l'écran)`);
+    return skip(`cartes pas encore affichées`);
   }
   automating = true;
+  if (!tile) {
+    tile = await findTile(p.cardId, p.cardName, cfg);
+    if (!tile) {
+      automating = false;
+      log(`[V4] « ${p.cardName} » introuvable dans la collection`);
+      showProgress(p.cardName, 'Carte introuvable dans ta collection (déjà en vente ?).', { error: true });
+      await save({ pendingFocus: { ...p, prefilledAt: Date.now() } });
+      return;
+    }
+  }
   log(`[V4] ${p.cardName} : début`);
   showProgress(p.cardName, 'Ouverture de la vente…');
   try {
@@ -289,11 +350,105 @@ async function maybePrefill(cfg: SelectorConfig): Promise<void> {
   }
 }
 
+let searched = false;
+
+/** Tuile d'une carte ; si elle n'est pas à l'écran, on la cherche avec le champ de recherche du site. */
+async function findTile(cardId: string, cardName: string, cfg: SelectorConfig): Promise<Element | null> {
+  const visible = () => lastTiles?.get(cardId) ?? collectionTiles(rootOf(document, cfg), cfg).get(cardId) ?? null;
+  const now = visible();
+  if (now) return now;
+  if (!(await searchCollection(cardName, cfg))) return null;
+  searched = true;
+  log(`recherche « ${cardName} »`);
+  try {
+    return await waitFor(visible, `carte « ${cardName} »`, 4000);
+  } catch {
+    return null;
+  }
+}
+
+async function runCardAuctions(siteCardId: string): Promise<{ ok: boolean; error?: string; result?: Awaited<ReturnType<typeof fetchCardAuctions>> }> {
+  if (!store?.settings.apiRead) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Automatisations).' };
+  return { ok: true, result: await fetchCardAuctions(siteCardId) };
+}
+
+/** Lectures via l'API (option « apiRead ») : mes mises, ventes récentes du marché. */
+async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales'): Promise<{ ok: boolean; error?: string; count?: number }> {
+  if (!store?.settings.apiRead && !store?.settings.apiWrite) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Automatisations).' };
+  if (op === 'collection') {
+    const cards = await fetchMyCollection();
+    await ext.runtime.sendMessage({ type: 'collection', cards });
+    lastApiCollection = Date.now();
+    log(`[api] collection rechargée : ${cards.length} carte(s)`);
+    return { ok: true, count: cards.length };
+  }
+  if (op === 'mySales') {
+    const result = await fetchMySales();
+    await save({ salesCache: result });
+    log(`[api] ${result.items.length} vente(s) terminée(s)`);
+    return { ok: true, count: result.items.length };
+  }
+  if (op === 'myBids') {
+    const result = await fetchMyBids();
+    await save({ bidsCache: result });
+    log(`[api] ${result.bids.length} enchère(s) où j'ai misé`);
+    return { ok: true, count: result.bids.length };
+  }
+  const prices = await fetchMarketSales();
+  await ext.runtime.sendMessage({ type: 'prices', prices });
+  log(`[api] ${prices.length} vente(s) récente(s) du marché`);
+  return { ok: true, count: prices.length };
+}
+
 /** Étiquetage automatique, carte par carte, avec progression et arrêt possible. */
+/** Étiquetage par l'API (option « apiWrite ») : mêmes écritures que le site, sans passer par l'interface. */
+async function runAutoTagApi(plan: TagChange[]): Promise<void> {
+  if (!store || automating) return;
+  automating = true;
+  stopRequested = false;
+  const lines: string[] = [];
+  const stop = () => (stopRequested = true);
+  let ok = 0;
+  let failed = 0;
+  showProgress('Étiquetage (API)', `${plan.length} carte(s) à traiter…`, { onStop: stop });
+  try {
+    const results = await applyTagsViaApi(
+      plan,
+      (done, total, step) => {
+        log(`[étiquettes API] ${step.cardName}`);
+        showProgress('Étiquetage (API)', `${done}/${total} · ${step.cardName}`, { onStop: stop });
+      },
+      () => stopRequested,
+    );
+    for (const r of results) {
+      if (r.ok) ok++;
+      else if (!r.skipped) failed++;
+      if (!r.ok) lines.push(r.skipped ? `★ ${r.cardName} : ${r.skipped}` : `✗ ${r.cardName} : ${r.error}`);
+    }
+  } catch (e) {
+    failed++;
+    lines.push(`✗ ${(e as Error).message}`);
+    log(`[étiquettes API] échec : ${(e as Error).message}`);
+  } finally {
+    automating = false;
+  }
+  const summary = `${ok} carte(s) étiquetée(s)${failed ? `, ${failed} échec(s)` : ''}${stopRequested ? ' · arrêté' : ''}`;
+  showProgress('Étiquetage (API)', [summary, ...lines.slice(-6), ok ? 'Recharge la page pour voir les étiquettes dans le site.' : ''].filter(Boolean).join('\n'), {
+    done: true,
+    error: failed > 0 && ok === 0,
+  });
+  // La collection est relue pour mettre à jour les étiquettes connues de l'extension.
+  if (ok) {
+    lastApiCollection = 0;
+    await runApi('collection').catch(() => {});
+  }
+}
+
 async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: number }> {
   if (!store || automating) return { ok: 0, failed: 0 };
   automating = true;
   stopRequested = false;
+  searched = false;
   const cfg = resolveSelectors(store.settings.selectorOverrides);
   let ok = 0;
   let failed = 0;
@@ -304,9 +459,15 @@ async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: numb
       if (stopRequested) break;
       const head = `${i + 1}/${plan.length} · ${change.cardName} → ${change.target}`;
       showProgress('Étiquetage automatique', [head, ...lines.slice(-4)].join('\n'), { onStop: stop });
-      const tile = lastTiles?.get(change.cardId) ?? collectionTiles(rootOf(document, cfg), cfg).get(change.cardId);
       try {
-        if (!tile) throw new ActionError('carte non visible sur la page');
+        const tile = await findTile(change.cardId, change.cardName, cfg);
+        if (!tile) throw new ActionError('carte introuvable dans la collection, même en la recherchant');
+        // Sécurité : une carte en favori n'est jamais modifiée, même si le relevé était ancien.
+        if (isFavorite(tile, cfg)) {
+          lines.push(`★ ${change.cardName} : favori, ignorée`);
+          log(`[étiquettes] ${change.cardName} : favori, ignorée`);
+          continue;
+        }
         await applyTags(tile, change, cfg, (s) => log(`[étiquettes] ${change.cardName} : ${s}`));
         ok++;
         lines.push(`✓ ${change.cardName} : ${change.target}`);
@@ -324,6 +485,7 @@ async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: numb
   } finally {
     automating = false;
   }
+  if (searched) await searchCollection('', cfg);
   const summary = `${ok} carte(s) étiquetée(s)${failed ? `, ${failed} échec(s)` : ''}${stopRequested ? ' · arrêté' : ''}`;
   showProgress('Étiquetage automatique', [summary, ...lines.slice(-6)].join('\n'), { done: true, error: failed > 0 && ok === 0 });
   lastPayload = '';
@@ -376,13 +538,22 @@ async function main(): Promise<void> {
       return true;
     }
     if (message.type === 'autoTag') {
-      if (lastKind !== 'collection') {
-        sendResponse({ ok: false, error: 'Ouvre ta collection pour lancer l\'étiquetage.' });
-        return false;
-      }
-      void runAutoTag(message.plan ?? planAutoTags(store!, store!.settings.autoTagRemoveOthers));
-      sendResponse({ ok: true });
-      return false;
+      // Réglages relus juste avant : le mode (API ou interface) vient peut-être d'être changé.
+      void refreshStore().then(() => {
+        if (!store?.settings.apiWrite && lastKind !== 'collection') {
+          sendResponse({ ok: false, error: 'Ouvre ta collection pour lancer l\'étiquetage.' });
+          return;
+        }
+        const plan = message.plan ?? planAutoTags(store!, store!.settings.autoTagRemoveOthers);
+        void (store!.settings.apiWrite ? runAutoTagApi(plan) : runAutoTag(plan));
+        sendResponse({ ok: true });
+      });
+      return true;
+    }
+    if (message.type === 'api') {
+      const job = message.op === 'cardAuctions' ? runCardAuctions(message.siteCardId) : runApi(message.op);
+      void job.then(sendResponse, (e) => sendResponse({ ok: false, error: (e as Error).message }));
+      return true;
     }
     if (message.type === 'toggleWindow') {
       void toggleWindow().then(() => sendResponse({ ok: true }));
@@ -407,6 +578,7 @@ async function main(): Promise<void> {
             ? { cards: byKind('card').length, auctions: byKind('auction').length, samples: [...byKind('card').slice(0, 3), ...byKind('auction').slice(0, 3)] }
             : 'script de page indisponible',
           actionLog: actionLog.slice(-60),
+          overlay: { tiles: lastTiles?.size ?? 0, tagChips: lastChipCount, colors: Object.fromEntries(colors) },
           scripts: [...document.scripts].map((sc) => sc.src).filter((src) => src.includes('/_next/')).map((src) => new URL(src).pathname),
           outline: domOutline(rootOf(document, cfg) ?? document.body),
         };

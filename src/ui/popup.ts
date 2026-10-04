@@ -1,14 +1,15 @@
 import './common.css';
 import './popup.css';
-import { allocate, type FreeSlot } from '../lib/allocation';
+import { allocate, makeContext, type FreeSlot } from '../lib/allocation';
+import { rarityBase } from '../lib/pricing';
 import { diagnoseAutoTags, planAutoTags } from '../lib/autotag';
 import { durationFor, durationLabel } from '../lib/duration';
 import { ext } from '../lib/browser';
 import { SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
 import type { DiagnosticResult, ToBackground, ToContent } from '../lib/messages';
 import { loadAll, onStoreChange, save } from '../lib/storage';
-import { formatDuration, formatPrice, RARITIES } from '../lib/text';
-import type { Rarity, StoreShape } from '../lib/types';
+import { formatDuration, formatPrice, normalize, RARITIES, slugify } from '../lib/text';
+import type { BidStatus, Card, CardAuctionsResult, FamilyCard, MyBid, Rarity, SoldItem, StoreShape } from '../lib/types';
 import { downloadJson, fmtDate, h, mount } from './dom';
 
 const app = document.getElementById('app')!;
@@ -22,7 +23,11 @@ function closeUi(): void {
 }
 let store: StoreShape;
 let activeTab: chrome.tabs.Tab | undefined;
-type PopupTab = 'sell' | 'running' | 'tags' | 'tools';
+type PopupTab = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'tags' | 'tools';
+type GroupBy = 'family' | 'tag' | 'category' | 'rarity';
+let groupBy = localStorage.getItem('wiky-group') as GroupBy | null;
+let cardFilter = '';
+const openGroups = new Set<string>();
 let currentTab = (localStorage.getItem('wiky-tab') as PopupTab | null) ?? 'sell';
 
 function rarityDot(r: Rarity | null) {
@@ -88,6 +93,41 @@ async function refreshSales(): Promise<void> {
     await save({ intent: { type: 'refreshSales', at: Date.now(), tabId: created.id ?? null } });
     closeUi();
   }
+}
+
+/**
+ * « Proposer d'autres cartes » : chaque slot libre passe à la carte suivante de ses candidates
+ * (en boucle), sans proposer deux fois la même carte.
+ */
+async function rotateProposals(free: FreeSlot[]): Promise<void> {
+  const overrides: Record<string, string> = { ...store.slotOverrides };
+  // D'abord des cartes qui ne sont pas déjà proposées ; à défaut, n'importe quelle autre candidate libre.
+  const current = new Set(free.map((s) => s.proposal?.card.id).filter((id): id is string => !!id));
+  const taken = new Set<string>();
+  for (const slot of free) {
+    if (slot.ignored || slot.candidates.length < 2 || !slot.proposal) continue;
+    const ids = slot.candidates.map((c) => c.card.id);
+    const start = ids.indexOf(slot.proposal.card.id);
+    const order = ids.map((_, i) => ids[(start + 1 + i) % ids.length]);
+    const next = order.find((id) => !taken.has(id) && !current.has(id)) ?? order.find((id) => !taken.has(id) && id !== slot.proposal!.card.id);
+    if (next) {
+      overrides[slot.key] = next;
+      taken.add(next);
+    }
+  }
+  await save({ slotOverrides: overrides });
+}
+
+function proposalTools(free: FreeSlot[]) {
+  const rotatable = free.some((s) => !s.ignored && s.candidates.length > 1);
+  const custom = Object.keys(store.slotOverrides).length > 0;
+  if (!rotatable && !custom) return null;
+  return h(
+    'div',
+    { class: 'row proposal-tools' },
+    rotatable ? h('button', { title: 'Propose d\'autres cartes pour les slots libres', onclick: () => rotateProposals(free) }, '🔀 Proposer d\'autres cartes') : null,
+    custom ? h('button', { class: 'small', title: 'Revenir aux meilleures propositions', onclick: () => save({ slotOverrides: {} }) }, '↺ Par défaut') : null,
+  );
 }
 
 /** Explique pourquoi un slot n'a pas de carte, avec la correction possible. */
@@ -209,6 +249,436 @@ async function copy(btn: HTMLButtonElement, text: string): Promise<void> {
   setTimeout(() => (btn.textContent = old), 1200);
 }
 
+const BID_STATUS: Record<BidStatus, string> = { leading: 'En tête', outbid: 'Surenchéri', won: 'Gagnée', lost: 'Perdue', cancelled: 'Annulée' };
+
+/** Onglet « Mises » : enchères des autres où j'ai misé, lues via l'API (lecture seule). */
+function bidsBlock() {
+  if (!store.settings.apiRead) {
+    const enable = async () => {
+      const ok = confirm(
+        'Lecture via l\'API\n\nL\'extension lira tes mises et les ventes du marché directement dans la base du site, avec ta session (lectures seules, aucune écriture). Les appels directs aux API internes sortent du cadre « copilote » ; le risque vis-à-vis des règles reste le tien.\n\nActiver ?',
+      );
+      if (ok) await save({ settings: { ...store.settings, apiRead: true } });
+    };
+    return [
+      h('p', { class: 'muted small' }, 'Liste des enchères où tu as misé, avec ta mise, le prix actuel et le prix de référence de chaque carte. Nécessite la lecture via l\'API du site.'),
+      h('button', { onclick: enable }, 'Activer la lecture via l\'API…'),
+    ];
+  }
+  const status = h('span', { class: 'small muted grow' }, store.bidsCache ? `Relevé ${fmtDate(store.bidsCache.at)}` : 'Pas encore de relevé.');
+  const run = async (op: 'myBids' | 'marketSales', btn: HTMLButtonElement) => {
+    if (!(await siteTab())) {
+      status.textContent = 'Ouvre un onglet WikiMasters pour interroger l\'API.';
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Chargement…';
+    const res = (await sendToTab({ type: 'api', op })) as { ok: boolean; error?: string; count?: number } | null;
+    btn.disabled = false;
+    status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `${res.count} ${op === 'myBids' ? 'enchère(s)' : 'vente(s) chargée(s)'}` : res.error ?? 'Erreur';
+  };
+  const ctx = makeContext(store, Date.now());
+  const order: Record<BidStatus, number> = { leading: 0, outbid: 0, won: 1, lost: 1, cancelled: 2 };
+  const rows = [...(store.bidsCache?.bids ?? [])].sort((a, b) => order[a.status] - order[b.status] || (order[a.status] === 0 ? (a.endsAt ?? 0) - (b.endsAt ?? 0) : b.lastBidAt - a.lastBidAt));
+  const now = Date.now();
+  const row = (b: MyBid) => {
+    const ref = rarityBase(b.rarity, b.shiny, ctx);
+    const refText = [
+      b.cardMedian != null ? `carte ${formatPrice(b.cardMedian)} (${b.cardSales} vente${b.cardSales > 1 ? 's' : ''})` : 'carte jamais vendue',
+      ref?.value != null ? `${ref.group} ${formatPrice(ref.value)}` : null,
+    ].filter(Boolean).join(' · ');
+    return h(
+      'div',
+      { class: `bid ${b.status}` },
+      h(
+        'div',
+        { class: 'row' },
+        rarityDot(b.rarity),
+        h('a', { class: 'grow ellipsis', href: '#', title: 'Ouvrir l\'enchère', onclick: (e: Event) => (e.preventDefault(), openAuction(b.auctionId)) }, `${b.cardName}${b.shiny ? ' ✨' : ''}`),
+        h('span', { class: `pill st-${b.status}` }, BID_STATUS[b.status]),
+      ),
+      h(
+        'div',
+        { class: 'row small muted' },
+        h('span', null, `ma mise ${formatPrice(b.myMax)}${b.myBids > 1 ? ` (${b.myBids}×)` : ''}`),
+        h('span', null, `· ${b.status === 'won' || b.status === 'lost' ? 'final' : 'actuel'} ${formatPrice(b.current)}`),
+        h('span', { class: 'grow' }),
+        h('span', null, b.endsAt && b.endsAt > now ? `fin ${formatDuration(b.endsAt - now)}` : fmtDate(b.endsAt)),
+      ),
+      h('div', { class: 'small muted' }, `réf. ${refText}`),
+    );
+  };
+  return [
+    h(
+      'div',
+      { class: 'row' },
+      status,
+      h('button', { title: 'Relire mes mises', onclick: (e: Event) => run('myBids', e.currentTarget as HTMLButtonElement) }, 'Actualiser'),
+      h('button', { title: 'Charge les ventes conclues des 7 derniers jours (prix de référence par rareté)', onclick: (e: Event) => run('marketSales', e.currentTarget as HTMLButtonElement) }, 'Prix du marché'),
+    ),
+    rows.length ? h('div', { class: 'bids' }, rows.map(row)) : h('p', { class: 'muted empty' }, store.bidsCache ? 'Aucune mise trouvée.' : 'Clique sur « Actualiser ».'),
+  ];
+}
+
+/** Groupes (familles) d'une carte selon le regroupement choisi. */
+function groupsOf(card: Card): string[] {
+  if (groupBy === 'rarity') return [card.rarity ? RARITIES[card.rarity].label : 'Rareté inconnue'];
+  if (groupBy === 'category') return [card.category || 'Sans catégorie'];
+  return card.tags.length ? card.tags : ['Sans étiquette'];
+}
+
+/** Ordre des familles : alphabétique (ou par rareté), les groupes « Sans … » à la fin. */
+function compareGroups(a: string, b: string): number {
+  const other = (n: string) => (/^(sans |rareté inconnue)/i.test(n) ? 1 : 0);
+  if (other(a) !== other(b)) return other(a) - other(b);
+  if (groupBy === 'rarity') {
+    const order = (n: string) => (Object.values(RARITIES).find((r) => r.label === n)?.order ?? 99);
+    return order(b) - order(a);
+  }
+  return normalize(a).localeCompare(normalize(b));
+}
+
+/** Carte d'une famille, complétée par ce que l'extension sait de ma collection. */
+function familyCardToCard(f: FamilyCard): Card {
+  const mine = Object.values(store.cards).find((c) => c.siteId === f.siteId) ?? store.cards[slugify(f.name)];
+  return (
+    mine ?? {
+      id: slugify(f.name),
+      siteId: f.siteId,
+      name: f.name,
+      rarity: f.rarity,
+      category: f.category ?? undefined,
+      tags: [],
+      quantity: 0,
+      favorite: false,
+      sitePrice: null,
+      sitePriceAt: null,
+      updatedAt: 0,
+    }
+  );
+}
+
+/** Familles de l'extension « Prix moyen collection » : toutes leurs cartes, possédées ou non. */
+function familyList() {
+  const families = store.families?.list ?? [];
+  if (!families.length) {
+    return [
+      h(
+        'p',
+        { class: 'muted small' },
+        'Aucune famille trouvée. Les familles viennent de l\'extension « WikiMasters - Prix moyen collection » (page Familles) : ouvre WikiMasters dans le navigateur où elle est installée.',
+      ),
+    ];
+  }
+  const q = normalize(cardFilter);
+  return families.map((fam) => {
+    const cards = fam.cards.filter((c) => !q || normalize(`${c.name} ${c.category ?? ''} ${fam.name}`).includes(q));
+    const ownedOf = (c: FamilyCard) => c.owned ?? !!Object.values(store.cards).find((m) => m.siteId === c.siteId);
+    const owned = fam.cards.filter(ownedOf).length;
+    const details = h(
+      'details',
+      { class: 'family', open: !!q || openGroups.has(fam.id) || families.length === 1 },
+      h('summary', null, h('strong', null, fam.name), h('span', { class: 'muted' }, ` (${owned}/${fam.cards.length})`)),
+      cards
+        .sort((a, b) => Number(ownedOf(a)) - Number(ownedOf(b)) || a.name.localeCompare(b.name))
+        .map((c) => {
+          const card = familyCardToCard(c);
+          const has = ownedOf(c);
+          return h(
+            'button',
+            { class: `card-row row${has ? '' : ' missing'}`, title: 'Voir les enchères en cours pour cette carte', onclick: () => openCardAuctions(card) },
+            rarityDot(c.rarity),
+            h('span', { class: 'grow ellipsis' }, c.name),
+            h('span', { class: has ? 'owned small' : 'muted small' }, has ? '✓' : 'manquante'),
+            card.sitePrice != null ? h('span', { class: 'muted small' }, `moy. ${formatPrice(card.sitePrice)}`) : null,
+            h('span', { class: 'muted' }, '›'),
+          );
+        }),
+    );
+    details.addEventListener('toggle', () => (details.open ? openGroups.add(fam.id) : openGroups.delete(fam.id)));
+    return details;
+  });
+}
+
+function cardList() {
+  if (groupBy === 'family') return familyList();
+  const q = normalize(cardFilter);
+  const cards = Object.values(store.cards).filter((c) => !q || normalize(`${c.name} ${c.category ?? ''} ${c.tags.join(' ')}`).includes(q));
+  const groups = new Map<string, Card[]>();
+  for (const c of cards) for (const g of groupsOf(c)) groups.set(g, [...(groups.get(g) ?? []), c]);
+  const sorted = [...groups.entries()].sort((a, b) => compareGroups(a[0], b[0]));
+  if (!sorted.length) return [h('p', { class: 'muted empty' }, Object.keys(store.cards).length ? 'Aucune carte ne correspond.' : 'Aucune carte connue : ouvre ta collection.')];
+  return sorted.map(([name, list]) => {
+    const details = h(
+      'details',
+      { class: 'family', open: !!q || openGroups.has(name) || sorted.length === 1 },
+      h('summary', null, h('strong', null, name), h('span', { class: 'muted' }, ` (${list.length})`)),
+      list
+        .sort((a, b) => (RARITIES[b.rarity ?? 'C'].order - RARITIES[a.rarity ?? 'C'].order) || a.name.localeCompare(b.name))
+        .map((c) =>
+          h(
+            'button',
+            { class: 'card-row row', title: 'Voir les enchères en cours pour cette carte', onclick: () => openCardAuctions(c) },
+            rarityDot(c.rarity),
+            h('span', { class: 'grow ellipsis' }, `${c.name}${c.shiny ? ' ✨' : ''}`),
+            c.favorite ? h('span', { title: 'Favori' }, '★') : null,
+            c.sitePrice != null ? h('span', { class: 'muted small' }, `moy. ${formatPrice(c.sitePrice)}`) : null,
+            h('span', { class: 'muted' }, '›'),
+          ),
+        ),
+    );
+    details.addEventListener('toggle', () => (details.open ? openGroups.add(name) : openGroups.delete(name)));
+    return details;
+  });
+}
+
+/** Onglet « Cartes » : familles (autre extension), ou mes cartes par étiquette, catégorie ou rareté. */
+function cardsBlock() {
+  groupBy ??= store.families?.list.length ? 'family' : 'tag';
+  const list = h('div', { class: 'families' }, cardList());
+  const redraw = () => mount(list, cardList());
+  const search = h('input', {
+    type: 'search',
+    class: 'grow',
+    placeholder: 'Rechercher une carte…',
+    value: cardFilter,
+    oninput: (e: Event) => {
+      cardFilter = (e.target as HTMLInputElement).value;
+      redraw();
+    },
+  });
+  const select = h(
+    'select',
+    {
+      title: 'Regrouper par',
+      onchange: (e: Event) => {
+        groupBy = (e.target as HTMLSelectElement).value as GroupBy;
+        localStorage.setItem('wiky-group', groupBy);
+        openGroups.clear();
+        redraw();
+      },
+    },
+    h('option', { value: 'family', selected: groupBy === 'family' }, 'par famille'),
+    h('option', { value: 'tag', selected: groupBy === 'tag' }, 'par étiquette'),
+    h('option', { value: 'category', selected: groupBy === 'category' }, 'par catégorie'),
+    h('option', { value: 'rarity', selected: groupBy === 'rarity' }, 'par rareté'),
+  );
+  return [collectionStatus(), h('div', { class: 'row' }, search, select), list];
+}
+
+/** État de la collection connue + bouton Recharger (complet via l'API, sinon relecture de la page). */
+function collectionStatus(label = '↻ Recharger') {
+  const n = Object.keys(store.cards).length;
+  const { lastCollectionScan, lastCollectionApi } = store.meta;
+  const fromApi = !!lastCollectionApi && lastCollectionApi === lastCollectionScan;
+  const status = h(
+    'span',
+    { class: 'small muted grow' },
+    `${n} carte(s) · relue ${fmtDate(lastCollectionScan)}${lastCollectionScan ? (fromApi ? ' (complète, API)' : ' (page)') : ''}`,
+  );
+  const reload = async (e: Event) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    const tab = await siteTab();
+    if (!tab) {
+      status.textContent = 'Ouvre un onglet WikiMasters pour recharger la collection.';
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Rechargement…';
+    if (store.settings.apiRead || store.settings.apiWrite) {
+      const res = (await sendToTab({ type: 'api', op: 'collection' })) as { ok: boolean; error?: string; count?: number } | null;
+      status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `${res.count} carte(s) rechargée(s)` : res.error ?? 'Erreur';
+    } else {
+      // Sans API : on relit la page de collection (seules les cartes affichées sont vues).
+      if (!tab.url?.startsWith(SITE_ORIGIN + '/collection')) await ext.tabs.update(tab.id!, { url: SITE_ORIGIN + '/collection' });
+      else await sendToTab({ type: 'rescan' });
+      status.textContent = 'Page relue. Active la lecture via l\'API (onglet Mises) pour recharger toute la collection.';
+    }
+    btn.disabled = false;
+  };
+  const viaApi = store.settings.apiRead || store.settings.apiWrite;
+  return h('div', { class: 'row' }, status, h('button', { title: viaApi ? 'Recharge toute la collection via l\'API' : 'Relit la page de collection', onclick: reload }, label));
+}
+
+/** Fenêtre « enchères en cours pour cette carte », de la moins chère à la plus chère. */
+async function openCardAuctions(card: Card): Promise<void> {
+  document.querySelector('.modal')?.remove();
+  const body = h('div', { class: 'modal-body' }, h('p', { class: 'muted' }, 'Chargement…'));
+  const close = () => modal.remove();
+  const modal = h(
+    'div',
+    { class: 'modal', onclick: (e: Event) => e.target === modal && close() },
+    h(
+      'div',
+      { class: 'modal-box', role: 'dialog', 'aria-label': `Enchères pour ${card.name}` },
+      h('div', { class: 'row modal-head' }, rarityDot(card.rarity), h('strong', { class: 'grow ellipsis' }, `${card.name}${card.shiny ? ' ✨' : ''}`), h('button', { title: 'Fermer', onclick: close }, '×')),
+      card.category ? h('div', { class: 'small muted' }, card.category) : null,
+      body,
+    ),
+  );
+  document.body.append(modal);
+
+  if (!store.settings.apiRead) {
+    mount(
+      body,
+      h('p', { class: 'muted small' }, 'La liste des enchères en cours vient de l\'API du site.'),
+      h('button', { onclick: async () => (await save({ settings: { ...store.settings, apiRead: true } }), close(), openCardAuctions(card)) }, 'Activer la lecture via l\'API'),
+    );
+    return;
+  }
+  if (!card.siteId) return mount(body, h('p', { class: 'muted small' }, 'Identifiant de la carte inconnu : ouvre ta collection pour le relever.'));
+  if (!(await siteTab())) return mount(body, h('p', { class: 'muted small' }, 'Ouvre un onglet WikiMasters pour interroger l\'API.'));
+  const res = (await sendToTab({ type: 'api', op: 'cardAuctions', siteCardId: card.siteId })) as { ok: boolean; error?: string; result?: CardAuctionsResult } | null;
+  if (!res?.ok || !res.result) return mount(body, h('p', { class: 'error small' }, res?.error ?? 'Page non joignable : recharge l\'onglet.'));
+  const { auctions, sales, median: med } = res.result;
+  const now = Date.now();
+  mount(
+    body,
+    h(
+      'div',
+      { class: 'small muted' },
+      `${auctions.length} enchère(s) en cours`,
+      sales ? ` · médiane des ventes ${formatPrice(med)} (${sales} vente${sales > 1 ? 's' : ''})` : ' · jamais vendue',
+    ),
+    auctions.length
+      ? h(
+          'div',
+          { class: 'auction-list' },
+          auctions.map((a, i) =>
+            h(
+              'div',
+              { class: 'row auction-row' },
+              h('span', { class: 'rank muted small' }, `${i + 1}.`),
+              h('strong', { class: 'num' }, formatPrice(a.price)),
+              h('span', { class: 'small muted grow' }, `${a.hasBid ? 'mise en cours' : 'mise de départ'}${a.shiny ? ' · ✨' : ''}${a.mine ? ' · à toi' : ''}`),
+              h('span', { class: 'small muted' }, a.endsAt ? formatDuration(a.endsAt - now) : ''),
+              h('button', { class: 'primary', onclick: () => (close(), openAuction(a.id)) }, 'Ouvrir'),
+            ),
+          ),
+        )
+      : h('p', { class: 'muted empty' }, 'Aucune enchère en cours pour cette carte.'),
+  );
+}
+
+/** « +6 (+25 %) » coloré : écart entre un prix obtenu et une référence. */
+function diffView(value: number | null, ref: number | null | undefined, label: string) {
+  if (value == null || ref == null || ref <= 0) return null;
+  const d = value - ref;
+  const pct = Math.round((d / ref) * 100);
+  return h('span', { class: d >= 0 ? 'up' : 'down', title: `${label} : ${formatPrice(ref)}` }, `${label} ${formatPrice(ref)} → ${d >= 0 ? '+' : ''}${formatPrice(d)} (${pct >= 0 ? '+' : ''}${pct} %)`);
+}
+
+let showUnsold = false;
+
+/** Onglet « Vendues » : mes ventes terminées, prix final et écart avec le prix de référence de la carte. */
+function soldBlock() {
+  const ctx = makeContext(store, Date.now());
+  if (!store.settings.apiRead) {
+    // Sans API : ventes vues par l'extension (journal local).
+    const done = store.journal.filter((e) => e.type === 'finished').reverse();
+    return [
+      h(
+        'div',
+        { class: 'row' },
+        h('span', { class: 'small muted grow' }, 'Journal local (ventes vues par l\'extension).'),
+        h('button', { onclick: async () => save({ settings: { ...store.settings, apiRead: true } }) }, 'Historique complet (API)…'),
+      ),
+      done.length
+        ? h(
+            'div',
+            { class: 'bids' },
+            done.slice(0, 100).map((e) =>
+              h(
+                'div',
+                { class: 'bid' },
+                h('div', { class: 'row' }, h('strong', { class: 'grow ellipsis' }, e.cardName), h('span', { class: 'num' }, formatPrice(e.finalPrice))),
+                h('div', { class: 'row small muted' }, diffView(e.finalPrice, e.startPrice, 'départ'), h('span', { class: 'grow' }), h('span', null, fmtDate(e.at))),
+                h('div', { class: 'small muted' }, diffView(e.finalPrice, e.avgPrice, 'réf.')),
+              ),
+            ),
+          )
+        : h('p', { class: 'muted empty' }, 'Aucune vente terminée dans le journal.'),
+    ];
+  }
+  const status = h('span', { class: 'small muted grow' }, store.salesCache ? `Relevé ${fmtDate(store.salesCache.at)}` : 'Pas encore de relevé.');
+  const run = async (btn: HTMLButtonElement) => {
+    if (!(await siteTab())) {
+      status.textContent = 'Ouvre un onglet WikiMasters pour interroger l\'API.';
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Chargement…';
+    const res = (await sendToTab({ type: 'api', op: 'mySales' })) as { ok: boolean; error?: string; count?: number } | null;
+    btn.disabled = false;
+    status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `${res.count} vente(s) terminée(s)` : res.error ?? 'Erreur';
+  };
+  const all = store.salesCache?.items ?? [];
+  const sold = all.filter((i) => i.sold);
+  const items = showUnsold ? all : sold;
+  const refOf = (i: SoldItem) => (i.cardSales ? i.cardMedian : rarityBase(i.rarity, i.shiny, ctx)?.value ?? null);
+  const total = sold.reduce((t, i) => t + (i.final ?? 0), 0);
+  const gaps = sold.map((i) => (i.final != null && refOf(i) ? (i.final - refOf(i)!) / refOf(i)! : null)).filter((g): g is number => g != null);
+  const avgGap = gaps.length ? Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 100) : null;
+  const row = (i: SoldItem) => {
+    const ref = refOf(i);
+    return h(
+      'div',
+      { class: `bid ${i.sold ? '' : 'unsold'}` },
+      h(
+        'div',
+        { class: 'row' },
+        rarityDot(i.rarity),
+        h('a', { class: 'grow ellipsis', href: '#', title: 'Ouvrir l\'enchère', onclick: (e: Event) => (e.preventDefault(), openAuction(i.auctionId)) }, `${i.cardName}${i.shiny ? ' ✨' : ''}`),
+        i.sold ? h('strong', { class: 'num' }, formatPrice(i.final)) : h('span', { class: 'pill st-lost' }, 'Invendue'),
+      ),
+      h('div', { class: 'row small muted' }, i.sold ? diffView(i.final, i.start, 'départ') : h('span', null, `départ ${formatPrice(i.start)}`), h('span', { class: 'grow' }), h('span', null, fmtDate(i.endedAt))),
+      i.sold
+        ? h(
+            'div',
+            { class: 'small muted' },
+            diffView(i.final, ref, i.cardSales ? `carte (${i.cardSales} vente${i.cardSales > 1 ? 's' : ''})` : 'médiane rareté') ?? 'pas de prix de référence',
+          )
+        : null,
+    );
+  };
+  return [
+    h(
+      'div',
+      { class: 'row' },
+      status,
+      h('button', { title: 'Relire mes ventes terminées', onclick: (e: Event) => run(e.currentTarget as HTMLButtonElement) }, 'Actualiser'),
+    ),
+    all.length
+      ? h(
+          'div',
+          { class: 'row small' },
+          h('strong', { class: 'grow' }, `${sold.length} vendue(s) · ${formatPrice(total)} au total${avgGap != null ? ` · ${avgGap >= 0 ? '+' : ''}${avgGap} % vs réf.` : ''}`),
+          h(
+            'label',
+            { class: 'muted' },
+            h('input', {
+              type: 'checkbox',
+              checked: showUnsold,
+              onchange: (e: Event) => {
+                showUnsold = (e.target as HTMLInputElement).checked;
+                render();
+              },
+            }),
+            ` invendues (${all.length - sold.length})`,
+          ),
+        )
+      : null,
+    items.length ? h('div', { class: 'bids' }, items.map(row)) : h('p', { class: 'muted empty' }, store.salesCache ? 'Aucune vente terminée.' : 'Clique sur « Actualiser ».'),
+  ];
+}
+
+async function openAuction(id: string): Promise<void> {
+  const url = `${SITE_ORIGIN}/marketplace/${id}`;
+  const tab = await siteTab();
+  if (tab?.id != null) await ext.tabs.update(tab.id, { url });
+  else await ext.tabs.create({ url });
+}
+
 /** Étiquetage automatique : activation, aperçu du plan et lancement sur l'onglet de la collection. */
 function autoTagBlock(onCollection: boolean) {
   if (!store.settings.autoTag) {
@@ -227,8 +697,10 @@ function autoTagBlock(onCollection: boolean) {
   }
   const plan = planAutoTags(store, store.settings.autoTagRemoveOthers);
   const status = h('div', { class: 'small muted' });
+  const owned = collectionStatus('↻ Recharger mes cartes');
+  const viaApi = store.settings.apiWrite;
   const start = async () => {
-    if (!onCollection) {
+    if (!onCollection && !viaApi) {
       const url = SITE_ORIGIN + '/collection';
       if (activeTab?.id != null && activeTab.url?.startsWith(SITE_ORIGIN)) await ext.tabs.update(activeTab.id, { url });
       else await ext.tabs.create({ url });
@@ -248,11 +720,12 @@ function autoTagBlock(onCollection: boolean) {
   return h(
     'div',
     { class: 'card autotag' },
+    owned,
     h(
       'div',
       { class: 'row' },
       h('strong', { class: 'grow' }, `Étiquetage auto : ${plan.length} carte(s)`),
-      plan.length ? h('button', { class: 'primary', onclick: start }, onCollection ? 'Lancer' : 'Aller à la collection') : null,
+      plan.length ? h('button', { class: 'primary', onclick: start }, onCollection || viaApi ? 'Lancer' : 'Aller à la collection') : null,
       h('button', { title: 'Désactiver', onclick: () => save({ settings: { ...store.settings, autoTag: false } }) }, 'Off'),
     ),
     plan.length
@@ -269,6 +742,27 @@ function autoTagBlock(onCollection: boolean) {
           ),
         )
       : h('div', { class: 'small muted' }, why()),
+    h(
+      'div',
+      { class: 'small muted row' },
+      h('span', { class: 'grow' }, viaApi ? 'Mode : API (écriture directe des étiquettes).' : 'Mode : interface (clics dans la fiche de chaque carte).'),
+      viaApi
+        ? null
+        : h(
+            'button',
+            {
+              class: 'small',
+              title: 'Plus fiable : écrit les étiquettes comme le site, sans ouvrir les fiches',
+              onclick: async () => {
+                const ok = confirm(
+                  'Étiquetage par l\'API\n\nL\'extension écrira directement les étiquettes dans la base du site (comme le site le fait quand tu en ajoutes une), avec ta session. Écritures limitées aux étiquettes ; les favoris sont revérifiés avant chaque écriture. Le risque vis-à-vis des règles reste le tien.\n\nActiver ?',
+                );
+                if (ok) await save({ settings: { ...store.settings, apiWrite: true, apiRead: true } });
+              },
+            },
+            'Passer par l\'API…',
+          ),
+    ),
     status,
   );
 }
@@ -347,11 +841,12 @@ function render(): void {
 
   const refreshing = !!store.intent && now - store.intent.at < 30_000;
   const sellCount = alloc.free.filter((s) => !s.ignored).length;
-  const tabs: { id: PopupTab; label: string; body: () => (Node | string | null)[] }[] = [
+  const tabs: { id: PopupTab; label: string; hidden?: boolean; body: () => (Node | string | null)[] }[] = [
     {
       id: 'sell',
-      label: `À vendre${sellCount ? ` (${sellCount})` : ''}`,
+      label: `Vendre${sellCount ? ` (${sellCount})` : ''}`,
       body: () => [
+        proposalTools(alloc.free),
         ...free.map(freeSlotView),
         alloc.unassigned > 0 ? h('div', { class: 'muted small' }, `${alloc.unassigned} slot(s) libre(s) sans règle : ajoute un quota dans les réglages.`) : null,
         free.length || alloc.unassigned ? null : h('p', { class: 'muted empty' }, 'Tous les slots sont occupés.'),
@@ -362,10 +857,14 @@ function render(): void {
       label: `En cours (${busy.length})`,
       body: () => (busy.length ? busy : [h('p', { class: 'muted empty' }, 'Aucune enchère en cours relevée. Utilise 🔄 pour relire tes ventes.')]),
     },
+    { id: 'bids', label: 'Mises', body: bidsBlock },
+    { id: 'sold', label: 'Vendues', body: soldBlock },
+    { id: 'cards', label: 'Cartes', body: cardsBlock },
     { id: 'tags', label: 'Étiquettes', body: () => [autoTagBlock(!!activeTab?.url?.startsWith(SITE_ORIGIN + '/collection'))] },
     {
       id: 'tools',
       label: 'Outils',
+      hidden: true,
       body: () => [
         tools ?? h('p', { class: 'muted small' }, 'Ouvre WikiMasters pour relire la page ou exporter un diagnostic.'),
         h(
@@ -393,6 +892,20 @@ function render(): void {
         '🔄',
       ),
       h('button', { title: 'Journal', onclick: () => ext.tabs.create({ url: ext.runtime.getURL('journal.html') }) }, '📒'),
+      h(
+        'button',
+        {
+          title: 'Outils : relire la page, diagnostic…',
+          class: current.id === 'tools' ? 'on' : '',
+          onclick: () => {
+            currentTab = current.id === 'tools' ? 'sell' : 'tools';
+            localStorage.setItem('wiky-tab', currentTab);
+            render();
+          },
+        },
+        '🧰',
+      ),
+      tagStyleSwitch(),
       h('button', { title: 'Réglages', onclick: () => ext.runtime.openOptionsPage() }, '⚙️'),
     ),
     banner,
@@ -401,7 +914,7 @@ function render(): void {
     h(
       'nav',
       { class: 'tabs', role: 'tablist' },
-      tabs.map((t) =>
+      tabs.filter((t) => !t.hidden).map((t) =>
         h(
           'button',
           {
@@ -418,6 +931,7 @@ function render(): void {
         ),
       ),
     ),
+    current.id === 'tools' ? h('h2', { class: 'tools-title' }, '🧰 Outils') : null,
     h('section', { class: 'panel', role: 'tabpanel' }, current.body()),
     h(
       'footer',
@@ -426,6 +940,26 @@ function render(): void {
         ? '⚠️ Automatisations actives : interdites par les règles de WikiMasters, risque de ban.'
         : 'Conseils uniquement : c\'est toi qui cliques sur « Mettre aux enchères ».',
     ),
+  );
+}
+
+/** Interrupteur sans texte : libellés ⇄ pastilles de couleur pour les étiquettes sur les cartes. */
+function tagStyleSwitch() {
+  const dots = store.settings.tagOverlayStyle === 'dot';
+  return h(
+    'button',
+    {
+      class: `tag-switch${dots ? ' on' : ''}`,
+      role: 'switch',
+      'aria-checked': String(dots),
+      'aria-label': 'Style des étiquettes sur les cartes',
+      title: dots
+        ? 'Étiquettes sur les cartes : pastilles de couleur (cliquer pour afficher les libellés)'
+        : 'Étiquettes sur les cartes : libellés (cliquer pour de simples pastilles de couleur)',
+      disabled: !store.settings.showTagOverlay,
+      onclick: () => save({ settings: { ...store.settings, tagOverlayStyle: dots ? 'label' : 'dot' } }),
+    },
+    h('span', { class: 'knob' }),
   );
 }
 
@@ -438,7 +972,7 @@ async function main(): Promise<void> {
   // Dans la fenêtre flottante, l'onglet est celui qui contient l'iframe.
   activeTab = (embedded ? await ext.tabs.getCurrent() : undefined) ?? (await ext.tabs.query({ active: true, currentWindow: true }))[0];
   await refresh();
-  onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent'], refresh);
+  onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'journal'], refresh);
   setInterval(render, 15_000);
 }
 

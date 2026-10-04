@@ -54,10 +54,19 @@ export function median(values: number[]): number | null {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
+/** Pas d'arrondi automatique, adapté au montant (les ventes se font souvent entre 5 et 30). */
+export function autoStep(value: number): number {
+  if (value < 20) return 1;
+  if (value < 100) return 5;
+  if (value < 1000) return 10;
+  return 50;
+}
+
+/** Arrondi au pas donné (0 = automatique) ; jamais en dessous de 1. */
 export function roundTo(value: number, step: number): number {
-  if (!step || step <= 0) return Math.round(value);
-  const r = Math.round(value / step) * step;
-  return r === 0 && value > 0 ? step : r;
+  const s = !step || step <= 0 ? autoStep(value) : step;
+  const r = Math.round(value / s) * s;
+  return Math.max(1, r === 0 && value > 0 ? s : r);
 }
 
 /** Prix observés pour une carte dans la fenêtre glissante. */
@@ -163,7 +172,11 @@ const SOURCE_LABEL: Record<PriceSource, string> = {
   none: '',
 };
 
-/** prix = min(plafond, max(plancher, arrondi(prix moyen × %))) */
+/**
+ * prix = arrondi(prix de référence × %).
+ * Le plancher et le plafond d'une règle ne bornent PAS ce prix : ils ne servent qu'à classer les cartes
+ * (étiquetage automatique, règles « plage de prix »).
+ */
 export function computePrice(card: Card, rule: TagRule, ctx: PricingContext, peers: Card[] = []): PriceResult {
   const base = basePrice(card, ctx, peers);
   if (base.value == null) {
@@ -175,18 +188,8 @@ export function computePrice(card: Card, rule: TagRule, ctx: PricingContext, pee
     base.source === 'history' ? statLabel :
     base.source === 'estimate' && base.group ? `estimation ${base.group}` :
     SOURCE_LABEL[base.source];
-  const raw = roundTo((base.value * rule.pct) / 100, ctx.settings.rounding);
-  let price = raw;
-  let clamp = '';
-  if (rule.floor != null && price < rule.floor) {
-    price = rule.floor;
-    clamp = ` → plancher ${rule.floor}`;
-  }
-  if (rule.ceiling != null && price > rule.ceiling) {
-    price = rule.ceiling;
-    clamp = ` → plafond ${rule.ceiling}`;
-  }
+  const price = roundTo((base.value * rule.pct) / 100, ctx.settings.rounding);
   const samples = base.source === 'history' || base.source === 'rarity' ? ` (${base.samples} ventes)` : base.group ? ` (${base.samples})` : '';
-  const detail = `${label} ${Math.round(base.value)}${samples} × ${rule.pct} % = ${raw}${clamp}`;
+  const detail = `${label} ${Math.round(base.value)}${samples} × ${rule.pct} % = ${price}`;
   return { price, base, detail, estimate: base.source === 'estimate' };
 }

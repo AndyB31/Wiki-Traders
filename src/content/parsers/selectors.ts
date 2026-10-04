@@ -70,6 +70,10 @@ export interface SelectorConfig {
   tagOption: string;
   /** Champ de saisie d'une nouvelle étiquette. */
   tagInput: string;
+  /** aria-label du « × » d'une pastille d'étiquette ; le groupe 1 est le nom. */
+  tagRemoveRe: string;
+  /** Champ de recherche de la collection (pour faire apparaître une carte). */
+  collectionSearch: string;
 }
 
 export const DEFAULT_SELECTORS: SelectorConfig = {
@@ -89,7 +93,8 @@ export const DEFAULT_SELECTORS: SelectorConfig = {
   cardName: 'h3, [data-wm-title]',
   cardTag: '[data-tag], [class*="tag" i]:not([class*="stage" i]), [class*="etiquette" i], [class*="label-chip" i]',
   cardQuantity: '',
-  cardFavorite: '[data-favorite="true"], [aria-label*="favori" i][aria-pressed="true"], [class*="pinned" i], [class*="favorite" i][class*="active" i]',
+  // Bouton étoile du site : « Retirer des favoris » quand la carte est favorite, « Ajouter aux favoris » sinon.
+  cardFavorite: '[aria-label^="Retirer des favoris" i], [data-favorite="true"], [aria-label*="favori" i][aria-pressed="true"]',
   cardIdAttr: 'data-card-id',
   price: '',
   endTime: 'time[datetime], [data-end], [data-ends-at]',
@@ -110,8 +115,11 @@ export const DEFAULT_SELECTORS: SelectorConfig = {
   sellButtonRe: '(mettre en vente|mettre aux ench[eè]res|vendre aux ench[eè]res|cr[ée]er une ench[eè]re|^\\s*vendre\\s*$)',
   priceInput: 'input[aria-label*="mise" i], input[type="number"], input[inputmode="numeric"], input[inputmode="decimal"], input[name*="price" i], input[name*="prix" i], input[placeholder*="prix" i]',
   tagButtonRe: '^\\s*(g[ée]rer les |modifier les |ajouter une? )?([ée]tiquettes?|tags?|labels?)\\s*$',
-  tagOption: '[role="menuitemcheckbox"], [role="option"], [role="checkbox"], [role="menuitem"], label, button, li',
-  tagInput: 'input[placeholder*="tiquette" i], input[placeholder*="tag" i], input[placeholder*="label" i]',
+  // Fiche carte : champ « Ajouter une étiquette… » (combobox) → liste [role=listbox] > li[role=option] > button.
+  tagOption: '[role="listbox"] [role="option"] button, [role="option"], [role="menuitemcheckbox"]',
+  tagInput: 'input[role="combobox"][placeholder*="tiquette" i], input[placeholder*="ajouter une" i], input[placeholder*="tiquette" i]',
+  tagRemoveRe: '^retirer l.[ée]tiquette (.+)$',
+  collectionSearch: 'input[placeholder^="Rechercher" i]',
 };
 
 export function resolveSelectors(overrides: Record<string, string> = {}): SelectorConfig {

@@ -31,6 +31,8 @@ export interface Card {
   rarity: Rarity | null;
   /** Version brillante (« shiny »), cotée à part. */
   shiny?: boolean;
+  /** Catégorie Wikipédia affichée sur la carte (ex. « actrice américaine »). */
+  category?: string;
   tags: string[];
   quantity: number;
   favorite: boolean;
@@ -75,6 +77,7 @@ export interface Settings {
   slots: number;
   windowDays: number;
   stat: 'mean' | 'median';
+  /** Pas d'arrondi du prix conseillé ; 0 = automatique selon le montant. */
   rounding: number;
   /** Classement à doublons égaux : prix le plus haut d'abord, ou le plus bas (pour écouler). */
   sortPrice: 'desc' | 'asc';
@@ -93,6 +96,14 @@ export interface Settings {
   sellPath: string;
   /** Durée de l'enchère selon le prix de départ (vide = durée par défaut du site). */
   durationRules: DurationRule[];
+  /** Pastilles d'étiquettes sur les cartes de la collection. */
+  showTagOverlay: boolean;
+  /** `label` : nom de l'étiquette ; `dot` : simple pastille de couleur (nom au survol). */
+  tagOverlayStyle: 'label' | 'dot';
+  /** Lecture des données via l'API du site (GET uniquement). */
+  apiRead: boolean;
+  /** Étiquetage automatique par l'API (écritures limitées aux étiquettes) plutôt que par l'interface. */
+  apiWrite: boolean;
   /** V4 : ouvre la fenêtre de vente et remplit le prix (le clic final reste humain). */
   prefill: boolean;
   /** Étiquetage automatique des cartes sur le site selon leur prix moyen. */
@@ -134,6 +145,8 @@ export interface PageStatus {
 export interface Meta {
   lastAuctionsScan: number | null;
   lastCollectionScan: number | null;
+  /** Dernier relevé complet de la collection via l'API. */
+  lastCollectionApi?: number | null;
   lastPage: PageStatus | null;
 }
 
@@ -153,6 +166,85 @@ export interface PendingFocus {
   arrivedAt?: number;
   /** Onglet ouvert par « Ouvrir » (le seul à pré-remplir). */
   tabId?: number;
+}
+
+export type BidStatus = 'leading' | 'outbid' | 'won' | 'lost' | 'cancelled';
+
+/** Enchère d'un autre joueur sur laquelle j'ai misé (lue via l'API). */
+export interface MyBid {
+  auctionId: string;
+  cardId: string;
+  cardName: string;
+  rarity: Rarity | null;
+  shiny: boolean;
+  myMax: number;
+  myBids: number;
+  lastBidAt: number;
+  current: number | null;
+  status: BidStatus;
+  endsAt: number | null;
+  /** Ventes conclues de cette carte (toutes enchères confondues). */
+  cardSales: number;
+  cardMedian: number | null;
+}
+
+/** Famille de cartes créée avec l'extension « WikiMasters - Prix moyen collection » (lue dans la page). */
+export interface FamilyCard {
+  /** Identifiant de la carte sur le site. */
+  siteId: string;
+  name: string;
+  rarity: Rarity | null;
+  category: string | null;
+  owned: boolean | null;
+}
+
+export interface Family {
+  id: string;
+  name: string;
+  cards: FamilyCard[];
+}
+
+/** Enchère en cours sur une carte donnée (lue via l'API). */
+export interface CardAuction {
+  id: string;
+  price: number;
+  hasBid: boolean;
+  endsAt: number | null;
+  shiny: boolean;
+  mine: boolean;
+}
+
+export interface CardAuctionsResult {
+  auctions: CardAuction[];
+  /** Ventes conclues de la carte. */
+  sales: number;
+  median: number | null;
+}
+
+/** Une de mes ventes terminées (lue via l'API). */
+export interface SoldItem {
+  auctionId: string;
+  cardId: string;
+  cardName: string;
+  rarity: Rarity | null;
+  shiny: boolean;
+  sold: boolean;
+  start: number | null;
+  final: number | null;
+  endedAt: number | null;
+  /** Médiane des AUTRES ventes de cette carte (hors celle-ci). */
+  cardMedian: number | null;
+  cardSales: number;
+}
+
+export interface MySalesResult {
+  at: number;
+  items: SoldItem[];
+}
+
+export interface MyBidsResult {
+  at: number;
+  bids: MyBid[];
 }
 
 /** Action de navigation demandée depuis la fenêtre, exécutée par le content script de l'onglet. */
@@ -177,4 +269,10 @@ export interface StoreShape {
   meta: Meta;
   pendingFocus: PendingFocus | null;
   intent: Intent | null;
+  /** Dernier relevé de mes mises via l'API. */
+  bidsCache: MyBidsResult | null;
+  /** Dernier relevé de mes ventes terminées via l'API. */
+  salesCache: MySalesResult | null;
+  /** Familles lues dans la page (autre extension), avec la date du relevé. */
+  families: { at: number; list: Family[] } | null;
 }

@@ -35,8 +35,20 @@ const CARDS = [
   ['Chat', 'C', 5, '20-50'],
   ['Origami', 'C', 1, ''],
 ];
-// Ventes conclues récentes (onglet Historique) : médianes C 12, PC 20, R 35, SR 60, UR 150, L 400.
-const SOLD = { C: [8, 10, 12, 12, 15, 30], PC: [15, 18, 20, 20, 25, 90], R: [25, 30, 35, 35, 40, 300], SR: [40, 50, 60, 60, 70, 900], UR: [100, 120, 150, 150, 200, 2000], L: [300, 350, 400, 400, 500, 5000] };
+// Ventes conclues récentes (onglet Historique) : médianes C 12, PC 30, R 35, SR 60, UR 150, L 400.
+const SOLD = { C: [8, 10, 12, 12, 15, 30], PC: [25, 28, 30, 30, 35, 90], R: [25, 30, 35, 35, 40, 300], SR: [40, 50, 60, 60, 70, 900], UR: [100, 120, 150, 150, 200, 2000], L: [300, 350, 400, 400, 500, 5000] };
+// Familles créées avec l'extension « WikiMasters - Prix moyen collection » (stockées dans le localStorage du site).
+const FAMILIES = [
+  { id: 'family-1', name: 'Merveilles du monde', updatedAt: 1, cards: [
+    { id: 'c-machu-picchu', title: 'Machu Picchu', rarity: 'SR', category: 'cité inca', owned: true, ownedCount: 2 },
+    { id: 'k-tour', title: 'Tour Eiffel', rarity: 'SR', category: 'tour de Paris', owned: false, ownedCount: 0 },
+    { id: 'k-khéops', title: 'Pyramide de Khéops', rarity: 'L', category: 'pyramide', owned: false, ownedCount: 0 },
+  ] },
+  { id: 'family-2', name: 'Animaux', updatedAt: 1, cards: [
+    { id: 'c-hibou', title: 'Hibou', rarity: 'PC', category: 'oiseau', owned: true, ownedCount: 3 },
+    { id: 'c-chat', title: 'Chat', rarity: 'C', category: 'félin', owned: true, ownedCount: 5 },
+  ] },
+];
 const TAG_DEFS = [{ id: 'tag-20-50', name: '20-50', color: '#22c55e' }, { id: 'tag-50-100', name: '50-100', color: '#f59e0b' }];
 const RARITY = { C: ['Commun', 'commun'], PC: ['Peu Commun', 'peu_commun'], R: ['Rare', 'rare'], SR: ['Super Rare', 'super_rare'], UR: ['Ultra Rare', 'ultra_rare'], L: ['Légendaire', 'legendaire'] };
 const slug = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -69,7 +81,7 @@ function openCard(li) {
   // Comme sur le site : fiche carte en portail « div.fixed.inset-0 » sans role, onglets, bouton « Mettre aux enchères ».
   const d = document.createElement('div');
   d.className = 'fixed inset-0 z-50';
-  d.innerHTML = '<div class="card-frame relative"><div role="tablist" aria-label="Vue de la carte"><button role="tab">Détails</button><button role="tab" aria-label="Étiquettes">Étiquettes</button></div><h2></h2><button type="button" class="sell">Mettre aux enchères</button></div>';
+  d.innerHTML = '<div class="card-frame relative"><div role="tablist" aria-label="Vue de la carte"><button role="tab">Détails</button><button role="tab">Lab</button></div><h2></h2><button type="button" class="sell">Mettre aux enchères</button></div>';
   d.querySelector('h2').textContent = uc.snapshot_title;
   d.querySelector('.sell').onclick = () => {
     const sell = document.createElement('div');
@@ -81,25 +93,51 @@ function openCard(li) {
     sell.querySelectorAll('.dur').forEach((b) => (b.onclick = () => (window.__duration = b.textContent)));
     document.body.append(sell);
   };
-  d.querySelector('[aria-label="Étiquettes"]').addEventListener('pointerdown', () => {
-    const m = document.createElement('div');
-    m.setAttribute('role', 'menu');
-    for (const def of TAG_DEFS) {
-      const it = document.createElement('div');
-      it.setAttribute('role', 'menuitemcheckbox');
-      it.textContent = def.name;
-      it.setAttribute('aria-checked', String(li.__props.tagIds.includes(def.id)));
-      it.onclick = () => {
-        const on = it.getAttribute('aria-checked') !== 'true';
-        it.setAttribute('aria-checked', String(on));
-        li.__props.tagIds = on ? [...li.__props.tagIds, def.id] : li.__props.tagIds.filter((x) => x !== def.id);
-        attach(li, li.__props);
-        li.querySelector('.chip').textContent = li.__props.tagIds.map(tagName).join(', ');
-      };
-      m.append(it);
+  // Bloc « Étiquettes » du site : pastilles avec « × », champ combobox « Ajouter une étiquette… », liste de suggestions.
+  const block = document.createElement('div');
+  block.innerHTML = '<p>Étiquettes</p><div class="chips"></div><div class="relative"><input type="text" role="combobox" placeholder="Ajouter une étiquette…"></div>';
+  d.querySelector('.card-frame').append(block);
+  const sync = () => {
+    attach(li, li.__props);
+    li.querySelector('.chip').textContent = li.__props.tagIds.map(tagName).join(', ');
+    const chips = block.querySelector('.chips');
+    chips.innerHTML = '';
+    for (const id of li.__props.tagIds) {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = tagName(id);
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.textContent = '×';
+      x.setAttribute('aria-label', "Retirer l'étiquette " + tagName(id));
+      x.onclick = () => { li.__props.tagIds = li.__props.tagIds.filter((t) => t !== id); sync(); };
+      chip.append(x);
+      chips.append(chip);
     }
-    document.body.append(m);
+  };
+  sync();
+  const input = block.querySelector('input');
+  input.addEventListener('input', () => {
+    block.querySelector('ul')?.remove();
+    const ul = document.createElement('ul');
+    ul.setAttribute('role', 'listbox');
+    for (const def of TAG_DEFS.filter((t) => !li.__props.tagIds.includes(t.id) && t.name.toLowerCase().includes(input.value.toLowerCase()))) {
+      const opt = document.createElement('li');
+      opt.setAttribute('role', 'option');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = def.name;
+      b.onclick = () => { li.__props.tagIds = [...li.__props.tagIds, def.id]; input.value = ''; ul.remove(); sync(); };
+      opt.append(b);
+      ul.append(opt);
+    }
+    block.querySelector('.relative').append(ul);
   });
+  const close = document.createElement('button');
+  close.setAttribute('aria-label', 'Fermer');
+  close.textContent = '×';
+  close.onclick = () => d.remove();
+  d.querySelector('.card-frame').prepend(close);
   document.body.append(d);
 }
 document.addEventListener('keydown', (e) => {
@@ -122,7 +160,7 @@ document.querySelectorAll('div.card[data-auction]').forEach((el) => attach(el, {
 const attr = (o) => JSON.stringify(o).replace(/"/g, '&quot;');
 
 const page = (title, body) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title}</title><style>${CSS}</style></head>
-<body data-tags="${attr(TAG_DEFS)}"><header><a href="/collection">Collection</a> · <a href="/marketplace">Marché</a></header><main>${body}</main><script>${FAKE_REACT}</script></body></html>`;
+<body data-tags="${attr(TAG_DEFS)}"><script src="/_next/static/chunks/app.js"></script><script>localStorage.setItem('wm_families_v1', ${JSON.stringify(JSON.stringify(FAMILIES)).replace(/</g, '\\u003c')});</script><header><a href="/collection">Collection</a> · <a href="/marketplace">Marché</a></header><main>${body}</main><script>${FAKE_REACT}</script></body></html>`;
 
 
 const collection = () =>
@@ -164,6 +202,38 @@ const marketplace = (tab) => {
 };
 
 const png = readFileSync(join(root, 'public/icons/icon-128.png'));
+
+// Faux Supabase pour l'onglet « Mises » (lecture via l'API).
+const b64url = (x) => Buffer.from(x).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const fakeJwt = (p) => `${b64url('{"alg":"HS256"}')}.${b64url(JSON.stringify(p))}.sig`;
+const SB_REF = 'demoprojectref01';
+const SB_URL = `https://${SB_REF}.supabase.co`;
+const SB_ANON = fakeJwt({ role: 'anon', ref: SB_REF });
+const SB_ME = 'user-demo';
+// Collection vue par l'API : Origami a été vendue, « Grande Muraille » vient d'être obtenue.
+const API_COLLECTION = [...CARDS.filter(([name]) => name !== 'Origami'), ['Grande Muraille', 'L', 1, '']];
+const SB_DATA = {
+  auction_bids: [
+    { auction_id: 'b1', amount: 45, placed_at: iso(-600_000) },
+    { auction_id: 'b1', amount: 60, placed_at: iso(-300_000) },
+    { auction_id: 'b2', amount: 120, placed_at: iso(-200_000) },
+    { auction_id: 'b3', amount: 18, placed_at: iso(-86_400_000) },
+    { auction_id: 'b4', amount: 300, placed_at: iso(-90_000_000) },
+  ],
+  auctions: [
+    { id: 'b1', card_id: 'k1', base_amount: 40, current_bid: 75, current_bidder_id: 'autre', final_price: null, status: 'active', end_at: iso(1_500_000), winner_id: null, snapshot_rarity: 'SR', is_shiny: false },
+    { id: 'b2', card_id: 'k2', base_amount: 100, current_bid: 120, current_bidder_id: SB_ME, final_price: null, status: 'active', end_at: iso(5_400_000), winner_id: null, snapshot_rarity: 'UR', is_shiny: false },
+    { id: 'b3', card_id: 'k3', base_amount: 10, current_bid: 18, current_bidder_id: SB_ME, final_price: 18, status: 'settled_sold', end_at: iso(-80_000_000), winner_id: SB_ME, snapshot_rarity: 'PC', is_shiny: true },
+    { id: 'b4', card_id: 'k4', base_amount: 250, current_bid: 340, current_bidder_id: 'autre', final_price: 340, status: 'settled_sold', end_at: iso(-86_000_000), winner_id: 'autre', snapshot_rarity: 'L', is_shiny: false },
+  ],
+  cards: [
+    { id: 'k1', wikipedia_title: 'Tour Eiffel', rarity: 'SR' },
+    { id: 'k2', wikipedia_title: 'Léonard de Vinci', rarity: 'UR' },
+    { id: 'k3', wikipedia_title: 'Hérisson', rarity: 'PC' },
+    { id: 'k4', wikipedia_title: 'Pyramide de Khéops', rarity: 'L' },
+  ],
+  sales: [{ card_id: 'k1', final_price: 70 }, { card_id: 'k1', final_price: 90 }, { card_id: 'k4', final_price: 320 }],
+};
 const ok = (cond, msg) => {
   if (!cond) throw new Error(`✗ ${msg}`);
   console.log(`✓ ${msg}`);
@@ -175,9 +245,58 @@ const ctx = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'w
   viewport: { width: 1280, height: 800 },
   args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
 });
+const apiCalls = [];
+const apiWrites = [];
+// Liens étiquettes ↔ cartes côté « base » : modifiés par les écritures de l'étiquetage par l'API.
+const apiLinks = new Set(API_COLLECTION.flatMap(([, , , tag], i) => (tag ? [`uc-${i}|tag-${tag}`] : [])));
+await ctx.route(`${SB_URL}/**`, (route) => {
+  const req = route.request();
+  const u = new URL(req.url());
+  apiCalls.push(req.method());
+  if (req.method() === 'POST' || req.method() === 'DELETE') {
+    const t = u.pathname.split('/').pop();
+    const q = decodeURIComponent(u.search);
+    apiWrites.push(`${req.method()} ${t}`);
+    if (t === 'user_card_tags' && req.method() === 'POST') {
+      for (const b of [JSON.parse(req.postData())].flat()) apiLinks.add(`${b.user_card_id}|${b.tag_id}`);
+    } else if (t === 'user_card_tags') {
+      const ids = [...q.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+      const tag = q.match(/tag_id=eq\.([^&]+)/)[1];
+      for (const id of ids) apiLinks.delete(`${id}|${tag}`);
+    }
+    return route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: '[]' });
+  }
+  const table = u.pathname.split('/').pop();
+  const headers = { 'access-control-allow-origin': '*', 'content-type': 'application/json' };
+  if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...headers, 'access-control-allow-headers': '*' } });
+  const q = decodeURIComponent(u.search);
+  const body =
+    table === 'user_cards' ? API_COLLECTION.map(([name, r, count, tag], i) => ({ id: `uc-${i}`, card_id: `c-${slug(name)}`, count, starred: false, snapshot_title: name, snapshot_rarity: r, snapshot_category: null, is_shiny: false })) :
+    table === 'tags' ? TAG_DEFS.map((t) => ({ id: t.id, name: t.name })) :
+    table === 'user_card_tags' ? [...apiLinks].map((l) => ({ user_card_id: l.split('|')[0], tag_id: l.split('|')[1] })) :
+    table === 'auction_bids' ? SB_DATA.auction_bids :
+    table === 'cards' ? SB_DATA.cards :
+    q.includes('seller_id=eq.') && q.includes('status=in.') ? [
+      { id: 'v1', card_id: 'k1', base_amount: 40, final_price: 66, status: 'settled_sold', end_at: iso(-3_600_000), settled_at: iso(-3_590_000), snapshot_rarity: 'SR', is_shiny: false },
+      { id: 'v2', card_id: 'k3', base_amount: 10, final_price: 12, status: 'settled_sold', end_at: iso(-7_200_000), settled_at: iso(-7_190_000), snapshot_rarity: 'PC', is_shiny: false },
+      { id: 'v3', card_id: 'k2', base_amount: 200, final_price: null, status: 'settled_unsold', end_at: iso(-9_000_000), settled_at: null, snapshot_rarity: 'UR', is_shiny: false },
+    ] :
+    q.includes('select=id,card_id,final_price') ? [{ id: 'v1', card_id: 'k1', final_price: 66 }, ...SB_DATA.sales.map((x, i) => ({ id: `z${i}`, ...x }))] :
+    q.includes('select=card_id,final_price') ? SB_DATA.sales :
+    q.includes('select=final_price&card_id=eq.') ? [{ final_price: 30 }, { final_price: 42 }] :
+    q.includes('card_id=eq.') ? [
+      { id: 'cx2', seller_id: 'v2', base_amount: 25, current_bid: 31, end_at: iso(2_400_000), is_shiny: false, status: 'active' },
+      { id: 'cx1', seller_id: 'v1', base_amount: 28, current_bid: null, end_at: iso(600_000), is_shiny: false, status: 'active' },
+      { id: 'cx3', seller_id: 'v3', base_amount: 60, current_bid: null, end_at: iso(9_000_000), is_shiny: true, status: 'active' },
+    ] :
+    SB_DATA.auctions;
+  return route.fulfill({ status: 200, headers, body: JSON.stringify(body) });
+});
+await ctx.addCookies([{ name: `sb-${SB_REF}-auth-token`, value: encodeURIComponent('base64-' + b64url(JSON.stringify({ access_token: fakeJwt({ sub: SB_ME, exp: 9_999_999_999 }) }))), domain: 'www.wiki-masters.com', path: '/' }]);
 await ctx.route(`${ORIGIN}/**`, (route) => {
   const url = new URL(route.request().url());
   if (/\.(png|jpe?g)$/.test(url.pathname)) return route.fulfill({ body: png, contentType: 'image/png' });
+  if (url.pathname === '/_next/static/chunks/app.js') return route.fulfill({ body: `window.__sb={url:"${SB_URL}",key:"${SB_ANON}"};`, contentType: 'application/javascript' });
   if (url.pathname.startsWith('/collection')) return route.fulfill({ body: collection(), contentType: 'text/html' });
   if (url.pathname.startsWith('/marketplace')) return route.fulfill({ body: marketplace(url.searchParams.get('tab') ?? 'browse'), contentType: 'text/html' });
   return route.fulfill({ body: page('WikiMasters', '<h1>Accueil</h1>'), contentType: 'text/html' });
@@ -222,6 +341,38 @@ const alarms = await sw.evaluate(() => chrome.alarms.getAll());
 ok(alarms.filter((a) => a.name.startsWith('auction:')).length === 3, 'une alarme par fin d\'enchère');
 const badge = await sw.evaluate(() => chrome.action.getBadgeText({}));
 ok(badge === '2', `badge = ${badge}`);
+
+// 1 ter. Étiquettes visibles sur les cartes (pastilles colorées)
+await site.goto(`${ORIGIN}/collection`);
+await site.waitForFunction(() => document.querySelectorAll('[data-wiky="tags"]').length >= 5, null, { timeout: 8000 });
+const chip = await site.evaluate(() => {
+  const li = [...document.querySelectorAll('li.card')].find((l) => l.querySelector('strong').textContent === 'Colisée');
+  const box = li.querySelector('[data-wiky="tags"]');
+  const span = box?.querySelector('span');
+  return span ? { text: span.textContent, bg: getComputedStyle(span).backgroundColor } : null;
+});
+ok(chip?.text === '20-50' && chip.bg === 'rgb(34, 197, 94)', `étiquettes sur les cartes : Colisée → « ${chip?.text} » (${chip?.bg})`);
+const noChip = await site.evaluate(() => !![...document.querySelectorAll('li.card')].find((l) => l.querySelector('strong').textContent === 'Canis lupus').querySelector('[title^="Étiquettes"]'));
+ok(!noChip, 'pas de pastille sur une carte sans étiquette');
+await site.screenshot({ path: join(shots, 'tag-overlay.png') });
+
+// 1 quater. Style « pastilles de couleur seulement »
+await sw.evaluate(async () => {
+  const { settings } = await chrome.storage.local.get('settings');
+  await chrome.storage.local.set({ settings: { ...settings, tagOverlayStyle: 'dot' } });
+});
+await site.waitForFunction(() => document.querySelector('[data-wiky="tags"]')?.dataset.style === 'dot', null, { timeout: 5000 });
+const dotInfo = await site.evaluate(() => {
+  const box = document.querySelector('[data-wiky="tags"]');
+  return { texts: [...box.querySelectorAll('span')].map((s) => s.textContent).join(''), titles: [...box.querySelectorAll('span')].map((s) => s.title) };
+});
+ok(dotInfo.texts === '' && dotInfo.titles.length > 0, `pastilles de couleur seulement (nom au survol : ${dotInfo.titles.join(', ')})`);
+await site.screenshot({ path: join(shots, 'tag-overlay-dots.png') });
+await sw.evaluate(async () => {
+  const { settings } = await chrome.storage.local.get('settings');
+  await chrome.storage.local.set({ settings: { ...settings, tagOverlayStyle: 'label' } });
+});
+await site.waitForFunction(() => document.querySelector('[data-wiky="tags"]')?.dataset.style === 'label', null, { timeout: 5000 });
 
 // 2 bis. Fenêtre flottante dans la page
 await site.goto(`${ORIGIN}/collection`);
@@ -285,6 +436,16 @@ ok(/3\/5 slots occupés/.test(banner), `bandeau : ${banner.trim()}`);
 const free = await popup.$$eval('.slot.free', (els) => els.map((e) => e.textContent));
 ok(free.length === 2 && free.every((t) => t.includes('20-50')), '2 slots « 20-50 » à remplir');
 await popup.screenshot({ path: join(shots, 'popup.png'), fullPage: true });
+const names = () => popup.$$eval('.slot.free .main strong', (els) => els.map((e) => e.textContent));
+const before = await names();
+await popup.click('button:has-text("Proposer d\'autres cartes")');
+await popup.waitForFunction((b) => JSON.stringify([...document.querySelectorAll('.slot.free .main strong')].map((e) => e.textContent)) !== b, JSON.stringify(before), { timeout: 5000 });
+const after = await names();
+ok(after.length === before.length && new Set(after).size === after.length && after.some((n) => !before.includes(n)), `🔀 nouvelles propositions (sans doublon) : ${before.join(', ')} → ${after.join(', ')}`);
+await popup.click('button:has-text("Par défaut")');
+await popup.waitForFunction((b) => JSON.stringify([...document.querySelectorAll('.slot.free .main strong')].map((e) => e.textContent)) === b, JSON.stringify(before), { timeout: 5000 });
+ok(true, '↺ retour aux propositions par défaut');
+
 
 // 4. Options et journal
 const opts = await ctx.newPage();
@@ -305,7 +466,7 @@ const panel = opened.locator('[data-wiky="panel"]');
 await panel.waitFor({ state: 'attached', timeout: 5000 });
 const panelText = await panel.evaluate((el) => el.shadowRoot.querySelector('.panel').textContent);
 ok(/Prix conseillé/.test(panelText), `encart : ${panelText.replace(/\s+/g, ' ').slice(0, 90)}…`);
-ok((await opened.locator('[data-wiky="badge"]').count()) > 0, 'pastilles sur les cartes vendables');
+ok((await opened.locator('[data-wiky="tags"]').count()) > 0 && !(await opened.evaluate(() => document.body.innerText.includes('🪙'))), 'étiquettes sur les cartes, sans pastille de prix');
 await opened.waitForTimeout(600);
 await opened.screenshot({ path: join(shots, 'overlay.png') });
 
@@ -316,9 +477,9 @@ await opened.evaluate(() => {
   d.innerHTML = '<div class="card-frame relative"><h2>Mettre aux enchères</h2><p>Colisée</p><label>Mise de départ</label><input type="number" aria-label="Mise de départ"><button>Mettre aux enchères</button></div>';
   document.body.append(d);
 });
-await opened.waitForFunction(() => /étiquette 20-50/.test(document.querySelector('[data-wiky="panel"]')?.shadowRoot?.querySelector('.panel')?.textContent ?? ''), null, { timeout: 5000 });
+await opened.waitForFunction(() => /Colisée[\s\S]*= 25/.test(document.querySelector('[data-wiky="panel"]')?.shadowRoot?.querySelector('.panel')?.textContent ?? ''), null, { timeout: 5000 });
 const sellText = await panel.evaluate((el) => el.shadowRoot.querySelector('.panel').textContent);
-ok(/Colisée/.test(sellText) && /médiane Rare 35 \(6 ventes\) × 70 % = 20/.test(sellText), 'prix conseillé dans la fenêtre de vente (médiane Rare 35 × 70 % = 20)');
+ok(/Colisée/.test(sellText) && /médiane Rare 35 \(6 ventes\) × 70 % = 25/.test(sellText), 'fenêtre de vente : prix de la proposition ouverte (médiane Rare 35 × 70 % = 24,5 → 25)');
 await opened.screenshot({ path: join(shots, 'sell-dialog.png') });
 
 // 7. Une nouvelle enchère créée par l'utilisateur, une autre terminée
@@ -339,14 +500,14 @@ await sw.evaluate(async () => {
 const popup2 = await ctx.newPage();
 await popup2.setViewportSize({ width: 380, height: 640 });
 await popup2.goto(extUrl('popup.html'));
-await popup2.click('.tabs .tab:nth-child(3)');
+await popup2.click('.tabs .tab:has-text("Étiquettes")');
 await popup2.waitForSelector('.autotag');
 const planText = await popup2.textContent('.autotag');
 ok(/2 carte\(s\)/.test(planText), `plan d'étiquetage : ${planText.match(/Étiquetage auto : \d+ carte\(s\)/)?.[0]}`);
 await popup2.click('.autotag summary');
 await popup2.screenshot({ path: join(shots, 'popup-automations.png'), fullPage: true });
 
-await popup2.click('.tabs .tab:nth-child(1)');
+await popup2.click('.tabs .tab:has-text("Vendre")');
 const [v4] = await Promise.all([ctx.waitForEvent('page'), popup2.click('.slot.free button.primary')]);
 await v4.waitForLoadState();
 await v4.goto(`${ORIGIN}/collection`);
@@ -388,12 +549,15 @@ const embedFrame = async (pg) => {
   return f;
 };
 let ef = await embedFrame(market);
-ok((await ef.$$('.tabs .tab')).length === 4, 'fenêtre en onglets : À vendre / En cours / Étiquettes / Outils');
-await ef.click('.tabs .tab:nth-child(1)');
+ok((await ef.$$('.tabs .tab')).length === 6, 'fenêtre en onglets : Vendre / En cours / Mises / Cartes / Étiquettes / Outils');
+await ef.click('.tabs .tab:has-text("Vendre")');
 await ef.waitForSelector('.slot.free button.primary');
 await ef.click('.slot.free button.primary');
 await market.waitForURL(/\/collection/, { timeout: 8000 });
-await market.waitForFunction(() => document.querySelector('input[aria-label="Mise de départ"]')?.value !== '10' && window.__duration !== '1 h', null, { timeout: 12000 });
+await market.waitForFunction(() => {
+  const v = document.querySelector('input[aria-label="Mise de départ"]')?.value;
+  return v != null && v !== '10' && window.__duration === '10 min';
+}, null, { timeout: 12000 });
 const marketCard = await market.textContent('.z-\\[60\\] p');
 ok(true, `depuis le Marché (« ${marketCard} ») : passage par la collection puis vente ouverte (mise ${await market.inputValue('input[aria-label="Mise de départ"]')}, durée ${await market.evaluate(() => window.__duration)})`);
 await market.keyboard.press('Escape');
@@ -407,9 +571,118 @@ await market.waitForURL(/tab=mine/, { timeout: 10000 });
 s = await waitFor((x) => x.intent === null && x.meta.lastAuctionsScan > scanBefore, 'ventes relues', 10000);
 ok(true, '🔄 : Marché → onglet « Mes ventes » → liste relue');
 ef = await embedFrame(market);
-await ef.click('.tabs .tab:nth-child(2)');
+await ef.click('.tabs .tab:has-text("En cours")');
 await market.waitForTimeout(400);
 await market.screenshot({ path: join(shots, 'window-tabs.png') });
+
+
+// 11. Onglet « Mises » : lecture via l'API (faux Supabase)
+await sw.evaluate(async () => {
+  const { settings } = await chrome.storage.local.get('settings');
+  await chrome.storage.local.set({ settings: { ...settings, apiRead: true } });
+});
+await market.goto(`${ORIGIN}/collection`);
+ef = await embedFrame(market);
+s = await waitFor((x) => x.meta?.lastCollectionApi && x.cards['grande-muraille'], 'collection rechargée via l\'API', 10000);
+ok(!s.cards['origami'] && s.cards['grande-muraille']?.rarity === 'L', 'collection rechargée via l\'API à l\'ouverture : carte vendue retirée, nouvelle carte ajoutée');
+await ef.click('.tabs .tab:has-text("Mises")');
+await ef.click('button[title="Relire mes mises"]');
+await ef.waitForSelector('.bid', { timeout: 8000 });
+const bidRows = await ef.$$eval('.bid', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+ok(bidRows.length === 4 && /Surenchéri/.test(bidRows[0]) && /En tête/.test(bidRows[1]), `4 mises lues : ${bidRows.map((r) => r.split(' ')[0]).join(', ')}…`);
+ok(/carte 80 \(2 ventes\)/.test(bidRows[0]), 'prix de la carte (médiane de ses ventes) affiché');
+ok(apiCalls.length > 0 && apiCalls.every((m) => m === 'GET' || m === 'OPTIONS'), `${apiCalls.length} appels API, uniquement en lecture (tant que l'écriture n'est pas activée)`);
+await market.waitForTimeout(300);
+await market.screenshot({ path: join(shots, 'window-bids.png') });
+
+
+// 12. Onglet « Cartes » : familles, puis enchères en cours d'une carte (de la moins chère à la plus chère)
+await ef.click('.tabs .tab:has-text("Cartes")');
+await ef.waitForSelector('.family');
+const families = await ef.$$eval('.family summary', (els) => els.map((e) => e.textContent.trim()));
+ok(families.join() === 'Merveilles du monde (1/3),Animaux (2/2)', `familles lues depuis l'autre extension : ${families.join(', ')}`);
+await ef.click('.family summary');
+const firstRow = await ef.textContent('.family .card-row');
+ok(/Pyramide de Khéops.*manquante/.test(firstRow.replace(/\s+/g, ' ')), 'cartes manquantes en premier');
+await ef.click('.family .card-row:has-text("Tour Eiffel")');
+await ef.waitForSelector('.auction-row', { timeout: 8000 });
+const prices = await ef.$$eval('.auction-row strong', (els) => els.map((e) => Number(e.textContent)));
+ok(prices.join() === '28,31,60', `carte manquante « Tour Eiffel » : enchères du - au + cher ${prices.join(' → ')}`);
+await market.waitForTimeout(300);
+await market.screenshot({ path: join(shots, 'window-card-auctions.png') });
+await ef.click('.auction-row button.primary');
+await market.waitForURL(/\/marketplace\/cx1/, { timeout: 8000 });
+ok(true, '« Ouvrir » amène sur la page de l\'enchère la moins chère');
+
+
+// 13. Étiquetage par l'API : mêmes écritures que le site (user_card_tags), sans ouvrir les fiches
+await sw.evaluate(async () => {
+  const { settings } = await chrome.storage.local.get('settings');
+  await chrome.storage.local.set({ settings: { ...settings, apiWrite: true } });
+});
+const planBefore = await sw.evaluate(async () => (await chrome.storage.local.get('cards')).cards['machu-picchu'].tags);
+ok(planBefore.join() === '20-50', 'avant : Machu Picchu porte « 20-50 » dans la base');
+await market.bringToFront();
+const resApi = await sw.evaluate(async () => {
+  const [tab] = await chrome.tabs.query({ url: 'https://www.wiki-masters.com/marketplace/cx1*' });
+  return chrome.tabs.sendMessage(tab.id, { type: 'autoTag' });
+});
+ok(resApi?.ok, 'étiquetage par l\'API lancé (sans être sur la collection)');
+s = await waitFor((x) => x.cards?.['machu-picchu']?.tags?.join() === '50-100' && x.cards?.['canis-lupus']?.tags?.join() === '20-50', 'étiquettes écrites puis relues', 12000);
+ok(apiWrites.length <= 3 && apiWrites.every((w) => /user_card_tags|tags$/.test(w)), `${apiWrites.length} écriture(s) groupée(s), toutes sur les étiquettes : Machu Picchu → 50-100, Canis lupus → 20-50`);
+
+
+// 14. Un onglet collection ouvert AVANT l'étiquetage par l'API garde d'anciennes étiquettes en mémoire :
+//     sa relecture ne doit pas écraser les étiquettes rechargées via l'API.
+const staleTab = await ctx.newPage();
+await staleTab.goto(`${ORIGIN}/collection`);
+await staleTab.waitForTimeout(1500);
+await sw.evaluate(async () => {
+  const { meta } = await chrome.storage.local.get('meta');
+  await chrome.storage.local.set({ meta: { ...meta, lastCollectionApi: Date.now() + 1000, lastCollectionScan: Date.now() + 1000 } });
+  const { cards } = await chrome.storage.local.get('cards');
+  cards['machu-picchu'].tags = ['50-100'];
+  await chrome.storage.local.set({ cards });
+});
+await staleTab.waitForTimeout(500);
+await sw.evaluate(async () => {
+  const [tab] = await chrome.tabs.query({ url: 'https://www.wiki-masters.com/collection*', active: true });
+  await chrome.tabs.sendMessage(tab.id, { type: 'rescan' });
+});
+await staleTab.waitForTimeout(1500);
+const afterStale = await sw.evaluate(async () => (await chrome.storage.local.get('cards')).cards['machu-picchu'].tags);
+ok(afterStale.join() === '50-100', `page périmée relue : Machu Picchu garde « ${afterStale.join()} » (pas d'écrasement par « 20-50 »)`);
+
+
+// 15. Onglet « Vendues » et bouton 🧰 Outils
+await market.goto(`${ORIGIN}/collection`);
+ef = await embedFrame(market);
+ok(!(await ef.$('.tabs .tab:has-text("Outils")')) && !!(await ef.$('header button[title^="Outils"]')), 'Outils : bouton 🧰 en haut, plus dans les onglets');
+await ef.click('header button[title^="Outils"]');
+await ef.waitForSelector('.tools-title');
+ok(true, '🧰 ouvre les outils');
+await ef.click('.tabs .tab:has-text("Vendues")');
+await ef.click('button[title="Relire mes ventes terminées"]');
+await ef.waitForSelector('.bid', { timeout: 8000 });
+const soldRows = await ef.$$eval('.bid', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+ok(soldRows.length === 2 && /Tour Eiffel.*66/.test(soldRows[0]) && /départ 40 → \+26 \(\+65 %\)/.test(soldRows[0]), `ventes : ${soldRows[0].slice(0, 70)}…`);
+ok(/carte \(2 ventes\) 80 → -14 \(-17 %\)/.test(soldRows[0]), 'écart avec le prix de la carte (médiane de ses autres ventes)');
+await market.waitForTimeout(300);
+await market.screenshot({ path: join(shots, 'window-sold.png') });
+
+
+// 16. Interrupteur sans texte (en haut, à côté des réglages) : libellés ⇄ pastilles
+await market.goto(`${ORIGIN}/collection`);
+ef = await embedFrame(market);
+const sw0 = await ef.$eval('.tag-switch', (b) => ({ checked: b.getAttribute('aria-checked'), text: b.textContent.trim(), next: b.nextElementSibling?.title }));
+ok(sw0.text === '' && sw0.next === 'Réglages', 'interrupteur sans texte, juste à côté des réglages');
+await ef.click('.tag-switch');
+await market.waitForFunction(() => document.querySelector('[data-wiky="tags"]')?.dataset.style === 'dot', null, { timeout: 5000 });
+ok((await ef.$eval('.tag-switch', (b) => b.getAttribute('aria-checked'))) === 'true', 'clic : cartes en pastilles de couleur');
+await (await ef.$('header')).screenshot({ path: join(shots, 'header-switch.png') });
+await ef.click('.tag-switch');
+await market.waitForFunction(() => document.querySelector('[data-wiky="tags"]')?.dataset.style === 'label', null, { timeout: 5000 });
+ok(true, 'second clic : retour aux libellés');
 
 await ctx.close();
 console.log(`\nCaptures enregistrées dans ${shots}`);

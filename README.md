@@ -44,13 +44,13 @@ Wiky-Traders fait donc **tout le travail de réflexion** (quel slot est libre, q
 
 Exemple de répartition : **1 carte « 50-100 » + 4 cartes « 20-50 »**, chacune à **70 % de son prix moyen**.
 
-- **Règles par étiquette** : quota de slots, % du prix moyen, prix plancher/plafond, nombre d'exemplaires à garder, étiquette de secours. Les favoris et une liste noire ne sont jamais proposés.
+- **Règles par étiquette** : quota de slots, % du prix moyen, plage de prix plancher/plafond (pour l'étiquetage automatique uniquement), nombre d'exemplaires à garder, étiquette de secours. Les favoris et une liste noire ne sont jamais proposés.
 - **Détection des slots libres** : relevé des enchères en cours, alarme locale à chaque fin d'enchère, notification et badge sur l'icône (ex. « 2 »).
 - **Choix de la carte** : priorité aux cartes ayant le plus de doublons, puis au prix calculé le plus haut (ou le plus bas pour écouler).
 - **Calcul du prix** :
 
   ```
-  prix = min(plafond, max(plancher, arrondi(prix moyen × %)))
+  prix = arrondi(prix de référence × %)
   ```
 
   Moyenne (ou médiane) sur 7 jours glissants, arrondi à la dizaine, détail toujours visible : « moyenne 86 × 70 % = 60 ».
@@ -117,6 +117,7 @@ La page de réglages s'ouvre à l'installation.
 > ⚠️ Ces options simulent des clics sur le site. Les [règles de WikiMasters](https://www.wiki-masters.com/rules) (section 3) et ses [conditions](https://www.wiki-masters.com/terms) (section 6) l'interdisent : **risque de bannissement définitif, avec perte des cartes**. Elles demandent une confirmation à l'activation, dans Réglages → Automatisations.
 
 - **V4 – Ouvrir et pré-remplir** : le bouton de la popup devient « Ouvrir et pré-remplir ». Dans l'onglet ouvert, l'extension ouvre la carte, puis sa fenêtre de vente, et remplit le prix. **Le clic « Mettre en vente » reste toujours à toi.** Le prix est aussi rempli quand tu ouvres toi-même la fenêtre de vente d'une carte connue.
+- **Lecture via l'API (onglet « Mises »)** : liste des enchères où tu as misé (en tête, surenchéri, gagnée, perdue), ta mise, le prix actuel ou final, et le prix de référence de la carte (médiane de ses ventes, médiane de sa rareté). Le bouton *Prix du marché* charge les ventes conclues des 7 derniers jours. Lectures seules (GET), avec ta session ; l'adresse et la clé publique de l'API sont retrouvées dans les scripts du site.
 - **Étiquetage automatique** : chaque carte au prix moyen connu reçoit l'étiquette dont la plage plancher–plafond contient ce prix (ex. 62 → « 50-100 »). En option, les autres étiquettes gérées sont retirées. La popup montre la liste des changements ; « Lancer » (sur la collection) les applique carte par carte, avec la progression et un bouton **Arrêter** sur la page. L'étiquetage s'arrête seul si l'interface n'est pas reconnue.
 
 ### Comment l'extension lit le site
@@ -139,7 +140,7 @@ Si une page n'est pas reconnue :
 | Nombre de slots | 5 | Nombre d'enchères simultanées |
 | Fenêtre du prix moyen | 7 jours | Période prise en compte |
 | Statistique | médiane | Les prix du marché sont très dispersés : la moyenne est tirée par quelques ventes énormes |
-| Arrondi | 10 | Pas d'arrondi du prix |
+| Arrondi | automatique | Unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà (ou un pas fixe) |
 | À doublons égaux | prix le plus haut | Ou le plus bas, pour écouler |
 | Étiquette de secours | aucune | Reprend le slot d'une étiquette sans carte vendable |
 | Enchères en cours dans la moyenne | non | Par défaut seules les ventes terminées comptent |
@@ -180,7 +181,7 @@ content script (lit le DOM affiché) → service worker (fusionne, alarmes, badg
 | `src/content/overlay.ts` | Pastilles sur les cartes vendables, encart « prix conseillé » |
 | `src/content/diagnostic.ts` | Export du plan de la page |
 | `src/lib/allocation.ts` | Manque par étiquette, classement des cartes vendables (F1–F3) |
-| `src/lib/pricing.ts` | Moyenne / médiane, %, plancher, plafond, arrondi (F4) |
+| `src/lib/pricing.ts` | Prix de référence (moyenne / médiane, rareté), %, arrondi (F4) |
 | `src/lib/journal.ts` | Rapprochement des enchères, statistiques par étiquette (F6) |
 | `src/background/` | Fusion des relevés, alarmes de fin d'enchère, notifications, badge (F2) |
 | `src/ui/` | Popup, page d'options, journal |

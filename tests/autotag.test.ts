@@ -40,3 +40,10 @@ describe('diagnoseAutoTags', () => {
     expect(diagnoseAutoTags(base, NOW).rulesWithRange).toBe(0);
   });
 });
+
+describe('favoris', () => {
+  it('ne sont jamais réétiquetés', () => {
+    const cards = cardsById(card('fav', { sitePrice: 80, tags: ['20-50'], favorite: true }), card('autre', { sitePrice: 80, tags: ['20-50'] }));
+    expect(planAutoTags(input({ cards }), true, NOW).map((c) => c.cardId)).toEqual(['autre']);
+  });
+});

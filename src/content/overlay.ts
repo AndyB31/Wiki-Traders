@@ -1,8 +1,8 @@
-import { adviceForCard, sellableCards, type AllocationInput } from '../lib/allocation';
+import { adviceForCard, type AllocationInput } from '../lib/allocation';
 import { save } from '../lib/storage';
 import { formatPrice, normalize } from '../lib/text';
 import type { Card, PendingFocus } from '../lib/types';
-import { fillInput } from './actions';
+import { fillInput, filledInputs } from './actions';
 import { openSellDialog, selectSellDuration } from './automation';
 import { durationFor, durationLabel } from '../lib/duration';
 import { joinedText } from './parsers/dom';
@@ -34,6 +34,70 @@ export interface OverlayState {
   root: Element;
   /** Tuiles de la collection (si la page est la collection). */
   tiles: Map<string, Element> | null;
+  /** Couleurs des étiquettes (nom → couleur du site). */
+  tagColors?: Map<string, string>;
+}
+
+/** Texte noir ou blanc selon la clarté de la couleur de fond. */
+function readableOn(hex: string): string {
+  const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
+  if (!m) return '#fff';
+  const [r, g, b] = m.slice(1).map((x) => parseInt(x, 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 ? '#1c1917' : '#fff';
+}
+
+const MAX_CHIPS = 3;
+
+/** Pastilles des étiquettes en haut de la carte, sur l'image (loin du texte et des badges de prix). */
+function renderTagChips(host: HTMLElement, tags: string[], colors: Map<string, string>, style: 'label' | 'dot' = 'label'): void {
+  const key = JSON.stringify([style, tags.map((t) => [t, colors.get(t) ?? ''])]);
+  const existing = host.querySelector<HTMLElement>(':scope > [data-wiky="tags"]');
+  // Rien n'a changé : on ne touche pas au DOM (pas de mutation, pas de clignotement).
+  if (existing?.dataset.key === key) return;
+  existing?.remove();
+  if (!tags.length) return;
+  // Les pastilles sont positionnées par rapport à la carte (une seule fois, si besoin).
+  if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  const box = document.createElement('div');
+  box.setAttribute('data-wiky', 'tags');
+  box.dataset.key = key;
+  box.dataset.style = style;
+  box.title = `Étiquettes : ${tags.join(', ')}`;
+  Object.assign(box.style, {
+    position: 'absolute', left: '6px', right: '6px', top: '30px', zIndex: '40', display: 'flex', flexWrap: 'wrap', gap: style === 'dot' ? '4px' : '3px',
+    justifyContent: 'flex-start', pointerEvents: 'none',
+  });
+  if (style === 'dot') {
+    // Simples ronds de couleur : discrets, le nom apparaît au survol (title).
+    for (const tag of tags.slice(0, 8)) {
+      const dot = document.createElement('span');
+      dot.title = tag;
+      Object.assign(dot.style, {
+        width: '12px', height: '12px', borderRadius: '50%', background: colors.get(tag) ?? '#57534e',
+        border: '2px solid rgba(255,255,255,.9)', boxShadow: '0 1px 3px rgba(0,0,0,.5)', boxSizing: 'border-box',
+      });
+      box.append(dot);
+    }
+    host.appendChild(box);
+    return;
+  }
+  for (const tag of tags.slice(0, MAX_CHIPS)) {
+    const chip = document.createElement('span');
+    const bg = colors.get(tag) ?? '#57534e';
+    chip.textContent = tag;
+    Object.assign(chip.style, {
+      maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '1px 7px', borderRadius: '999px',
+      background: bg, color: readableOn(bg), font: '600 10px/1.5 system-ui, sans-serif', boxShadow: '0 1px 3px rgba(0,0,0,.45)',
+    });
+    box.append(chip);
+  }
+  if (tags.length > MAX_CHIPS) {
+    const more = document.createElement('span');
+    more.textContent = `+${tags.length - MAX_CHIPS}`;
+    Object.assign(more.style, { padding: '1px 6px', borderRadius: '999px', background: 'rgba(0,0,0,.65)', color: '#fff', font: '600 10px/1.5 system-ui, sans-serif' });
+    box.append(more);
+  }
+  host.appendChild(box);
 }
 
 let host: HTMLElement | null = null;
@@ -41,7 +105,6 @@ let shadow: ShadowRoot | null = null;
 let scrolledFor: string | null = null;
 /** Une automatisation est en cours : l'encart affiche sa progression. */
 let busy = false;
-const filledInputs = new WeakSet<HTMLInputElement>();
 
 function ensurePanel(): ShadowRoot {
   if (shadow && host?.isConnected) return shadow;
@@ -141,30 +204,37 @@ function findSellDialog(state: OverlayState): { dialog: Element; card: Card | nu
   return { dialog, card };
 }
 
-/** Pastilles « vendable · prix » sur les cartes de la collection. */
+/** Conteneur où poser les pastilles : le wrapper « relative isolate group » de la carte (au-dessus des effets de la carte). */
+function chipHost(tile: Element): HTMLElement {
+  const parent = tile.parentElement;
+  if (parent && /\b(group|isolate)\b/.test(parent.className) && parent.children.length <= 4) return parent;
+  return tile as HTMLElement;
+}
+
+export let lastChipCount = 0;
+
+/** Pastilles des étiquettes sur les cartes de la collection (mises à jour seulement si elles changent). */
 function renderBadges(state: OverlayState): void {
-  for (const old of qsa(document, '[data-wiky="badge"]')) old.remove();
   for (const old of qsa(document, '[data-wiky-focus]')) {
     (old as HTMLElement).style.outline = '';
     old.removeAttribute('data-wiky-focus');
   }
-  if (!state.tiles) return;
-  const sellable = sellableCards(state.store);
-  for (const [cardId, tile] of state.tiles) {
-    const info = sellable.get(cardId);
-    if (!info) continue;
-    const el = tile as HTMLElement;
-    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
-    const badge = document.createElement('span');
-    badge.setAttribute('data-wiky', 'badge');
-    badge.title = `Vendable (étiquette ${info.rule.tag})`;
-    badge.textContent = `🪙 ${info.price != null ? formatPrice(info.price) : '?'}`;
-    Object.assign(badge.style, {
-      position: 'absolute', top: '4px', left: '4px', zIndex: '5', padding: '1px 6px', borderRadius: '999px',
-      background: '#f59e0b', color: '#fff', font: '600 11px/1.6 system-ui, sans-serif', pointerEvents: 'none',
-    });
-    el.appendChild(badge);
+  const keep = new Set<Element>();
+  lastChipCount = 0;
+  if (state.tiles && state.store.settings.showTagOverlay) {
+    for (const [cardId, tile] of state.tiles) {
+      const tags = state.store.cards[cardId]?.tags ?? [];
+      const host = chipHost(tile);
+      renderTagChips(host, tags, state.tagColors ?? new Map(), state.store.settings.tagOverlayStyle);
+      const box = host.querySelector(':scope > [data-wiky="tags"]');
+      if (box) {
+        keep.add(box);
+        lastChipCount++;
+      }
+    }
   }
+  // Pastilles de cartes qui ne sont plus affichées (ou option désactivée).
+  for (const box of qsa(document, '[data-wiky="tags"], [data-wiky="badge"]')) if (!keep.has(box)) box.remove();
 }
 
 export function updateOverlay(state: OverlayState): void {
@@ -174,10 +244,13 @@ export function updateOverlay(state: OverlayState): void {
   const sell = findSellDialog(state);
   if (sell) {
     const advice = sell.card ? adviceForCard(state.store, sell.card.id) : null;
+    // Carte ouverte depuis Wiky-Traders : son prix proposé (règle du slot) fait foi, pas un recalcul.
+    const pending = state.store.pendingFocus;
+    const fromProposal = !!pending && (!sell.card || sell.card.id === pending.cardId);
     // V4 : à l'ouverture de la fenêtre, la mise (pré-remplie à 10 par le site) et la durée sont réglées une fois ;
     // le clic « Mettre aux enchères » reste humain.
-    const price = advice?.pricing.price ?? state.store.pendingFocus?.price ?? null;
-    const minutes = durationFor(price, state.store.settings.durationRules);
+    const price = fromProposal ? pending!.price : advice?.pricing.price ?? null;
+    const minutes = fromProposal && pending!.durationMin !== undefined ? pending!.durationMin ?? null : durationFor(price, state.store.settings.durationRules);
     const withDuration = (detail: string) => (minutes != null ? `${detail}\nDurée conseillée : ${durationLabel(minutes)}` : detail);
     const open = state.store.settings.prefill ? openSellDialog(state.cfg) : null;
     if (open && !filledInputs.has(open.input)) {
@@ -185,13 +258,9 @@ export function updateOverlay(state: OverlayState): void {
       if (price != null) fillInput(open.input, String(price));
       if (minutes != null) selectSellDuration(state.cfg, minutes);
     }
-    if (sell.card && advice) {
-      showPanel(sell.card.name, advice.pricing.price, withDuration(`${advice.pricing.detail} · étiquette ${advice.rule.tag}`), () => {});
-    } else {
-      const p = state.store.pendingFocus;
-      if (p) showPanel(p.cardName, p.price, withDuration(p.detail), () => {});
-      else hidePanel();
-    }
+    if (fromProposal) showPanel(pending!.cardName, pending!.price, withDuration(pending!.detail), () => {});
+    else if (sell.card && advice) showPanel(sell.card.name, advice.pricing.price, withDuration(`${advice.pricing.detail} · étiquette ${advice.rule.tag}`), () => {});
+    else hidePanel();
     return;
   }
 

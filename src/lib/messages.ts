@@ -26,10 +26,10 @@ export interface ProposedMessage {
   avgPrice: number | null;
 }
 
-export type ToBackground = ScanMessage | ProposedMessage | { type: 'refreshBadge' } | { type: 'tabId' };
+export type ToBackground = ScanMessage | ProposedMessage | { type: 'refreshBadge' } | { type: 'tabId' } | { type: 'prices'; prices: PriceObs[] } | { type: 'collection'; cards: ScannedCard[] };
 
 /** Messages envoyés par la popup au content script de l'onglet actif. */
-export type ToContent = { type: 'diagnostic' } | { type: 'rescan' } | { type: 'autoTag'; plan?: TagChange[] } | { type: 'stopAutoTag' } | { type: 'toggleWindow' };
+export type ToContent = { type: 'diagnostic' } | { type: 'rescan' } | { type: 'autoTag'; plan?: TagChange[] } | { type: 'stopAutoTag' } | { type: 'toggleWindow' } | { type: 'api'; op: 'myBids' | 'marketSales' | 'collection' | 'mySales' } | { type: 'api'; op: 'cardAuctions'; siteCardId: string };
 
 export interface DiagnosticResult {
   url: string;
@@ -41,6 +41,8 @@ export interface DiagnosticResult {
   react: unknown;
   /** Dernières étapes des automatisations. */
   actionLog: string[];
+  /** Surcouche : cartes repérées, pastilles d'étiquettes posées, couleurs connues. */
+  overlay: { tiles: number; tagChips: number; colors: Record<string, string> };
   /** Scripts Next.js chargés (pour retrouver les libellés des boutons du site). */
   scripts: string[];
   outline: string;

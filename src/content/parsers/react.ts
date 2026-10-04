@@ -97,6 +97,8 @@ export function cardFromItem(item: BridgeItem, now: number, tagNames: Map<string
   if (!name) return null;
   const rarity = (rarityField(d) || rarityField(c)) as Rarity;
   const card: Partial<Card> = { id: slugify(name), siteId: str(d.card_id ?? d.cardId) ?? str(pick(d, SITE_ID)) ?? undefined, name, rarity, shiny: shinyOf(c, d), updatedAt: now };
+  const category = str(d.category ?? d.snapshot_category ?? c?.snapshot_category);
+  if (category) card.category = category;
   const qty = pickNum(QTY, c, d);
   if (qty != null) card.quantity = qty;
   const fav = pick(c, FAV) ?? pick(d, FAV);
@@ -119,6 +121,13 @@ export interface ReactAuction extends ParsedAuction {
 export function tagDictionary(items: BridgeItem[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const i of items) if (i.kind === 'tag' && typeof i.data.id === 'string' && typeof i.data.name === 'string') map.set(i.data.id, i.data.name);
+  return map;
+}
+
+/** Couleur de chaque étiquette (nom → couleur), telle que définie sur le site. */
+export function tagColors(items: BridgeItem[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const i of items) if (i.kind === 'tag' && typeof i.data.name === 'string' && typeof i.data.color === 'string') map.set(i.data.name, i.data.color);
   return map;
 }
 
@@ -175,6 +184,7 @@ export function requestBridge(timeout = 1200): Promise<BridgeItem[] | null> {
   });
 }
 
-export function refElement(ref: number): Element | null {
-  return document.querySelector(`[data-wiky-ref="${ref}"]`);
+export function refElement(ref: string): Element | null {
+  if (!ref) return null;
+  return document.querySelector(`[data-wiky-ref="${ref.replace(/["\\]/g, '\\$&')}"]`);
 }

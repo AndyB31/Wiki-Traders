@@ -29,6 +29,8 @@ function mergeCards(cards: Record<string, Card>, incoming: ScannedCard[], now: n
       siteId: c.siteId ?? prev?.siteId,
       name: c.name ?? prev?.name ?? c.id,
       rarity: c.rarity ?? prev?.rarity ?? null,
+      shiny: c.shiny ?? prev?.shiny,
+      category: c.category ?? prev?.category,
       // Des étiquettes lues dans les données du site font foi ; celles du texte s'ajoutent.
       tags: c.tags ? (c.tagsExact ? c.tags : [...new Set([...c.tags, ...(prev?.tags ?? [])])]) : prev?.tags ?? [],
       quantity: c.quantity ?? prev?.quantity ?? 1,
@@ -215,6 +217,18 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
     msg.type === 'scan' ? () => handleScan(msg) :
     msg.type === 'proposed' ? () => handleProposed(msg) :
     msg.type === 'refreshBadge' ? updateBadge :
+    msg.type === 'collection' ? async () => {
+      // Relevé complet : il remplace la collection (les cartes vendues ou défaussées disparaissent).
+      const { cards, meta } = await load('cards', 'meta');
+      const now = Date.now();
+      const kept: Record<string, Card> = {};
+      for (const c of msg.cards) if (c.id && cards[c.id]) kept[c.id] = cards[c.id];
+      await save({ cards: mergeCards(kept, msg.cards, now), meta: { ...meta, lastCollectionScan: now, lastCollectionApi: now } });
+    } :
+    msg.type === 'prices' ? async () => {
+      const { priceObs } = await load('priceObs');
+      await save({ priceObs: mergeObs(priceObs, msg.prices, Date.now()) });
+    } :
     null;
   if (!run) return false;
   serial(run).then(
@@ -289,6 +303,11 @@ ext.runtime.onInstalled.addListener(async (details) => {
   // de rareté : on repart de zéro (relu à la prochaine visite de la collection).
   if (details.reason === 'update' && olderThan(details.previousVersion, '0.3.0')) {
     await save({ cards: {}, priceObs: [], slotOverrides: {}, ignoredSlots: [] });
+  }
+  // 0.6.0 : l'arrondi à la dizaine ramenait presque tous les petits prix à 10 → arrondi automatique.
+  if (details.reason === 'update' && olderThan(details.previousVersion, '0.6.0')) {
+    const { settings } = await load('settings');
+    if (settings.rounding === 10) await save({ settings: { ...settings, rounding: 0 } });
   }
   void init();
 });

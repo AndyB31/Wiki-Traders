@@ -13,6 +13,9 @@ const CLICKABLE = 'button, [role="button"], [role="menuitem"], [role="menuitemch
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Champs « Mise de départ » déjà remplis par l'extension : un seul remplissage par fenêtre de vente. */
+export const filledInputs = new WeakSet<HTMLInputElement>();
+
 /** Pause « humaine » entre deux actions. */
 export const pause = (min = 250, max = 600) => sleep(min + Math.random() * (max - min));
 

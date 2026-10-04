@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { fillInput, findByText, findExact, isChecked, realClick } from '../src/content/actions';
-import { fillSellPrice, openSellDialog, prefillSale } from '../src/content/automation';
+import { applyTags, fillSellPrice, openSellDialog, prefillSale } from '../src/content/automation';
 import { DEFAULT_SELECTORS } from '../src/content/parsers/selectors';
 
 describe('actions', () => {
@@ -88,5 +88,76 @@ describe('parcours de vente réel (structure du site)', () => {
   it('signale le bouton désactivé (maximum d\'enchères atteint)', async () => {
     mountSite(true);
     await expect(prefillSale(document.getElementById('tile')!, 20, DEFAULT_SELECTORS, () => {})).rejects.toThrow('Maximum 5 enchères actives');
+  });
+});
+
+describe('étiquettes : interface réelle de la fiche carte', () => {
+  /** Fiche carte avec le bloc « Étiquettes » du site : pastilles « × », champ combobox, liste [role=listbox]. */
+  function mountTags(initial: string[], catalog = ['Galaxy', 'Mettre au Enchère', '20-50', '50-100'], starred = false) {
+    document.body.innerHTML = `<main><div class="relative isolate group"><div class="glow-r relative" id="tile"><img alt="" src="/rare.png"><h3>Col d'Ornon</h3></div></div></main>`;
+    const tags = [...initial];
+    const ops: string[] = [];
+    document.getElementById('tile')!.addEventListener('click', () => {
+      const detail = document.createElement('div');
+      detail.className = 'fixed inset-0 z-50';
+      detail.innerHTML = `<div class="card-frame relative"><button aria-label="Fermer">×</button><button type="button" aria-label="${starred ? 'Retirer des favoris' : 'Ajouter aux favoris'}">★</button><h2>Col d'Ornon</h2><div class="space-y-2"><p>Étiquettes</p><div class="chips"></div>
+        <div class="relative"><input type="text" role="combobox" placeholder="Ajouter une étiquette…" aria-expanded="false"></div></div></div>`;
+      const chips = detail.querySelector('.chips')!;
+      const renderChips = () => {
+        chips.innerHTML = tags.map((t) => `<span>${t}<button type="button" aria-label="Retirer l'étiquette ${t}">×</button></span>`).join('');
+        chips.querySelectorAll('button').forEach((b, i) => b.addEventListener('click', () => (ops.push(`-${tags[i]}`), tags.splice(i, 1), renderChips())));
+      };
+      renderChips();
+      const input = detail.querySelector('input')!;
+      const box = input.parentElement!;
+      input.addEventListener('input', () => {
+        box.querySelector('ul')?.remove();
+        const q = input.value.toLowerCase();
+        const ul = document.createElement('ul');
+        ul.setAttribute('role', 'listbox');
+        for (const t of catalog.filter((c) => !tags.includes(c) && c.toLowerCase().includes(q))) {
+          const li = document.createElement('li');
+          li.setAttribute('role', 'option');
+          li.innerHTML = `<button type="button"><span><span aria-hidden="true"></span>${t}</span></button>`;
+          li.querySelector('button')!.addEventListener('click', () => (ops.push(`+${t}`), tags.push(t), renderChips(), ul.remove(), (input.value = '')));
+          ul.append(li);
+        }
+        box.append(ul);
+      });
+      detail.querySelector('[aria-label="Fermer"]')!.addEventListener('click', () => detail.remove());
+      document.body.append(detail);
+    });
+    return { tags, ops };
+  }
+
+  it('ajoute via le champ et la liste, retire via « × », puis ferme la fiche', async () => {
+    const site = mountTags(['20-50', 'Galaxy']);
+    const steps: string[] = [];
+    await applyTags(document.getElementById('tile')!, { cardId: 'col-d-ornon', cardName: "Col d'Ornon", base: 60, target: '50-100', add: ['50-100'], remove: ['20-50'] }, DEFAULT_SELECTORS, (s) => steps.push(s));
+    expect(site.ops).toEqual(['+50-100', '-20-50']);
+    expect(site.tags).toEqual(['Galaxy', '50-100']);
+    expect(steps).toEqual(['ouverture de la carte', 'ajout « 50-100 »', 'retrait « 20-50 »']);
+    expect(document.querySelector('.fixed')).toBeNull();
+  });
+
+  it('étiquette déjà présente : rien à faire', async () => {
+    const site = mountTags(['50-100']);
+    await applyTags(document.getElementById('tile')!, { cardId: 'x', cardName: 'x', base: 60, target: '50-100', add: ['50-100'], remove: [] }, DEFAULT_SELECTORS, () => {});
+    expect(site.ops).toEqual([]);
+  });
+});
+
+describe('étiquettes : favori dans la fiche', () => {
+  it('ne touche pas une carte dont la fiche indique « Retirer des favoris »', async () => {
+    document.body.innerHTML = `<main><div id="tile"><img alt="" src="/rare.png"><h3>NGC</h3></div></main>`;
+    document.getElementById('tile')!.addEventListener('click', () => {
+      const d = document.createElement('div');
+      d.className = 'fixed inset-0 z-50';
+      d.innerHTML = `<div class="card-frame"><button aria-label="Fermer">×</button><button aria-label="Retirer des favoris">★</button><p>Étiquettes</p><input type="text" role="combobox" placeholder="Ajouter une étiquette…"></div>`;
+      d.querySelector('[aria-label="Fermer"]')!.addEventListener('click', () => d.remove());
+      document.body.append(d);
+    });
+    await expect(applyTags(document.getElementById('tile')!, { cardId: 'ngc', cardName: 'NGC', base: 60, target: '50-100', add: ['50-100'], remove: [] }, DEFAULT_SELECTORS, () => {})).rejects.toThrow('favori');
+    expect(document.querySelector('.fixed')).toBeNull();
   });
 });

@@ -24,14 +24,15 @@ export function ruleForPrice(rules: TagRule[], price: number): TagRule | null {
 
 /**
  * Étiquetage automatique : pour chaque carte au prix connu (site, historique, saisi ou médiane de sa rareté),
- * l'étiquette dont la plage contient ce prix. Les estimations ne servent pas à étiqueter.
+ * l'étiquette dont la plage contient ce prix. Les estimations ne servent pas à étiqueter ; les favoris sont ignorés.
  */
 export function planAutoTags(input: AllocationInput, removeOthers: boolean, now = Date.now()): TagChange[] {
   const ctx = makeContext(input, now);
   const ruleTags = input.rules.filter((r) => r.active).map((r) => r.tag);
   const out: TagChange[] = [];
   for (const card of Object.values(input.cards)) {
-    if (card.quantity < 1) continue;
+    // Les favoris ne sont jamais réétiquetés.
+    if (card.quantity < 1 || card.favorite) continue;
     const base = referencePrice(card, ctx);
     if (base == null) continue;
     const rule = ruleForPrice(input.rules, base);

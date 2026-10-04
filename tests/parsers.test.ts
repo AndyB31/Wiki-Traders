@@ -150,3 +150,18 @@ describe('vrai DOM : collection', () => {
     expect(byId['zico'].sitePrice).toBeUndefined();
   });
 });
+
+describe('vrai DOM : favoris', () => {
+  it('étoile « Retirer des favoris » = favori, « Ajouter aux favoris » = non', () => {
+    document.body.innerHTML = `<main><div class="flex flex-wrap">
+      <div class="relative isolate group"><div class="glow-c relative"><img alt="" src="/commun.png"><img alt="NGC 1033" src="https://upload.wikimedia.org/x/ngc.jpg">
+        <div style="background-color: var(--color-rarity-c)">C</div><div class="absolute top-2 right-2"><button type="button" aria-label="Retirer des favoris"></button></div><h3>NGC 1033</h3></div></div>
+      <div class="relative isolate group"><div class="glow-sr relative"><img alt="" src="/super_rare.png"><img alt="Zico" src="https://upload.wikimedia.org/x/Zico.jpg">
+        <div style="background-color: var(--color-rarity-sr)">SR</div><div class="absolute top-2 right-2"><button type="button" aria-label="Ajouter aux favoris"></button></div><h3>Zico</h3></div></div>
+    </div></main>`;
+    const { cards } = parseCollection(rootOf(document, cfg), cfg, [], NOW);
+    const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
+    expect(byId['ngc-1033'].favorite).toBe(true);
+    expect(byId['zico'].favorite).toBe(false);
+  });
+});

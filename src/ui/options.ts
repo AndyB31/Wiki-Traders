@@ -153,7 +153,11 @@ function settingsForm() {
         h('option', { value: 'median', selected: s.stat === 'median' }, 'médiane (résiste aux ventes aberrantes)'),
       ),
     ),
-    field('Arrondi', h('input', { type: 'number', min: '1', value: s.rounding, oninput: set('rounding', (v) => num(v, 10)!) }), 'ex. 10 → 63 devient 60'),
+    field(
+      'Arrondi',
+      h('input', { type: 'number', min: '0', value: s.rounding, oninput: set('rounding', (v) => num(v, 0)!) }),
+      '0 = automatique (unité sous 20, 5 sous 100, 10 sous 1 000) ; ex. 10 → 63 devient 60',
+    ),
     field(
       'À doublons égaux, proposer',
       h(
@@ -176,6 +180,17 @@ function settingsForm() {
     field('Proposer une carte déjà en vente', h('input', { type: 'checkbox', checked: s.allowDuplicateListing, onchange: set('allowDuplicateListing', (v) => v === 'true') })),
     field('Compter les enchères en cours dans le prix moyen', h('input', { type: 'checkbox', checked: s.includeListings, onchange: set('includeListings', (v) => v === 'true') }), 'par défaut, seules les ventes terminées comptent'),
     field('Notifications', h('input', { type: 'checkbox', checked: s.notifications, onchange: set('notifications', (v) => v === 'true') })),
+    field('Étiquettes visibles sur les cartes', h('input', { type: 'checkbox', checked: s.showTagOverlay, onchange: set('showTagOverlay', (v) => v === 'true') }), 'sur chaque carte de la collection, aux couleurs du site'),
+    field(
+      'Style des étiquettes sur les cartes',
+      h(
+        'select',
+        { onchange: set('tagOverlayStyle', (v) => v as Settings['tagOverlayStyle']) },
+        h('option', { value: 'label', selected: s.tagOverlayStyle === 'label' }, 'libellés détaillés'),
+        h('option', { value: 'dot', selected: s.tagOverlayStyle === 'dot' }, 'pastilles de couleur seulement'),
+      ),
+      'pastilles : nom de l\'étiquette au survol',
+    ),
     field(
       'Heures silencieuses',
       h(
@@ -192,7 +207,7 @@ function settingsForm() {
 }
 
 /** Bascule avec confirmation pour les automatisations interdites par les règles du site. */
-function riskyToggle(key: 'prefill' | 'autoTag', label: string, help: string) {
+function riskyToggle(key: 'prefill' | 'autoTag' | 'apiRead' | 'apiWrite', label: string, help: string) {
   return field(
     label,
     h('input', {
@@ -225,6 +240,8 @@ function automationBlock() {
       'div',
       { class: 'grid' },
       riskyToggle('prefill', 'V4 – Ouvrir la vente et pré-remplir le prix', '« Ouvrir » ouvre la carte, sa fenêtre de vente et remplit le prix. Le clic « Mettre en vente » reste toujours à toi.'),
+      riskyToggle('apiRead', 'Lecture via l\'API du site', 'Onglet « Mises » (enchères où tu as misé, prix des cartes) et chargement des ventes du marché. Lectures seules, avec ta session.'),
+      riskyToggle('apiWrite', 'Étiquetage par l\'API (plus fiable)', 'L\'étiquetage automatique écrit directement les étiquettes, comme le fait le site (table user_card_tags), au lieu de cliquer dans la fiche de chaque carte. Écritures limitées aux étiquettes ; favoris revérifiés avant chaque écriture.'),
       riskyToggle('autoTag', 'Étiquetage automatique sur le site', 'Range chaque carte dans l\'étiquette dont la plage plancher–plafond contient son prix moyen. Lancé depuis la popup, sur la collection, avec bouton Arrêter.'),
       field(
         'Retirer les autres étiquettes gérées',
@@ -456,7 +473,7 @@ function render(): void {
       'section',
       { class: 'card' },
       h('h2', null, 'Règles par étiquette'),
-      h('p', { class: 'muted small' }, 'Chaque étiquette occupe en permanence son quota de slots, au % du prix moyen indiqué, borné par le plancher et le plafond. « Garder » = exemplaires jamais proposés à la vente.'),
+      h('p', { class: 'muted small' }, 'Chaque étiquette occupe en permanence son quota de slots ; le prix conseillé est le prix de référence × le %. Le plancher et le plafond définissent la plage de prix de l\'étiquette : ils servent uniquement à l\'étiquetage automatique (et aux règles « plage de prix »), pas au prix conseillé. « Garder » = exemplaires jamais proposés à la vente.'),
       h(
         'table',
         { class: 'rules' },

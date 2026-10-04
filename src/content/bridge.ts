@@ -16,7 +16,8 @@ const MAX_ELEMENTS = 8000;
 
 export interface BridgeItem {
   kind: 'card' | 'auction' | 'tag';
-  ref: number;
+  /** Valeur de `data-wiky-ref` posée sur l'élément (identifiant stable de la donnée). */
+  ref: string;
   data: Record<string, unknown>;
   /** Objet englobant (ex. { quantity, card }) quand la carte est imbriquée. */
   container: Record<string, unknown> | null;
@@ -79,20 +80,23 @@ function fiberOf(el: Element): Fiber | null {
 }
 
 export function extract(root: ParentNode = document): BridgeItem[] {
-  for (const el of document.querySelectorAll('[data-wiky-ref]')) el.removeAttribute('data-wiky-ref');
   const seen = new WeakSet<object>();
   const items: BridgeItem[] = [];
+  const marked = new Set<Element>();
   const add = (kind: BridgeItem['kind'], data: Record<string, unknown>, container: Record<string, unknown> | null, el: Element) => {
     if (seen.has(data)) return;
     seen.add(data);
-    const ref = items.length;
-    el.setAttribute('data-wiky-ref', String(ref));
+    // Référence stable (identifiant de la donnée) : l'attribut n'est réécrit que s'il change,
+    // pour ne pas provoquer de mutations inutiles sur les cartes (d'autres extensions les observent).
+    const id = data.id ?? data.card_id;
+    const ref = typeof id === 'string' || typeof id === 'number' ? `${kind}:${id}` : `${kind}#${items.length}`;
+    if (el.getAttribute('data-wiky-ref') !== ref) el.setAttribute('data-wiky-ref', ref);
+    marked.add(el);
     items.push({ kind, ref, data: sanitize(data, 4) as Record<string, unknown>, container: container ? (sanitize(container, 3) as Record<string, unknown>) : null });
   };
-
   const addTag = (t: Record<string, unknown>) => {
     seen.add(t);
-    items.push({ kind: 'tag', ref: -1, data: { id: t.id, name: t.name, color: t.color }, container: null });
+    items.push({ kind: 'tag', ref: '', data: { id: t.id, name: t.name, color: t.color }, container: null });
   };
 
   const elements = root.querySelectorAll('*');
@@ -124,6 +128,7 @@ export function extract(root: ParentNode = document): BridgeItem[] {
       }
     }
   }
+  for (const el of document.querySelectorAll('[data-wiky-ref]')) if (!marked.has(el)) el.removeAttribute('data-wiky-ref');
   return items;
 }
 

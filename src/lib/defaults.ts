@@ -7,7 +7,8 @@ export const DEFAULT_SETTINGS: Settings = {
   windowDays: 7,
   // Les prix du marché sont très dispersés (quelques ventes énormes) : la médiane est plus juste.
   stat: 'median',
-  rounding: 10,
+  // 0 = arrondi automatique (unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà).
+  rounding: 0,
   sortPrice: 'desc',
   allowDuplicateListing: false,
   includeListings: false,
@@ -19,6 +20,10 @@ export const DEFAULT_SETTINGS: Settings = {
   myAuctionsPath: null,
   sellPath: '/collection',
   durationRules: [],
+  apiRead: false,
+  apiWrite: false,
+  showTagOverlay: true,
+  tagOverlayStyle: 'label',
   prefill: false,
   autoTag: false,
   autoTagRemoveOthers: true,
@@ -45,6 +50,9 @@ export const DEFAULT_STORE: StoreShape = {
   meta: DEFAULT_META,
   pendingFocus: null,
   intent: null,
+  bidsCache: null,
+  salesCache: null,
+  families: null,
 };
 
 /** Au-delà, la popup demande de rouvrir la page des enchères. */
