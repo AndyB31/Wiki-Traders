@@ -11,31 +11,14 @@ import { formatDuration } from '../../lib/text';
 import { cardPrices, knownPrice, type CardPrice } from '../catalog';
 import { onSiteResponse } from '../net';
 import { endProgress, showProgress } from '../overlay';
-import {
-  AUTO_OPEN_KEY,
-  buildRecap,
-  loadAutoOpen,
-  loadPullStats,
-  mapPackCards,
-  normalizeBounds,
-  openPacksSequence,
-  PULL_STATS_KEY,
-  pullShares,
-  randomDelay,
-  recordPulls,
-  resetPullStats,
-  saveAutoOpen,
-  type AutoOpenState,
-  type OpenAllResult,
-  type PackCard,
-  type PullStats,
-} from './packs-logic';
+import { AUTO_OPEN_KEY, buildRecap, loadAutoOpen, loadPullStats, mapPackCards, normalizeBounds, openPacksSequence, PULL_STATS_KEY, pullShares, randomDelay, recordPulls, resetPullStats, saveAutoOpen, type AutoOpenState, type OpenAllResult, type PackCard, type PullStats, importOtherPullStats, OTHER_PULL_STATS_KEY, readOtherPullStats } from './packs-logic';
 import { type FeatureContext, registerFeature } from './runtime';
 import { button, confirmDialog, ensureFeatureStyle, floatingPanel, node, rarityChip, RARITY_COLORS, wiki } from './ui';
 import { ext } from '../../lib/browser';
 import { sharePack } from './pull-image';
 
 const CSS = `
+[data-wiky="pulls-tools"][data-opening] .wiky-pt-box { display: none; }
 [data-wiky="pulls-tools"] { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .wiky-pt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wiky-pt-box { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border, rgba(255,255,255,.12)); background: var(--color-surface, #1c1917); }
@@ -197,6 +180,7 @@ function statsBox(s: PullStats): HTMLElement {
   box.append(h);
   if (!s.total) {
     box.append(node('p', 'part', 'wiky-f-muted', 'Aucune carte comptée pour le moment : ouvre un paquet pour commencer.'));
+    importButton(box);
     return box;
   }
   const grid = node('div', 'part', 'wiky-pt-stats');
@@ -217,7 +201,36 @@ function statsBox(s: PullStats): HTMLElement {
   }, 'ghost', true);
   reset.style.marginTop = '8px';
   box.append(grid, reset);
+  importButton(box);
   return box;
+}
+
+/** Statistiques d'une autre extension disponibles à l'import (lecture du localStorage du site). */
+function otherStatsAvailable(): boolean {
+  try {
+    return !!readOtherPullStats(localStorage.getItem(OTHER_PULL_STATS_KEY));
+  } catch {
+    return false;
+  }
+}
+
+/** Bouton « Importer depuis une autre extension », à côté de « Réinitialiser ». */
+function importButton(box: HTMLElement): void {
+  if (!otherStatsAvailable()) return;
+  const b = button('Importer depuis une autre extension', async () => {
+    const ok = await confirmDialog({
+      title: 'Importer les statistiques ?',
+      text: 'Les compteurs de tirage enregistrés par une autre extension sont repris : pour chaque rareté, le plus grand des deux compteurs est gardé (les paquets comptés par les deux ne sont pas comptés deux fois).',
+      confirm: 'Importer',
+    });
+    if (!ok) return;
+    const next = await importOtherPullStats();
+    if (next) stats = next;
+    redrawTools();
+  }, 'ghost', true);
+  b.style.marginTop = '8px';
+  b.style.marginLeft = '8px';
+  box.append(b);
 }
 
 // ---------------------------------------------------------------- ouvrir tous les paquets
@@ -421,12 +434,16 @@ function drawTools(c: FeatureContext): void {
   const main = document.querySelector('main');
   const h1 = main?.querySelector('h1');
   if (!main || !h1) return;
-  const key = JSON.stringify([wantStats && stats, wantOpen, busy, wantAuto && auto, wantAuto && auto?.nextAt ? Math.floor((auto.nextAt - Date.now()) / 60_000) : 0]);
+  // Pendant l'ouverture des cartes (compteur « Carte X / N » du site), les statistiques sont masquées.
+  const opening = !!pullCounter();
+  if (existing && existing.hasAttribute('data-opening') !== opening) existing.toggleAttribute('data-opening', opening);
+  const key = JSON.stringify([wantStats && stats, wantOpen, busy, wantAuto && auto, wantAuto && auto?.nextAt ? Math.floor((auto.nextAt - Date.now()) / 60_000) : 0, otherStatsAvailable()]);
   if (existing?.isConnected && existing.dataset.key === key) return;
   ensureFeatureStyle();
   ensureFeatureStyle(CSS, 'packs');
   const tools = existing ?? node('div', 'pulls-tools');
   tools.dataset.key = key;
+  tools.toggleAttribute('data-opening', opening);
   const parts: HTMLElement[] = [];
   if (wantOpen) {
     const bar = node('div', 'part', 'wiky-pt-bar');

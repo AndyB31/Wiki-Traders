@@ -167,7 +167,7 @@ function drawHome(): void {
         <option value="recent">Modifiées récemment</option><option value="name">Nom</option><option value="progress">Progression</option><option value="size">Taille</option>
       </select>
       <button type="button" class="wf-btn" data-act="import-code" title="Importer une famille partagée (code F0. / F1.)">${icon('download', 15)}Importer un code</button>
-      <button type="button" class="wf-btn" data-act="reimport" title="Récupère les familles de l'extension « WikiMasters - Prix moyen collection » (fusion par nom, sans doublon)">${icon('refresh', 15)}Réimporter depuis Prix moyen collection</button>
+      <button type="button" class="wf-btn" data-act="reimport" title="Récupère les familles enregistrées par une autre extension sur ce navigateur (fusion par nom, sans doublon)">${icon('refresh', 15)}Importer depuis une autre extension</button>
       <button type="button" class="wf-btn primary" data-act="new-family">${icon('plus', 15)}Nouvelle famille</button>
     </div>
     <div class="wf-muted wf-small" data-part="summary"></div>
@@ -242,7 +242,7 @@ function drawDetail(f: CardFamily): void {
       <input class="wf-name" data-name maxlength="120" aria-label="Nom de la famille (cliquer pour renommer)" title="Cliquer pour renommer">
       <span class="wf-grow"></span>
       <button type="button" class="wf-btn primary" data-act="toggle-add">${icon('plus', 15)}Ajouter des cartes</button>
-      <button type="button" class="wf-btn" data-act="export" title="Code de partage, compatible avec « Prix moyen collection »">${icon('share', 15)}Exporter</button>
+      <button type="button" class="wf-btn" data-act="export" title="Code de partage (format F0. / F1., compatible avec une autre extension)">${icon('share', 15)}Exporter</button>
       <button type="button" class="wf-btn danger" data-act="delete">${icon('trash', 15)}Supprimer</button>
     </div>
     <div class="wf-stats" data-part="stats"></div>
@@ -762,7 +762,7 @@ async function onClick(e: Event): Promise<void> {
       const r = await reimportLegacy();
       noticeToast(r.found
         ? `${plural(r.found, 'famille trouvée', 'familles trouvées')} : ${plural(r.created, 'nouvelle', 'nouvelles')}, ${plural(r.cardsAdded, 'carte ajoutée', 'cartes ajoutées')}.`
-        : 'Aucune famille de « Prix moyen collection » sur ce navigateur (clé wm_families_v1 absente).', { error: !r.found });
+        : 'Aucune famille d\'une autre extension sur ce navigateur.', { error: !r.found });
       return;
     }
     case 'toggle-add':
@@ -783,7 +783,7 @@ async function onClick(e: Event): Promise<void> {
       return openColorPicker(btn, FAMILY_COLORS, f.color, (color) => void updateFamily(f.id, (x) => ({ ...x, color, updatedAt: Date.now() })));
     case 'export': {
       const code = await encodeFamilyCode(f);
-      return showCodeDialog(`Exporter « ${f.name} »`, code, `${plural(f.cards.length, 'carte')}. Ce code s'importe dans Wiky-Traders ou dans « Prix moyen collection ».`);
+      return showCodeDialog(`Exporter « ${f.name} »`, code, `${plural(f.cards.length, 'carte')}. Ce code s'importe dans Wiky-Traders (ou une autre extension qui lit les codes F0. / F1.).`);
     }
     case 'delete':
       if (await confirmDialog('Supprimer la famille', `Supprimer « ${f.name} » (${plural(f.cards.length, 'carte')}) ? Tes cartes ne sont pas touchées.`, { ok: 'Supprimer', danger: true })) {

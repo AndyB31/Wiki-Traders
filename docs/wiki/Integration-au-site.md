@@ -2,7 +2,7 @@
 
 # Intégration au site
 
-Avec l'option **Intégration au site** (activée par défaut), Wiky-Traders s'installe dans l'interface de WikiMasters, à la manière des « Familles » (en violet) de l'extension *WikiMasters – Prix moyen collection*, mais en **orange**.
+Avec l'option **Intégration au site** (activée par défaut), Wiky-Traders s'installe dans l'interface de WikiMasters, aux couleurs du site, avec une touche **orange**.
 
 ![Barre latérale](../screenshots/site-sidebar.png)
 
@@ -23,7 +23,7 @@ Avec l'option **Barre latérale compacte** (activée par défaut), toute la barr
 - Un clic sur **Collection**, **Marché** ou **Paramètres** ouvre la page et déplie le menu ; la **flèche** ne fait que déplier ou replier.
 - Le menu de la page affichée est ouvert et mis en valeur ; l'état des autres menus est mémorisé.
 - Les pastilles orange comptent les slots à remplir (*Mes ventes*) et les mises en jeu (*Mes enchères*).
-- Les liens d'autres extensions (ex. « Familles » et « Mes enchères » de *Prix moyen collection*, en violet) sont rangés au même endroit.
+- Les liens ajoutés par d'autres extensions sont rangés au même endroit.
 
 Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans les menus, et un clic utilise la navigation normale du site. Désactiver l'option rend la barre du site intacte, avec un bloc Wiky-Traders (récapitulatif et menu) au-dessus de *Paramètres*.
 

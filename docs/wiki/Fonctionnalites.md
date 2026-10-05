@@ -2,9 +2,9 @@
 
 # Fonctionnalités
 
-Wiky-Traders reprend toutes les fonctionnalités de l'extension *WikiMasters – Prix moyen collection*, en plus rapide : les prix de 150 cartes arrivent en **une** requête (au lieu d'une par carte) et restent en cache 6 h, et rien n'est recalculé si rien n'a changé.
+Les outils de collection de Wiky-Traders sont pensés pour être rapides : les prix de 150 cartes arrivent en **une** requête (au lieu d'une par carte) et restent en cache 6 h, et rien n'est recalculé si rien n'a changé.
 
-> Désactive « Prix moyen collection » une fois Wiky-Traders installée, sinon certains éléments apparaissent en double (prix, « Plus chères », Familles…).
+> Si une autre extension WikiMasters propose les mêmes fonctions, désactive-la pour éviter les doublons (prix, « Plus chères », Familles…).
 
 Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles marquées *API* demandent la *lecture via l'API* ; celles marquées ⚠️ agissent sur le site à ta place, sont désactivées par défaut et demandent une confirmation (voir [Automatisations et risques](Automatisations-et-risques.md)).
 
@@ -40,7 +40,7 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 | Fonctionnalité | Défaut | Ce qu'elle fait |
 | --- | --- | --- |
 | Récapitulatif d'ouverture | oui | Après l'ouverture : cartes obtenues, « Nouvelle » ou exemplaires déjà possédés, prix et total (sans gâcher la révélation) |
-| Statistiques de tirage | oui | Répartition des raretés de tes paquets, sur la page Paquets (réinitialisable) |
+| Statistiques de tirage | oui | Répartition des raretés de tes paquets, sur la page Paquets (réinitialisable, importable depuis une autre extension) ; masquées pendant l'ouverture des cartes |
 | Partager un tirage | oui | Bouton « Partager » : le tirage en image |
 
 ## Échanges et notifications

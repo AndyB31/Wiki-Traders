@@ -455,7 +455,7 @@ export function showCodeDialog(title: string, code: string, hint: string): void 
 /** Demande un code de partage et le valide avec `accept` (qui lève une erreur lisible si le code est mauvais). */
 export function importCodeDialog(accept: (code: string) => Promise<string>): void {
   dialog((box, close) => {
-    box.innerHTML = `<h2>Importer une famille</h2><p>Colle un code de famille (Wiky-Traders ou « Prix moyen collection », commençant par F0. ou F1.).</p><textarea placeholder="F1.…"></textarea><div class="wf-error" role="alert"></div><div class="wf-actions"><button type="button" class="wf-btn ghost" data-r="0">Annuler</button><button type="button" class="wf-btn primary" data-r="1">Importer</button></div>`;
+    box.innerHTML = `<h2>Importer une famille</h2><p>Colle un code de famille (commençant par F0. ou F1.).</p><textarea placeholder="F1.…"></textarea><div class="wf-error" role="alert"></div><div class="wf-actions"><button type="button" class="wf-btn ghost" data-r="0">Annuler</button><button type="button" class="wf-btn primary" data-r="1">Importer</button></div>`;
     const area = box.querySelector('textarea')!;
     const err = box.querySelector<HTMLElement>('.wf-error')!;
     box.addEventListener('click', async (e) => {

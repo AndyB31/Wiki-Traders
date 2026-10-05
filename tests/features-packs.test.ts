@@ -200,3 +200,17 @@ describe('ouvrir tous les paquets', () => {
     expect(randomDelay(10, 20, () => 1)).toBe(20 * 60_000);
   });
 });
+
+describe('statistiques de tirage : import et ouverture', () => {
+  it('import depuis une autre extension : plus grand compteur par rareté (pas de double comptage)', async () => {
+    const { readOtherPullStats, mergePullStats, emptyPullStats } = await import('../src/content/features/packs-logic');
+    expect(readOtherPullStats(null)).toBeNull();
+    expect(readOtherPullStats('{"counts":{"C":0}}')).toBeNull();
+    const other = readOtherPullStats(JSON.stringify({ counts: { C: 120, PC: 40, R: 12, SR: 3, UR: 1, L: 0 } }))!;
+    const ours = { ...emptyPullStats(0), counts: { C: 20, PC: 50, R: 2, SR: 0, UR: 0, L: 1 }, total: 73, packs: 9 };
+    const merged = mergePullStats(ours, other, 1);
+    expect(merged.counts).toEqual({ C: 120, PC: 50, R: 12, SR: 3, UR: 1, L: 1 });
+    expect(merged.total).toBe(187);
+    expect(merged.packs).toBe(9);
+  });
+});

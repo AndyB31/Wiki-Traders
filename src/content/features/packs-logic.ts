@@ -122,6 +122,53 @@ export function recordPulls(cards: PackCard[], packs = 1): Promise<PullStats> {
   return job;
 }
 
+/** Statistiques de tirage d'une autre extension, gardées dans le localStorage du site. */
+export const OTHER_PULL_STATS_KEY = 'wm_pull_stats_v1';
+
+/** Compteurs par rareté lus dans l'autre extension (null : absents ou vides). */
+export function readOtherPullStats(raw: string | null): Record<Rarity, number> | null {
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw) as { counts?: Partial<Record<Rarity, unknown>> };
+    const counts = { C: 0, PC: 0, R: 0, SR: 0, UR: 0, L: 0 } as Record<Rarity, number>;
+    for (const k of RARITIES) counts[k] = Math.max(0, Math.floor(Number(data?.counts?.[k]) || 0));
+    return RARITIES.some((k) => counts[k] > 0) ? counts : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fusion avec des compteurs importés : le plus grand compteur par rareté. Les deux extensions ont pu compter les
+ * mêmes paquets en même temps ; additionner les compterait deux fois. Le nombre de paquets (inconnu de l'autre
+ * extension) est gardé.
+ */
+export function mergePullStats(stats: PullStats, other: Record<Rarity, number>, now = Date.now()): PullStats {
+  const next: PullStats = { ...stats, counts: { ...stats.counts }, updatedAt: now };
+  for (const k of RARITIES) next.counts[k] = Math.max(next.counts[k], other[k] ?? 0);
+  next.total = RARITIES.reduce((s, k) => s + next.counts[k], 0);
+  return next;
+}
+
+/** Importe les statistiques de l'autre extension (si elle en a) dans les nôtres. */
+export function importOtherPullStats(): Promise<PullStats | null> {
+  const job = queue.then(async () => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(OTHER_PULL_STATS_KEY);
+    } catch {
+      raw = null;
+    }
+    const other = readOtherPullStats(raw);
+    if (!other) return null;
+    const next = mergePullStats(await loadPullStats(), other);
+    await ext.storage.local.set({ [PULL_STATS_KEY]: next });
+    return next;
+  });
+  queue = job.catch(() => {});
+  return job;
+}
+
 export async function resetPullStats(): Promise<void> {
   await ext.storage.local.set({ [PULL_STATS_KEY]: emptyPullStats() });
 }

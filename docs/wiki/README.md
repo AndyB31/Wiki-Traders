@@ -14,7 +14,7 @@ Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : l'extens
 
 | Page | Contenu |
 | --- | --- |
-| [Fonctionnalités](Fonctionnalites.md) | Tout ce que reprend Wiky-Traders de « Prix moyen collection » : prix sur les cartes, classement, paquets, échanges… |
+| [Fonctionnalités](Fonctionnalites.md) | Prix sur les cartes, classement, paquets, échanges, mises… |
 | [Familles](Familles.md) | Regrouper des cartes, ajout par sélection multiple, progression, marché des manquantes |
 | [Intégration au site](Integration-au-site.md) | Barre latérale compacte, bloc Wiky-Traders, fenêtres, pages, onglet Paramètres |
 | [Vendre](Vendre.md) | Slots, cartes proposées, prix et durée conseillés, fenêtre de vente, Mode enchère |

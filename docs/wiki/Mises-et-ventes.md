@@ -56,7 +56,7 @@ Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant e
 
 ## Cartes & prix
 
-Page **Cartes & prix** : ta collection groupée par **famille** (familles de l'extension *Prix moyen collection*), **étiquette**, **catégorie** ou **rareté**, avec recherche. Un clic sur une carte affiche ses **enchères en cours**, de la moins chère à la plus chère (*Ouvrir* mène à la moins chère). Les cartes manquantes d'une famille apparaissent en premier.
+Page **Cartes & prix** : ta collection groupée par **famille**, **étiquette**, **catégorie** ou **rareté**, avec recherche. Un clic sur une carte affiche ses **enchères en cours**, de la moins chère à la plus chère (*Ouvrir* mène à la moins chère). Les cartes manquantes d'une famille apparaissent en premier.
 
 ## Journal
 

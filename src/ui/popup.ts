@@ -505,7 +505,7 @@ function familyList() {
       h(
         'p',
         { class: 'muted small' },
-        'Aucune famille. Crée-les sur WikiMasters : menu Wiky-Traders → Familles (celles de « Prix moyen collection » y sont importées).',
+        'Aucune famille. Crée-les sur WikiMasters : menu Wiky-Traders → Familles (celles d\'une autre extension y sont importées).',
       ),
     ];
   }

@@ -2,7 +2,7 @@
 
 # Familles
 
-Regroupe des cartes en **familles** (une série, un thème, un pays…), suis ta progression et complète-les au marché. Reprend la page « Familles » de l'extension *WikiMasters – Prix moyen collection*, en plus rapide.
+Regroupe des cartes en **familles** (une série, un thème, un pays…), suis ta progression et complète-les au marché.
 
 ![Familles](../screenshots/families.png)
 
@@ -10,9 +10,9 @@ Regroupe des cartes en **familles** (une série, un thème, un pays…), suis ta
 
 Menu **Wiky-Traders → Familles** dans la barre latérale (page `/collection?wiky=families`). Nécessite l'option *Intégration au site*.
 
-## Tes familles de « Prix moyen collection »
+## Tes familles d'une autre extension
 
-Au premier lancement, toutes les familles enregistrées par l'autre extension sont **importées automatiquement** (cartes, couverture, une couleur chacune). Le bouton **Réimporter depuis Prix moyen collection** fusionne à nouveau par nom, sans doublon. Ensuite, Wiky-Traders garde ses familles dans son propre stockage : l'autre extension peut être désactivée.
+Au premier lancement, toutes les familles enregistrées par l'autre extension sont **importées automatiquement** (cartes, couverture, une couleur chacune). Le bouton **Importer depuis une autre extension** fusionne à nouveau par nom, sans doublon. Ensuite, Wiky-Traders garde ses familles dans son propre stockage : l'autre extension peut être désactivée.
 
 ## Accueil
 

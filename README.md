@@ -56,8 +56,8 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 | **Mises et ventes** | Tes mises (en tête, surenchérie, gagnée, perdue) et tes ventes conclues, avec l'écart au prix de la carte. |
 | **Journal** | Ventes proposées, créées et terminées ; conseils pour ajuster tes %. |
 | **Étiquettes sur les cartes** | Pastilles aux couleurs du site sur chaque carte de la collection (libellés ou simples ronds). |
-| **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** depuis la collection ou par recherche au fil de la frappe, marché des manquantes ; tes familles de « Prix moyen collection » sont importées. |
-| **Tout « Prix moyen collection », en plus rapide** | Prix moyen sur les cartes, classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, prix au marché, récapitulatif et statistiques de paquets, valeur des échanges, son des notifications, suivi des mises en direct. Les prix de 150 cartes arrivent en une requête. |
+| **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** depuis la collection ou par recherche au fil de la frappe, marché des manquantes ; les familles d'une autre extension peuvent être importées. |
+| **Outils de collection, en plus rapide** | Prix moyen sur les cartes, classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, prix au marché, récapitulatif et statistiques de paquets, valeur des échanges, son des notifications, suivi des mises en direct. Les prix de 150 cartes arrivent en une requête. |
 
 | Familles | Une famille | Barre latérale |
 | --- | --- | --- |
@@ -120,7 +120,7 @@ La page de réglages s'ouvre à l'installation. Épingle l'icône 🧩 → Wiky-
 
 Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
-> **Tu utilises « WikiMasters – Prix moyen collection » ?** Wiky-Traders reprend toutes ses fonctionnalités et importe tes familles au premier lancement : désactive-la ensuite pour éviter les doublons (prix, « Plus chères », Familles…).
+> **Tu utilises une autre extension WikiMasters ?** Wiky-Traders importe ses familles au premier lancement (et ses statistiques de tirage à la demande). Si elle propose les mêmes fonctions, désactive-la ensuite pour éviter les doublons (prix, « Plus chères », Familles…).
 
 ### 5. Mettre à jour
 

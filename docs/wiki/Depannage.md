@@ -63,7 +63,7 @@ WikiMasters change ses classes CSS à chaque mise à jour. L'extension préfère
 
 **Mes données sont-elles envoyées quelque part ?** Non. Tout reste dans le navigateur ; seules les options d'API interrogent l'API de WikiMasters, avec ta session.
 
-**Puis-je utiliser Wiky-Traders avec « Prix moyen collection » ?** Oui : ses familles sont lues (page Cartes & prix) et ses liens restent dans la barre latérale.
+**Puis-je garder une autre extension WikiMasters ?** Oui : ses familles et statistiques de tirage peuvent être importées, et ses liens sont rangés dans les menus de la barre latérale. Si elle propose les mêmes fonctions (prix, classement, familles…), désactive-la pour éviter les doublons.
 
 **Sur mobile ?** Les navigateurs mobiles ne chargent pas ces extensions ; la barre du bas du site n'est pas modifiée.
 
