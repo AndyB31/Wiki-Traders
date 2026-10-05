@@ -7,6 +7,7 @@ import { reliableBase } from '../lib/pricing';
 import { load, loadAll, onStoreChange, save } from '../lib/storage';
 import { inQuietHours } from '../lib/time';
 import type { Card, JournalEntry, MyAuction, PriceObs, StoreShape } from '../lib/types';
+import { checkForUpdate, UPDATE_KEY, UPDATER_HOST, type UpdateInfo } from '../lib/update';
 
 const ALARM_PREFIX = 'auction:';
 const NOTIF_ID = 'wiky-slot';
@@ -208,11 +209,58 @@ async function openAuctionsPage(): Promise<void> {
   await save({ intent: { type: 'refreshSales', at: Date.now(), tabId: tabId ?? null } });
 }
 
+// ---------------------------------------------------------------- mises à jour
+
+const UPDATE_ALARM = 'update-check';
+const RELOAD_FLAG = 'reloadTabsAfterUpdate';
+
+async function runUpdateCheck(): Promise<UpdateInfo> {
+  const info = await checkForUpdate();
+  await ext.storage.local.set({ [UPDATE_KEY]: info });
+  // Badge « ↑ » sur l'icône quand une mise à jour attend (le badge des slots libres reprend la main ensuite).
+  if (info.status === 'available') void ext.action.setTitle({ title: `Wiky-Traders – mise à jour disponible (${info.behind} nouveauté${info.behind > 1 ? 's' : ''})` });
+  return info;
+}
+
+/** Programme d'aide aux mises à jour (native messaging) ; null s'il n'est pas installé. */
+async function updater(cmd: 'ping' | 'update'): Promise<Record<string, unknown>> {
+  try {
+    return (await ext.runtime.sendNativeMessage(UPDATER_HOST, { cmd })) as Record<string, unknown>;
+  } catch (e) {
+    return { ok: false, missing: true, error: (e as Error).message, id: ext.runtime.id };
+  }
+}
+
+/** Met à jour (programme d'aide), puis recharge l'extension ; les onglets du site sont rechargés au redémarrage. */
+async function applyUpdate(): Promise<Record<string, unknown>> {
+  const res = await updater('update');
+  if (!res.ok) return res;
+  await ext.storage.local.set({ [RELOAD_FLAG]: Date.now() });
+  setTimeout(() => ext.runtime.reload(), 300);
+  return res;
+}
+
+/** Après une mise à jour : recharge les onglets WikiMasters (leur script était celui de l'ancienne version). */
+async function afterUpdateReload(): Promise<void> {
+  const flag = (await ext.storage.local.get(RELOAD_FLAG))[RELOAD_FLAG] as number | undefined;
+  if (!flag) return;
+  await ext.storage.local.remove(RELOAD_FLAG);
+  if (Date.now() - flag > 5 * 60_000) return;
+  for (const tab of await ext.tabs.query({ url: `${SITE_ORIGIN}/*` })) if (tab.id != null) void ext.tabs.reload(tab.id);
+  void runUpdateCheck();
+}
+void afterUpdateReload();
+
 ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
   const msg = raw as ToBackground;
   if (msg.type === 'tabId') {
     sendResponse({ tabId: sender.tab?.id ?? null });
     return false;
+  }
+  if (msg.type === 'checkUpdate' || msg.type === 'updaterStatus' || msg.type === 'applyUpdate') {
+    const job = msg.type === 'checkUpdate' ? runUpdateCheck() : msg.type === 'updaterStatus' ? updater('ping') : applyUpdate();
+    void job.then(sendResponse, (e) => sendResponse({ ok: false, error: String(e) }));
+    return true;
   }
   const run =
     msg.type === 'scan' ? () => handleScan(msg) :
@@ -244,6 +292,10 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
 });
 
 ext.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === UPDATE_ALARM) {
+    void runUpdateCheck();
+    return;
+  }
   if (alarm.name.startsWith(ALARM_PREFIX)) void serial(() => onAuctionEnd(alarm.name.slice(ALARM_PREFIX.length)));
 });
 
@@ -315,5 +367,9 @@ ext.runtime.onInstalled.addListener(async (details) => {
     if (settings.rounding === 10) await save({ settings: { ...settings, rounding: 0 } });
   }
   void init();
+  void ext.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 6 * 60 });
 });
-ext.runtime.onStartup.addListener(() => void init());
+ext.runtime.onStartup.addListener(() => {
+  void init();
+  void ext.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 6 * 60 });
+});

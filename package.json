@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "updater:install": "node scripts/updater/install.mjs",
+    "updater:uninstall": "node scripts/updater/install.mjs --uninstall"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.4",

@@ -1,0 +1,38 @@
+# À chaque push sur main : tests, construction, et publication du zip de l'extension dans la release « latest ».
+# Le programme d'aide aux mises à jour (installation depuis un zip) télécharge ce fichier.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npm run zip
+      - name: Publier la release « latest »
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest wiky-traders.zip \
+            --title "Dernière version" \
+            --notes "Construite depuis ${GITHUB_SHA::7}. Installation : décompresser, puis « Charger l'extension non empaquetée »." \
+            --target "$GITHUB_SHA" --latest
