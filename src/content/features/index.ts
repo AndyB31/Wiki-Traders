@@ -18,5 +18,6 @@ import './families-page';
 import './family-badges';
 import './collection-families';
 import './auction-others';
+import './market-tabs';
 
 export {};
