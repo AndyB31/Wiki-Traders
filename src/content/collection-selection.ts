@@ -71,6 +71,15 @@ export function selectionToggle(root: ParentNode = document): HTMLElement | null
 
 /** La carte (ou son conteneur immédiat) est-elle marquée comme sélectionnée ? */
 export function isCardSelected(card: Element, selectionMode = true): boolean {
+  // Repère du site (relevé sur le vrai site) : dans le conteneur `div.relative.isolate.group` de la carte, une case
+  // `span[aria-hidden]` en haut à droite contient `svg.lucide-check` quand la carte est cochée (`svg.lucide-square`
+  // invisible sinon), et un calque `ring-4 ring-[var(--color-accent)]` l'entoure.
+  const group = card.matches('.group') ? card : card.closest('.group') ?? card.parentElement;
+  if (group) {
+    if (group.querySelector(':scope > span[aria-hidden] svg.lucide-check, :scope > span[aria-hidden] .lucide-check')) return true;
+    if (group.querySelector(':scope > span[aria-hidden] svg.lucide-square')) return false;
+    if (selectionMode && group.querySelector(':scope > div[class*="ring-4"]')) return true;
+  }
   const scope = [card, card.parentElement].filter((e): e is HTMLElement => !!e);
   for (const e of scope) {
     if (e.querySelector(':scope input[type="checkbox"]:checked, :scope [role="checkbox"][aria-checked="true"]')) return true;

@@ -48,7 +48,7 @@ La possession est **exacte et instantanée** : elle vient de ta collection connu
 2. Dans la barre du site (« N cartes sélectionnées »), clique **Ajouter à une famille ▾**.
 3. Choisis la famille ou **Nouvelle famille…**.
 
-Le nombre de cartes ajoutées est comparé au compteur du site ; en cas d'écart, un message le signale.
+Seules les cartes cochées (✓ en haut à droite) sont ajoutées, avec leur identifiant exact. Leur nombre est comparé au compteur du site ; en cas d'écart, un message le signale.
 
 ### Depuis la fiche d'une carte
 

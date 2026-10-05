@@ -109,3 +109,25 @@ describe('cartes cochées (heuristique)', () => {
     expect(selectionModeActive()).toBe(true);
   });
 });
+
+describe('cartes cochées : repère réel du site', () => {
+  /** Case en haut à droite du conteneur, telle que relevée sur wiki-masters.com en mode « Sélectionner ». */
+  const realTile = (title: string, id: string, checked: boolean) =>
+    `<div class="relative isolate group"><div class="w-[clamp(8.4rem,43vw,10rem)] glow-ur relative rounded-2xl" data-wiky-ref="card:${id}"><img alt=""><h3>${title}</h3></div>
+      <div class="pointer-events-none absolute inset-0 z-10 rounded-2xl ${checked ? 'ring-4 ring-[var(--color-accent)]' : 'bg-black/0 hover:bg-black/10'}" aria-hidden="true"></div>
+      <span class="pointer-events-none absolute top-1.5 right-1.5 z-30 flex size-6 rounded-md border-2 ${checked ? 'bg-[var(--color-accent)]' : 'bg-black/60'}" aria-hidden="true">${checked ? '<svg class="lucide lucide-check size-4"></svg>' : '<svg class="lucide lucide-square size-3.5 opacity-0"></svg>'}</span></div>`;
+
+  it('seules les cartes avec ✓ sont retournées, avec leur identifiant exact, et le compte correspond à la barre du site', () => {
+    page('Quitter la sélection', realTile('Meg Ryan', 'id-1', false) + realTile('Tour de France Femmes 2024', 'id-2', true) + realTile('Djilsi', 'id-3', true) + realTile('Backrooms', 'id-4', false), SITE_BAR(2));
+    const selected = selectedCollectionCards();
+    expect(selected.map(nativeCardTitle)).toEqual(['Tour de France Femmes 2024', 'Djilsi']);
+    expect(selected.map(nativeCardSiteId)).toEqual(['id-2', 'id-3']);
+    expect(selected.length).toBe(siteSelectedCount());
+  });
+
+  it('case visible mais vide (lucide-square) : non cochée, même avec un calque coloré', () => {
+    document.body.innerHTML = `<main>${realTile('Meg Ryan', 'id-1', false)}</main>`;
+    const card = document.querySelector('[data-wiky-ref]')!;
+    expect(isCardSelected(card, true)).toBe(false);
+  });
+});
