@@ -50,13 +50,13 @@ describe('barre latérale du site', () => {
     expect(order).toEqual(['Paquets', 'collection', 'market', 'social', 'progress', 'recap', 'settings']);
     expect(nav.lastElementChild!.getAttribute('data-group')).toBe('settings');
     const items = (g: string) => [...nav.querySelectorAll(`[data-group="${g}"] .wiky-group-items > *`)].map((a) => a.textContent!.trim().replace(/\d+$/, ''));
-    expect(items('collection')).toEqual(['Ma collection', 'Toutes les cartes', 'Familles', 'Familles', 'Cartes & prix', 'Étiquettes']);
+    expect(items('collection')).toEqual(['Ma collection', 'Toutes les cartes', 'Familles', 'Familles', 'Cartes & prix']);
     expect(items('market')).toEqual(['Parcourir', 'Mes ventes', 'Mes enchères', 'Historique']);
     expect(items('social')).toEqual(['Échanges', 'Guilde', 'Amis', 'Messages', 'Bataille']);
     expect(items('progress')).toEqual(['Profil', 'Succès', 'Classement']);
     expect(items('settings')).toEqual(['Paramètres du site', 'Réglages Wiky-Traders', 'Outils']);
     // Les pages de l'extension se distinguent par leur icône orange ; les onglets du Marché (pages du site) restent neutres.
-    expect(nav.querySelectorAll('[data-group="collection"] .wiky-sub:not(.site-tab) .wiky-ico')).toHaveLength(3);
+    expect(nav.querySelectorAll('[data-group="collection"] .wiky-sub:not(.site-tab) .wiky-ico')).toHaveLength(2);
     expect(nav.querySelectorAll('[data-group="market"] .wiky-sub.site-tab')).toHaveLength(4);
     // Les liens d'origine restent dans la barre (React les gère), masqués ; la copie déclenche l'original.
     const friends = nav.querySelector<HTMLAnchorElement>(':scope > a[href="/friends"]')!;
@@ -184,5 +184,24 @@ describe('Paramètres du site', () => {
     const page = document.getElementById('wiky-page')!;
     expect(page.querySelector('.wiky-tab.is-active')!.textContent).toBe('Wiky-Traders');
     expect(page.querySelector('iframe')!.getAttribute('src')).toContain('options.html?embed=1');
+  });
+});
+
+describe('bouton « Étiquettes » de la collection', () => {
+  it('juste après « Plus chères » sur la ligne du titre, ouvre la fenêtre d\'étiquetage ; absent ailleurs', async () => {
+    const { makeContext, runFeatures } = await import('../src/content/features/runtime');
+    await import('../src/content/features/ranking');
+    await import('../src/content/features/tag-tool');
+    document.querySelector('main')!.innerHTML = '<div class="flex"><h1>Collection</h1><button>Sélectionner</button></div>';
+    const s = { ...store().settings, apiRead: true };
+    runFeatures(makeContext(s, {}, []));
+    const tools = document.querySelector('[data-wiky="coll-tools"]')!;
+    expect([...tools.querySelectorAll<HTMLElement>('[data-tool]')].map((b) => b.dataset.tool).slice(0, 2)).toEqual(['ranking', 'tags']);
+    tools.querySelector<HTMLButtonElement>('[data-tool="tags"]')!.click();
+    expect(document.querySelector<HTMLIFrameElement>('[data-wiky="modal"] iframe')!.src).toContain('view=tags');
+    closeModal();
+    history.replaceState(null, '', '/marketplace');
+    runFeatures(makeContext(s, {}, []));
+    expect(document.querySelector('[data-tool="tags"]')).toBeNull();
   });
 });

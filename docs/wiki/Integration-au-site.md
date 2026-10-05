@@ -13,7 +13,7 @@ Avec l'option **Barre latérale compacte** (activée par défaut), toute la barr
 | Place | Contenu |
 | --- | --- |
 | En haut | **Paquets** |
-| **Collection ▸** | Ma collection · Toutes les cartes · 🟠 Familles · 🟠 Cartes & prix · 🟠 Étiquettes |
+| **Collection ▸** | Ma collection · Toutes les cartes · 🟠 Familles · 🟠 Cartes & prix |
 | **Marché ▸** | Parcourir · Mes ventes · Mes enchères · Historique (onglets du site, enrichis — voir [Mises et ventes](Mises-et-ventes.md)) |
 | **Social ▸** | Échanges · Guilde · Amis · Messages · Bataille |
 | **Progression ▸** | Profil · Succès · Classement |
@@ -52,7 +52,7 @@ Juste au-dessus de *Paramètres* :
 | Vendre | fenêtre (clic sur le récapitulatif) | Les slots à remplir : carte, prix, durée — voir [Vendre](Vendre.md) |
 | Familles | page | Voir [Familles](Familles.md) |
 | Cartes & prix | page | Ta collection par famille, étiquette, catégorie ou rareté, et les enchères en cours de chaque carte |
-| Étiquettes | fenêtre | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
+| Étiquettes | fenêtre (bouton à côté de « Plus chères » sur la collection) | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
 | Outils | fenêtre | Relire la page, diagnostic, journal, bilan des prix |
 | Réglages Wiky-Traders | page | L'onglet Wiky-Traders de *Paramètres* |
 

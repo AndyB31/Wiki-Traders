@@ -100,7 +100,7 @@ const TREE: TreeGroup[] = [
     icon: 'layers',
     iconFrom: '/collection',
     href: '/collection',
-    entries: [{ site: '/collection', label: 'Ma collection' }, { site: '/global-collection' }, { site: '/global-collection?wm=themes' }, { wiky: 'families' }, { wiky: 'cards' }, { wiky: 'tags' }],
+    entries: [{ site: '/collection', label: 'Ma collection' }, { site: '/global-collection' }, { site: '/global-collection?wm=themes' }, { wiky: 'families' }, { wiky: 'cards' }],
   },
   {
     id: 'market',

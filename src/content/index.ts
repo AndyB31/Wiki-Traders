@@ -755,6 +755,9 @@ async function main(): Promise<void> {
 
   onStoreChange(['settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'pendingFocus', 'intent'], async () => {
     await refreshStore();
+    // « Actualiser mes ventes » via l'API : traité tout de suite, sans attendre une relecture de la page
+    // (qui peut être en cours, et la suivante ne viendrait qu'avec une modification de la page).
+    if (store?.intent?.type === 'refreshSales' && store.settings.apiRead) maybeRefreshSales(resolveSelectors(store.settings.selectorOverrides));
     schedule(200);
   });
   // Le résumé de la barre latérale suit les relevés (sans relancer la lecture de la page).

@@ -19,5 +19,6 @@ import './family-badges';
 import './collection-families';
 import './auction-others';
 import './market-tabs';
+import './tag-tool';
 
 export {};

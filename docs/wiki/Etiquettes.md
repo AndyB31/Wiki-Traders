@@ -34,7 +34,7 @@ Range chaque carte dans l'étiquette dont la plage **plancher – plafond** cont
 
 1. Réglages → Automatisations → **Étiquetage automatique sur le site** (confirmation).
 2. Options : **Retirer les autres étiquettes gérées** (une carte ne garde qu'une plage). Les cartes sans prix connu ne sont pas modifiées.
-3. Fenêtre **Étiquettes** : la liste des changements prévus (carte → étiquette), et pourquoi certaines cartes sont écartées.
+3. Sur ta collection, bouton **Étiquettes** (à côté de « Plus chères ») : la fenêtre d'étiquetage s'ouvre par-dessus la page, avec la liste des changements prévus (carte → étiquette), et pourquoi certaines cartes sont écartées.
 4. **Lancer** :
    - par l'**interface** (sur la collection) : l'extension ouvre chaque carte et clique dans le menu des étiquettes ;
    - par l'**API** (option *Étiquetage par l'API*, plus fiable, depuis n'importe quelle page) : les mêmes écritures que la sélection multiple du site, limitées aux étiquettes.

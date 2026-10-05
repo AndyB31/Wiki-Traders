@@ -136,7 +136,7 @@ describe('boutons de la collection', () => {
     mount(['Zico']);
     runFeatures(ctxWith(['ranking', 'compactMode'], {}));
     const tools = document.querySelector('[data-wiky="coll-tools"]')!;
-    expect([...tools.children].map((b) => b.textContent)).toEqual(['Plus chères', 'Compact']);
+    expect([...tools.children].map((b) => b.textContent)).toEqual(['Plus chères', 'Étiquettes', 'Compact']);
     expect(tools.nextElementSibling!.textContent).toBe('Sélectionner');
     (tools.querySelector('[data-tool="compact"]') as HTMLButtonElement).click();
     expect(document.documentElement.hasAttribute('data-wiky-compact')).toBe(true);
