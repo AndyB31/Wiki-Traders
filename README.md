@@ -41,7 +41,7 @@ Par défaut, Wiky-Traders fait **tout le travail de réflexion** (quel slot est 
 | Choisit la carte à vendre selon ta répartition | Valides ou changes la carte proposée |
 | Calcule le prix (prix de référence × % de l'étiquette) | Cliques sur « Mettre aux enchères » |
 
-Quelques options **facultatives et désactivées par défaut** (pré-remplissage, mode enchère, étiquetage automatique, lecture de l'API) vont plus loin : elles demandent une confirmation et sont signalées comme contraires aux règles. Voir [Automatisations et risques](docs/wiki/Automatisations-et-risques.md).
+Quelques options **facultatives et désactivées par défaut** (pré-remplissage, mode enchère, étiquetage automatique, surenchère en un clic, vente depuis le classement, ouverture des paquets, lecture de l'API) vont plus loin : elles demandent une confirmation et sont signalées comme contraires aux règles. Voir [Automatisations et risques](docs/wiki/Automatisations-et-risques.md).
 
 ## Fonctionnalités
 
@@ -56,6 +56,12 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 | **Mises et ventes** | Tes mises (en tête, surenchérie, gagnée, perdue) et tes ventes conclues, avec l'écart au prix de la carte. |
 | **Journal** | Ventes proposées, créées et terminées ; conseils pour ajuster tes %. |
 | **Étiquettes sur les cartes** | Pastilles aux couleurs du site sur chaque carte de la collection (libellés ou simples ronds). |
+| **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** depuis la collection ou par recherche au fil de la frappe, marché des manquantes ; tes familles de « Prix moyen collection » sont importées. |
+| **Tout « Prix moyen collection », en plus rapide** | Prix moyen sur les cartes, classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, prix au marché, récapitulatif et statistiques de paquets, valeur des échanges, son des notifications, suivi des mises en direct. Les prix de 150 cartes arrivent en une requête. |
+
+| Familles | Une famille | Barre latérale |
+| --- | --- | --- |
+| ![Familles](docs/screenshots/families.png) | ![Une famille](docs/screenshots/family-detail.png) | ![Barre latérale](docs/screenshots/site-sidebar.png) |
 
 | Barre latérale | Fenêtre « Vendre » | Mode enchère |
 | --- | --- | --- |
@@ -114,6 +120,8 @@ La page de réglages s'ouvre à l'installation. Épingle l'icône 🧩 → Wiky-
 
 Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
+> **Tu utilises « WikiMasters – Prix moyen collection » ?** Wiky-Traders reprend toutes ses fonctionnalités et importe tes familles au premier lancement : désactive-la ensuite pour éviter les doublons (prix, « Plus chères », Familles…).
+
 ### 5. Mettre à jour
 
 ```bash
@@ -140,7 +148,8 @@ Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou 
 5. **Notifications** et **heures silencieuses** (23 h – 8 h par défaut).
 6. **Affichage sur le site** : intégration au site, barre latérale compacte, étiquettes sur les cartes (libellés ou pastilles).
 7. **Liste noire** et **prix saisis à la main** si besoin.
-8. **Automatisations** (facultatif, désactivé par défaut, voir l'avertissement) : lecture via l'API (mises, ventes, marché, relève automatique des ventes en cours), pré-remplissage, étiquetage automatique.
+8. **Fonctionnalités** : coche celles que tu veux (prix sur les cartes, familles, classement, paquets, échanges…) — voir [Fonctionnalités](docs/wiki/Fonctionnalites.md).
+9. **Automatisations** (facultatif, désactivé par défaut, voir l'avertissement) : lecture via l'API (nécessaire aux prix, familles, mises…), pré-remplissage, étiquetage automatique.
 
 Enfin, **ouvre ta collection** puis l'onglet **Historique** du Marché une fois : l'extension apprend tes cartes et les prix réels.
 
@@ -178,6 +187,7 @@ Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises
 | Lecture via l'API | **non** | Mises, ventes conclues, marché, ventes en cours relues chaque minute |
 | V4 – pré-remplissage (et Mode enchère) | **non** | Ouvre la vente, remplit prix et durée |
 | Étiquetage automatique / par l'API | **non** | Range les cartes par plage de prix |
+| Fonctionnalités | voir la page | Une case par fonctionnalité ; les automatisations sont désactivées par défaut |
 
 Les réglages s'exportent et s'importent en JSON (Réglages → bas de page).
 
@@ -213,6 +223,9 @@ API du site (facultatif, lecture) ────────┼─ content script 
 | `src/content/toast.ts`, `overlay.ts` | Toasts (prix conseillé, progression), étiquettes sur les cartes |
 | `src/content/sell-market.ts` | Résumé du marché et enchères de la carte dans la fenêtre de vente |
 | `src/content/api.ts`, `api-tags.ts` | Lecture de l'API du site ; étiquetage par l'API |
+| `src/content/catalog.ts`, `net.ts` | Catalogue et prix en lot (cache) ; réponses des appels du site relayées par `bridge.ts` |
+| `src/content/features/` | Une fonctionnalité par module (familles, prix, classement, paquets, échanges, mises…), relancés par `runtime.ts` |
+| `src/lib/features.ts`, `families.ts` | Liste des fonctionnalités ; logique des familles (possession, coût, import / export) |
 | `src/content/actions.ts`, `automation.ts` | Pré-remplissage, étiquetage par l'interface |
 | `src/lib/allocation.ts`, `pricing.ts` | Slots, choix des cartes, prix de référence et prix conseillé |
 | `src/lib/journal.ts`, `autotag.ts`, `duration.ts` | Journal, plan d'étiquetage, paliers de durée |

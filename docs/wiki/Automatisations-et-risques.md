@@ -14,8 +14,11 @@ Par défaut, Wiky-Traders ne fait que **lire** ce que la page affiche et **conse
 | Mode enchère | Même chose, au clic sur une carte de la collection | Interaction |
 | Étiquetage automatique (interface) | **Clique** dans le menu des étiquettes de chaque carte | Interaction |
 | Étiquetage par l'API | **Écrit** les étiquettes (table des étiquettes de cartes uniquement) | Écriture |
+| Surenchère en un clic | **Mise** à ta place (montant minimal, après confirmation) | Action |
+| Vendre depuis le classement | **Met aux enchères** à ta place (après deux clics de confirmation) | Action |
+| Ouvrir tous les paquets / ouverture automatique | **Ouvre** tes paquets à ta place | Action |
 
-Ce que l'extension ne fait **jamais**, même avec ces options : cliquer sur « Mettre aux enchères », miser, acheter, échanger, ouvrir des paquets, ou modifier autre chose que des étiquettes.
+Ce que l'extension ne fait **jamais** : acheter, échanger, défausser, ou agir sans que l'option correspondante soit activée. Mise, mise en vente et ouverture de paquets ne se font qu'avec les options ci-dessus, après confirmation.
 
 ## Garde-fous
 

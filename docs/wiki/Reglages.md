@@ -37,6 +37,10 @@ Réglages : **Paramètres → onglet Wiky-Traders** sur le site, ou page d'optio
 | Page « mes enchères » | automatique | Chemin, ex. `/marketplace?tab=mine` |
 | Page ouverte par « Ouvrir » | `/collection` | |
 
+## Fonctionnalités
+
+Une case par fonctionnalité, par groupe (collection et familles, affichage des cartes, marché, paquets, échanges, automatisations) : voir [Fonctionnalités](Fonctionnalites.md). Les automatisations demandent une confirmation.
+
 ## Durée des enchères
 
 Paliers **De – À → Durée** (10 min, 30 min, 1 h, 3 h, 6 h, 12 h). Le premier palier qui contient le prix l'emporte ; sans palier, la durée du site (1 h). Les paliers qui se chevauchent sont signalés.
