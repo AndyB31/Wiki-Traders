@@ -805,5 +805,17 @@ await integ.waitForTimeout(400);
 ok(true, '« Cartes & prix » : page du site');
 await integ.screenshot({ path: join(shots, 'site-page-cards.png') });
 
+// Familles : import automatique des familles de « Prix moyen collection », page native du site.
+await integ.evaluate((f) => localStorage.setItem('wm_families_v1', f), JSON.stringify(FAMILIES));
+await integ.goto(`${ORIGIN}/collection?wiky=families`);
+await integ.waitForSelector('.wf-tile', { timeout: 10000 });
+const famTiles = await integ.$$eval('.wf-tile .wf-tile-name', (els) => els.map((e) => e.textContent.trim()));
+ok(famTiles.includes('Merveilles du monde') && famTiles.includes('Animaux'), `familles importées depuis Prix moyen collection : ${famTiles.join(', ')}`);
+await integ.waitForTimeout(500);
+await integ.screenshot({ path: join(shots, 'families.png') });
+await integ.click('.wf-tile[data-act="open"]');
+await integ.waitForTimeout(800);
+await integ.screenshot({ path: join(shots, 'family-detail.png') });
+
 await ctx.close();
 console.log(`\nCaptures enregistrées dans ${shots}`);
