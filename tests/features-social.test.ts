@@ -77,7 +77,7 @@ describe('valeur des échanges', () => {
   it('total de chaque côté : prix moyens connus + WikiBidous, cartes sans prix comptées à part', () => {
     const [t] = mapTrades(TRADES);
     const prices = new Map([
-      ['c1', { median: 200, mean: 210, count: 5, at: 0 }],
+      ['c1', { median: 200, mean: 200, count: 5, at: 0 }],
       ['c2', { median: 10, mean: 10, count: 1, at: 0 }],
       ['c3', { median: 300, mean: 300, count: 2, at: 0 }],
     ]);

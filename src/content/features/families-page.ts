@@ -64,7 +64,7 @@ let gridToken = 0;
 let add: AddPanel | null = null;
 let market: { familyId: string; missingKey: string; at: number; data?: Map<string, ActiveAuction[]>; error?: string; loading?: boolean } | null = null;
 
-const priceOf = (siteId: string): number | null => displayPrice(knownPrice(siteId));
+const priceOf = (siteId: string, rarity?: Rarity | null): number | null => displayPrice(knownPrice(siteId), rarity);
 
 // ---------------------------------------------------------------- point d'entrée
 
@@ -337,7 +337,7 @@ function drawGrid(node: HTMLElement, f: CardFamily): void {
     { act: 'copy-to', title: 'Ajouter à une autre famille', icon: 'folderPlus' },
     { act: 'remove', title: 'Retirer de la famille', icon: 'x', danger: true },
   ];
-  const html = (from: number, to: number) => list.slice(from, to).map((c) => cardHtml({ card: c, owned: ownedCount(c, idx), price: priceOf(c.siteId), cover: c.siteId === f.coverSiteId, actions })).join('');
+  const html = (from: number, to: number) => list.slice(from, to).map((c) => cardHtml({ card: c, owned: ownedCount(c, idx), price: priceOf(c.siteId, c.rarity), cover: c.siteId === f.coverSiteId, actions })).join('');
   const grid = el('div', { class: 'wf-grid' });
   grid.innerHTML = html(0, CHUNK);
   node.replaceChildren(grid);
@@ -399,7 +399,7 @@ function drawMarket(f: CardFamily, missing: CatalogCard[]): void {
     }
     n.innerHTML = head + `<div class="wf-market">${rows
       .map(({ c, offers }) => {
-        const p = priceOf(c.siteId);
+        const p = priceOf(c.siteId, c.rarity);
         const thumb = c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="wf-thumb"></span>';
         const links = offers
           .slice(0, 4)

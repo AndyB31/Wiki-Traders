@@ -172,18 +172,31 @@ export async function activeAuctionsFor(ids: string[]): Promise<Map<string, Acti
 
 // ---------------------------------------------------------------- prix moyens
 
+/** Ventes conclues d'une carte pour une rareté donnée (le site calcule sa moyenne rareté par rareté). */
+export interface RarityPrice {
+  mean: number;
+  count: number;
+}
+
 export interface CardPrice {
   /** Médiane des ventes conclues (null : jamais vendue). */
   median: number | null;
+  /** Moyenne de toutes les ventes conclues, toutes raretés confondues. */
   mean: number | null;
   count: number;
+  /**
+   * Moyenne par rareté de la carte au moment de la vente (`snapshot_rarity`), comme le « Prix moyen » du site :
+   * une même carte peut avoir été vendue en Rare et en Super Rare, à des prix très différents.
+   */
+  byRarity?: Partial<Record<Rarity, RarityPrice>>;
   /** Vente la plus basse / la plus haute (absentes des anciennes entrées du cache). */
   min?: number | null;
   max?: number | null;
   at: number;
 }
 
-const PRICE_KEY = 'cardPrices';
+// v2 : moyenne par rareté (les anciennes entrées, sans `byRarity`, sont ignorées).
+const PRICE_KEY = 'cardPrices2';
 const PRICE_TTL = 6 * 3600_000;
 const prices = new Map<string, CardPrice>();
 let loaded: Promise<void> | null = null;
@@ -221,17 +234,30 @@ export function knownPrice(siteId: string): CardPrice | undefined {
 
 async function fetchPrices(ids: string[]): Promise<void> {
   const { cfg, session } = await api();
-  const rows = await get<{ card_id: string; final_price: number | null }[]>(
+  const rows = await get<{ card_id: string; final_price: number | null; snapshot_rarity: string | null }[]>(
     cfg,
     session,
-    `auctions?select=card_id,final_price&status=eq.settled_sold&card_id=${inList(ids)}&limit=20000`,
+    `auctions?select=card_id,final_price,snapshot_rarity&status=eq.settled_sold&card_id=${inList(ids)}&limit=20000`,
   );
   const byCard = new Map<string, number[]>();
-  for (const r of rows) if (r.final_price != null) byCard.set(r.card_id, [...(byCard.get(r.card_id) ?? []), r.final_price]);
+  const byCardRarity = new Map<string, Map<Rarity, number[]>>();
+  for (const r of rows) {
+    if (r.final_price == null) continue;
+    byCard.set(r.card_id, [...(byCard.get(r.card_id) ?? []), r.final_price]);
+    if (RARITIES.has(r.snapshot_rarity as Rarity)) {
+      const m = byCardRarity.get(r.card_id) ?? new Map<Rarity, number[]>();
+      m.set(r.snapshot_rarity as Rarity, [...(m.get(r.snapshot_rarity as Rarity) ?? []), r.final_price]);
+      byCardRarity.set(r.card_id, m);
+    }
+  }
   const now = Date.now();
+  const avg = (list: number[]) => Math.round(list.reduce((a, b) => a + b, 0) / list.length);
   for (const id of ids) {
     const list = byCard.get(id) ?? [];
+    const byRarity: Partial<Record<Rarity, RarityPrice>> = {};
+    for (const [r, l] of byCardRarity.get(id) ?? []) byRarity[r] = { mean: avg(l), count: l.length };
     prices.set(id, {
+      byRarity,
       median: median(list),
       mean: list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : null,
       count: list.length,
@@ -270,9 +296,17 @@ export async function cardPrices(ids: string[], force = false): Promise<Map<stri
   return new Map(wanted.flatMap((id) => (prices.has(id) ? [[id, prices.get(id)!] as const] : [])));
 }
 
-/** Prix affiché : médiane (plus juste que la moyenne, tirée par quelques ventes énormes). */
-export function displayPrice(p: CardPrice | undefined): number | null {
-  return p?.median ?? null;
+/** Prix affiché : moyenne des ventes, dans la rareté de la carte si elle est connue (comme le site). */
+export function displayPrice(p: CardPrice | undefined, rarity?: Rarity | null): number | null {
+  if (!p) return null;
+  // Comme le « Prix moyen » du site : la moyenne des ventes de la carte dans sa rareté, à défaut toutes raretés.
+  return (rarity ? p.byRarity?.[rarity]?.mean : undefined) ?? p.mean ?? null;
+}
+
+/** Nombre de ventes derrière le prix affiché (même rareté si connue). */
+export function displayCount(p: CardPrice | undefined, rarity?: Rarity | null): number {
+  if (!p) return 0;
+  return (rarity ? p.byRarity?.[rarity]?.count : undefined) ?? p.count;
 }
 
 // ---------------------------------------------------------------- titre → identifiant, enchère → carte

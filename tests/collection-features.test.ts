@@ -265,3 +265,17 @@ describe('images manquantes', () => {
     expect(img.getAttribute('data-wiky-img')).toBe('Sans image');
   });
 });
+
+describe('prix affiché : comme le « Prix moyen » du site', () => {
+  it('moyenne des ventes dans la rareté de la carte, pas la médiane ni les autres raretés', async () => {
+    const { displayPrice, displayCount } = await import('../src/content/catalog');
+    // Ventes 15, 20, 61 en Rare (moyenne 32, médiane 20) et 400 en Super Rare.
+    const p = { median: 40, mean: 124, count: 4, at: 0, byRarity: { R: { mean: 32, count: 3 }, SR: { mean: 400, count: 1 } } };
+    expect(displayPrice(p, 'R')).toBe(32);
+    expect(displayCount(p, 'R')).toBe(3);
+    expect(displayPrice(p, 'SR')).toBe(400);
+    // Rareté inconnue ou jamais vendue dans cette rareté : moyenne toutes raretés.
+    expect(displayPrice(p, null)).toBe(124);
+    expect(displayPrice(p, 'UR')).toBe(124);
+  });
+});

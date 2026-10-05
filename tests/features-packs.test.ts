@@ -67,7 +67,7 @@ describe('réponse d\'ouverture de paquet', () => {
   it('récapitulatif : prix moyens, déjà possédée, doublon, total et tri par prix', () => {
     const cards = mapPackCards(PACK);
     const prices = new Map([
-      ['c1', { median: 120, mean: 130, count: 4, at: 0 }],
+      ['c1', { median: 120, mean: 120, count: 4, at: 0 }],
       ['c2', { median: 8, mean: 8, count: 2, at: 0 }],
       ['c3', { median: null, mean: null, count: 0, at: 0 }],
     ]);

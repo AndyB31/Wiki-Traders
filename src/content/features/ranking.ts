@@ -1,5 +1,5 @@
 /**
- * Classement « Plus chères » : ma collection triée par prix moyen (médiane des ventes conclues), avec filtres
+ * Classement « Plus chères » : ma collection triée par prix moyen (moyenne des ventes de la carte dans sa rareté, comme le site), avec filtres
  * (recherche, rareté, étiquette, favoris) et valeur totale. Les prix déjà connus s'affichent tout de suite,
  * les autres arrivent en lots de 150 (`cardPrices`) ; la liste est virtualisée (seules les lignes visibles
  * sont dans le DOM), elle reste fluide avec des milliers de cartes.
@@ -48,7 +48,7 @@ export function rankCards(cards: Card[], priceOf: (siteId: string) => CardPrice 
     if (f.tag && !card.tags.includes(f.tag)) continue;
     if (q && !normalize(`${card.name} ${card.category ?? ''}`).includes(q)) continue;
     const p = card.siteId ? priceOf(card.siteId) : undefined;
-    const price = displayPrice(p);
+    const price = displayPrice(p, card.rarity);
     rows.push({ card, price, sales: p?.count ?? 0, total: price == null ? null : price * Math.max(1, card.quantity) });
   }
   return rows.sort((a, b) => {

@@ -76,7 +76,7 @@ export interface TradeSide {
 /** Valeur de chaque côté d'un échange (prix moyens connus + WikiBidous). */
 export function tradeSides(trade: Trade, prices: Map<string, CardPrice>): [TradeSide, TradeSide] {
   const side = (user: TradeUser): TradeSide => {
-    const cards = trade.items.filter((i) => i.offeredBy === user.id).map((i) => ({ card: i.card, price: displayPrice(prices.get(i.card.siteId)) }));
+    const cards = trade.items.filter((i) => i.offeredBy === user.id).map((i) => ({ card: i.card, price: displayPrice(prices.get(i.card.siteId), i.card.rarity) }));
     return {
       user,
       cards,
@@ -191,7 +191,7 @@ function valuesPanel(trade: Trade, showCards: boolean): HTMLElement {
 }
 
 function valuesKey(trade: Trade): string {
-  return JSON.stringify([trade.id, trade.items.map((i) => [i.card.siteId, displayPrice(prices.get(i.card.siteId))]), pricesLoading]);
+  return JSON.stringify([trade.id, trade.items.map((i) => [i.card.siteId, displayPrice(prices.get(i.card.siteId), i.card.rarity)]), pricesLoading]);
 }
 
 /** Échange qui correspond le mieux à un bloc de la page (titres des cartes, pseudos). */
@@ -260,7 +260,7 @@ function renderPreviews(): void {
     if (!title) continue;
     const card = byTitle.get(norm(title));
     const r = (RARITIES.has(rarity) ? rarity : card?.rarity ?? null) as Rarity | null;
-    const price = ctx?.flags.tradeValues && card ? displayPrice(prices.get(card.siteId)) : null;
+    const price = ctx?.flags.tradeValues && card ? displayPrice(prices.get(card.siteId), r) : null;
     const key = JSON.stringify([title, r, card?.imageUrl ?? null, price]);
     const prev = chip.previousElementSibling as HTMLElement | null;
     if (prev?.getAttribute('data-wiky') === 'trade-preview' && prev.dataset.key === key) continue;

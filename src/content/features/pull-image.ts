@@ -65,7 +65,7 @@ export interface ShareInput {
 }
 
 /** Dessine le tirage : grille de cartes (image, rareté, nom, prix) et total. */
-export async function drawPackImage(input: ShareInput, priceOf: (c: PackCard) => number | null = (c) => displayPrice(knownPrice(c.siteId))): Promise<HTMLCanvasElement> {
+export async function drawPackImage(input: ShareInput, priceOf: (c: PackCard) => number | null = (c) => displayPrice(knownPrice(c.siteId), c.rarity)): Promise<HTMLCanvasElement> {
   const priced = input.cards.map((c) => ({ c, price: priceOf(c) }));
   const total = priced.reduce((s, p) => s + (p.price ?? 0), 0);
   // Les plus chères d'abord quand il y en a beaucoup.

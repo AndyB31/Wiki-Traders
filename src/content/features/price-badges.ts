@@ -4,9 +4,10 @@
  * sont demandés en une fois à `cardPrices` (lots de 150, cache 6 h) ; les prix déjà connus s'affichent
  * immédiatement à chaque nouveau rendu du site.
  */
-import { cardIdsByTitles, cardPrices, displayPrice, knownCardId, knownPrice } from '../catalog';
-import { cardTitle, ensureStyle, formatW, isCollection, isGlobalCollection, myCard, nativeCards } from './dom';
+import { cardIdsByTitles, cardPrices, displayCount, displayPrice, knownCardId, knownPrice } from '../catalog';
+import { cardRarity, cardTitle, ensureStyle, formatW, isCollection, isGlobalCollection, myCard, nativeCards } from './dom';
 import { registerFeature, type FeatureContext } from './runtime';
+import type { Rarity } from '../../lib/types';
 
 const CSS = `
 .wiky-avg { position: relative; z-index: 25; align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; max-width: 100%; flex: 0 0 auto;
@@ -41,12 +42,20 @@ function siteIdOf(ctx: FeatureContext, title: string): string | null | undefined
   return myCard(ctx, title)?.siteId ?? knownCardId(title);
 }
 
-function stateOf(siteId: string, now: number): { state: State; text: string; title: string } {
+function stateOf(siteId: string, rarity: Rarity | null, now: number): { state: State; text: string; title: string } {
   const p = knownPrice(siteId);
   if (p) {
-    const v = displayPrice(p);
+    // Même calcul que le « Prix moyen » du site : moyenne des ventes de la carte dans sa rareté.
+    const v = displayPrice(p, rarity);
     if (v == null) return { state: 'empty', text: 'Moy. —', title: 'Aucune vente conclue pour cette carte' };
-    return { state: 'value', text: `Moy. ${formatW(v)} W`, title: `Médiane de ${p.count} vente${p.count > 1 ? 's' : ''} conclue${p.count > 1 ? 's' : ''} (Wiky-Traders)` };
+    const n = displayCount(p, rarity);
+    const sameRarity = !!rarity && !!p.byRarity?.[rarity];
+    const median = p.median != null ? ` · médiane ${formatW(p.median)} W` : '';
+    return {
+      state: 'value',
+      text: `Moy. ${formatW(v)} W`,
+      title: `Moyenne de ${n} vente${n > 1 ? 's' : ''} conclue${n > 1 ? 's' : ''}${sameRarity ? ` en ${rarity}` : ''}${median} (Wiky-Traders)`,
+    };
   }
   if (now - (failedAt.get(siteId) ?? 0) < RETRY_MS) return { state: 'error', text: 'Prix indispo.', title: 'Erreur temporaire, nouvel essai dans une minute' };
   return { state: 'loading', text: 'Prix…', title: 'Chargement du prix moyen…' };
@@ -56,7 +65,7 @@ function stateOf(siteId: string, now: number): { state: State; text: string; tit
 function paintBadge(card: HTMLElement, siteId: string, now: number): State {
   const h3 = card.querySelector('h3');
   if (!h3) return 'loading';
-  const s = stateOf(siteId, now);
+  const s = stateOf(siteId, cardRarity(card), now);
   const key = `${siteId}|${s.text}`;
   let badge = card.querySelector<HTMLElement>('[data-wiky="avg"]');
   if (badge?.dataset.key === key && badge.previousElementSibling === h3) return s.state;

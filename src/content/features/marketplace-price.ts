@@ -1,6 +1,6 @@
 /**
  * Prix moyen d'une carte sur la page d'une enchère (/marketplace/<uuid>) et dans la fiche d'une carte ouverte
- * par le site : médiane des ventes conclues, nombre de ventes, plus bas et plus haut.
+ * par le site : moyenne des ventes conclues (comme le site), médiane, nombre de ventes, plus bas et plus haut.
  * L'enchère → carte et le titre → carte passent par le catalogue (mis en cache), les prix par `cardPrices`.
  */
 import { cardIdForAuction, cardIdsByTitles, cardPrices, knownCardId, knownPrice, type CardPrice } from '../catalog';
@@ -38,7 +38,8 @@ export function priceSummary(p: CardPrice | undefined): { value: string; meta: s
   if (!p) return { value: '…', meta: 'Chargement des ventes…' };
   if (!p.count) return { value: '—', meta: 'Aucune vente conclue' };
   const range = p.min != null && p.max != null ? ` · min <b>${formatW(p.min)}</b> · max <b>${formatW(p.max)}</b>` : '';
-  return { value: `${formatW(p.median)} W`, meta: `<b>${p.count}</b> vente${p.count > 1 ? 's' : ''}${range}` };
+  const median = p.median != null ? ` · médiane <b>${formatW(p.median)}</b>` : '';
+  return { value: `${formatW(p.mean)} W`, meta: `<b>${p.count}</b> vente${p.count > 1 ? 's' : ''}${median}${range}` };
 }
 
 function box(host: Element, where: 'after' | 'append', siteId: string, extraClass = ''): void {
@@ -53,7 +54,7 @@ function box(host: Element, where: 'after' | 'append', siteId: string, extraClas
   el.innerHTML = `<span class="wiky-mprice-label">Prix moyen</span><span class="wiky-mprice-value"></span><span class="wiky-mprice-meta"></span>`;
   el.querySelector('.wiky-mprice-value')!.textContent = s.value;
   el.querySelector('.wiky-mprice-meta')!.innerHTML = s.meta;
-  el.title = 'Médiane des ventes conclues (Wiky-Traders)';
+  el.title = 'Moyenne des ventes conclues (Wiky-Traders)';
   if (!existing) {
     isolateClicks(el);
     if (where === 'after') host.after(el);

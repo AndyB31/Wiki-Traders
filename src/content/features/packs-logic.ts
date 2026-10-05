@@ -150,7 +150,7 @@ export function buildRecap(cards: PackCard[], prices: Map<string, CardPrice>, ow
   const rows: RecapRow[] = cards.map((c) => {
     const repeat = seen.has(c.siteId);
     seen.add(c.siteId);
-    return { ...c, price: displayPrice(prices.get(c.siteId)), ownedBefore: owned(c), repeat };
+    return { ...c, price: displayPrice(prices.get(c.siteId), c.rarity), ownedBefore: owned(c), repeat };
   });
   const order = (r: RecapRow) => (r.price == null ? -1 : r.price);
   rows.sort((a, b) => order(b) - order(a));

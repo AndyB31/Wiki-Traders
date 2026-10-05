@@ -49,7 +49,7 @@ export function readCard(card: HTMLElement, ctx: FeatureContext | null): Snapsho
     category: (card.querySelector('h3 ~ p, p')?.textContent ?? '').trim(),
     rarity: cardRarity(card),
     artUrl,
-    price: siteId ? displayPrice(knownPrice(siteId)) : null,
+    price: siteId ? displayPrice(knownPrice(siteId), cardRarity(card)) : null,
   };
 }
 
