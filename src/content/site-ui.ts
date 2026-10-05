@@ -187,6 +187,9 @@ nav[data-wiky-nav] > [data-wiky="nav-recap"] { margin: auto 0 4px; padding-top: 
 .wiky-slots i.on { background: #f97316; }
 .wiky-win { color: #4ade80 !important; }
 .wiky-lose { color: #f87171 !important; }
+.wiky-update { display: block; margin-top: 8px; padding: 5px 8px; border-radius: 8px; font-size: 11.5px; font-weight: 600; text-decoration: none;
+  color: #fff; background: rgba(249,115,22,.85); }
+.wiky-update:hover { background: #f97316; }
 .wiky-sync { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 10.5px; color: color-mix(in srgb, var(--color-foreground) 42%, transparent); }
 .wiky-sync .wiky-refresh { margin-left: auto; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; }
 .wiky-sync .wiky-refresh:hover { background: rgba(249,115,22,.16); color: #fff; }
@@ -492,7 +495,7 @@ function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions
     if (settingsBox) nav.insertBefore(recap, settingsBox);
     else nav.append(recap);
   }
-  const recapKey = JSON.stringify([summary, Math.floor(now / 30_000)]);
+  const recapKey = JSON.stringify([summary, Math.floor(now / 30_000), updatesAvailable]);
   if (recap.dataset.key === recapKey) return;
   recap.dataset.key = recapKey;
   // Avec le suivi des mises, la liste « Mises en direct » (bid-watch.ts) remplace le compte en tête / surenchéries.
@@ -504,6 +507,7 @@ function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions
     // Les lignes des mises (liens, bouton de surenchère) gardent leur rôle.
     if ((e.target as Element).closest('[data-wiky="bid-watch"]')) return;
     const act = (e.target as Element).closest<HTMLElement>('[data-act]');
+    if (act?.dataset.act === 'update') return;
     if (act?.dataset.act === 'refresh') {
       act.classList.add('spin');
       actions.refresh();
@@ -560,6 +564,12 @@ export function siteSummary(store: SiteUiStore, now = Date.now()): SiteSummary {
   };
 }
 
+/** Nouveautés disponibles sur main (0 : à jour) — renseigné par index.ts depuis la vérification des mises à jour. */
+let updatesAvailable = 0;
+export function setUpdatesAvailable(n: number): void {
+  updatesAvailable = n;
+}
+
 function statusHtml(s: SiteSummary, now: number, toggle = true, bidsRow = true): string {
   const free = Math.max(0, s.slots - s.occupied);
   const stale = s.lastSync == null ? 'none' : now - s.lastSync > STALE_AFTER_MS ? 'stale' : '';
@@ -578,6 +588,7 @@ function statusHtml(s: SiteSummary, now: number, toggle = true, bidsRow = true):
     ${s.nextEnd ? `<div class="wiky-row"><span>Prochaine fin</span><b>${formatDuration(s.nextEnd - now)}</b></div>` : ''}
     ${bidsRow || !(s.leading || s.outbid) ? `<div class="wiky-row"><span>Mises</span><span>${bids}</span></div>` : ''}
     ${results}
+    ${updatesAvailable ? `<a class="wiky-update" data-act="update" href="/settings?wiky=settings#maj">↑ Mise à jour disponible (${updatesAvailable})</a>` : ''}
     <div class="wiky-sync">${s.lastSync ? `Synchro ${ago(s.lastSync, now)}` : 'Pas encore synchronisé'}
       <span class="wiky-refresh" role="button" tabindex="0" data-act="refresh" title="Actualiser mes ventes et mes mises">${icon('refresh', 12)}</span></div>`;
 }

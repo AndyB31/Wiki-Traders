@@ -14,7 +14,8 @@ import { domOutline } from './diagnostic';
 import { endProgress, lastChipCount, showProgress, updateOverlay } from './overlay';
 import { initWindow, setOpen as setWindowOpen, toggleWindow } from './window';
 import { enhanceSellDialog } from './sell-market';
-import { closeModal, isModalOpen, openModal, renderSiteUi } from './site-ui';
+import { closeModal, isModalOpen, openModal, renderSiteUi, setUpdatesAvailable } from './site-ui';
+import { UPDATE_KEY, type UpdateInfo } from '../lib/update';
 import { renderAuctionSwitch } from './auction-mode';
 import { makeContext as featureContext, runFeatures } from './features/runtime';
 import './features';
@@ -766,6 +767,20 @@ async function main(): Promise<void> {
     drawSiteUi();
   });
   setInterval(drawSiteUi, 30_000);
+  // Mise à jour disponible : signalée dans le récapitulatif de la barre latérale.
+  const readUpdate = async () => {
+    try {
+      const info = (await ext.storage.local.get(UPDATE_KEY))[UPDATE_KEY] as UpdateInfo | undefined;
+      setUpdatesAvailable(info?.status === 'available' ? info.behind : 0);
+      drawSiteUi();
+    } catch {
+      /* stockage indisponible */
+    }
+  };
+  void readUpdate();
+  ext.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && UPDATE_KEY in changes) void readUpdate();
+  });
   void refreshMyAuctions();
   setInterval(() => void refreshMyAuctions(), 15_000);
   document.addEventListener('visibilitychange', () => void refreshMyAuctions());
