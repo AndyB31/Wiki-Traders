@@ -578,8 +578,15 @@ let auctionsBusy = false;
  * Mes ventes en cours relues via l'API (option « apiRead ») : au chargement, puis chaque minute tant que l'onglet est
  * visible, sans aller sur Marché → « Mes ventes ». Les autres onglets du site profitent du même relevé.
  */
+let forcePending = false;
+
 async function refreshMyAuctions(force = false): Promise<void> {
-  if (!store?.settings.apiRead || auctionsBusy) return;
+  if (!store?.settings.apiRead) return;
+  // Une relecture est déjà en cours : une demande explicite (↻, onglet « Mes ventes ») est rejouée juste après.
+  if (auctionsBusy) {
+    if (force) forcePending = true;
+    return;
+  }
   if (!force && (document.visibilityState !== 'visible' || Date.now() - (store.meta.lastAuctionsScan ?? 0) < AUCTIONS_EVERY)) return;
   auctionsBusy = true;
   try {
@@ -590,6 +597,10 @@ async function refreshMyAuctions(force = false): Promise<void> {
     log(`[api] ventes en cours : ${(e as Error).message}`);
   } finally {
     auctionsBusy = false;
+  }
+  if (forcePending) {
+    forcePending = false;
+    await refreshMyAuctions(true);
   }
 }
 
@@ -612,6 +623,10 @@ async function refreshBidsFast(): Promise<void> {
     log(`[api] mes mises : ${(e as Error).message}`);
   } finally {
     auctionsBusy = false;
+  }
+  if (forcePending) {
+    forcePending = false;
+    await refreshMyAuctions(true);
   }
 }
 

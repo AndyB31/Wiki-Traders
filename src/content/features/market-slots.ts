@@ -22,7 +22,7 @@ import type { FeatureContext } from './runtime';
 import { button, confirmDialog, ensureFeatureStyle, node, rarityChip, wiki } from './ui';
 
 const CSS = `
-.wiky-slot { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center;
+.wiky-slot { position: relative !important; inset: auto !important; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center;
   min-height: 250px; cursor: pointer; border: 2px dashed rgba(249,115,22,.55) !important; background: rgba(249,115,22,.04);
   color: var(--color-foreground, #e7e5e4); font: inherit; transition: background .15s ease, border-color .15s ease; }
 .wiky-slot:hover, .wiky-slot:focus-visible { background: rgba(249,115,22,.1); border-color: #f97316 !important; outline: none; }

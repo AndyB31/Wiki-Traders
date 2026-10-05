@@ -821,6 +821,16 @@ await integ.waitForTimeout(400);
 ok(true, '« Cartes & prix » : page du site');
 await integ.screenshot({ path: join(shots, 'site-page-cards.png') });
 
+// Marché → « Mes ventes » : slots libres affichés à côté des ventes du site, « Vendre » intégré au clic.
+await integ.goto(`${ORIGIN}/marketplace?wtab=sales`);
+await integ.waitForSelector('[data-wiky="mt-slot"]', { timeout: 10000 });
+const slotCount = await integ.$$eval('[data-wiky="mt-slot"]', (els) => els.length);
+ok(slotCount === 2, `Mes ventes : ${slotCount} slots libres affichés à côté des 3 ventes`);
+await integ.click('[data-wiky="mt-slot"]');
+await integ.waitForTimeout(600);
+await integ.screenshot({ path: join(shots, 'market-sales-slot.png') });
+await integ.keyboard.press('Escape');
+
 // Familles : import automatique des familles de « Prix moyen collection », page native du site.
 await integ.evaluate((f) => localStorage.setItem('wm_families_v1', f), JSON.stringify(FAMILIES));
 await integ.goto(`${ORIGIN}/collection?wiky=families`);

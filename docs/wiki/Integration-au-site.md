@@ -14,7 +14,7 @@ Avec l'option **Barre latérale compacte** (activée par défaut), toute la barr
 | --- | --- |
 | En haut | **Paquets** |
 | **Collection ▸** | Ma collection · Toutes les cartes · 🟠 Familles · 🟠 Cartes & prix · 🟠 Étiquettes |
-| **Marché ▸** | Parcourir le marché · 🟠 Vendre · 🟠 Mes ventes · 🟠 Mes mises · 🟠 Ventes conclues |
+| **Marché ▸** | Parcourir · Mes ventes · Mes enchères · Historique (onglets du site, enrichis — voir [Mises et ventes](Mises-et-ventes.md)) |
 | **Social ▸** | Échanges · Guilde · Amis · Messages · Bataille |
 | **Progression ▸** | Profil · Succès · Classement |
 | En bas | Le **récapitulatif Wiky-Traders** (et « Mises en direct ») |
@@ -22,7 +22,7 @@ Avec l'option **Barre latérale compacte** (activée par défaut), toute la barr
 
 - Un clic sur **Collection**, **Marché** ou **Paramètres** ouvre la page et déplie le menu ; la **flèche** ne fait que déplier ou replier.
 - Le menu de la page affichée est ouvert et mis en valeur ; l'état des autres menus est mémorisé.
-- 🟠 Les pastilles orange (ex. *Vendre 2*) comptent les slots à remplir, les ventes et les mises en cours.
+- Les pastilles orange comptent les slots à remplir (*Mes ventes*) et les mises en jeu (*Mes enchères*).
 - Les liens d'autres extensions (ex. « Familles » et « Mes enchères » de *Prix moyen collection*, en violet) sont rangés au même endroit.
 
 Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans les menus, et un clic utilise la navigation normale du site. Désactiver l'option rend la barre du site intacte, avec un bloc Wiky-Traders (récapitulatif et menu) au-dessus de *Paramètres*.
@@ -38,24 +38,20 @@ Juste au-dessus de *Paramètres* :
 | Point coloré | Vert : données à jour · orange : anciennes (plus de 30 min) · gris : jamais synchronisé |
 | Slots | Slots occupés / total, nombre de libres, barre de remplissage |
 | Prochaine fin | Temps avant la fin de ta prochaine enchère |
-| Mises | Tes mises en cours : **en tête** (vert) et **surenchéries** (rouge) |
 | 24 h | Mises **gagnées** et **perdues** sur les dernières 24 h |
 | Synchro | Âge des données, bouton **↻** pour actualiser |
 
 - **Clic sur le récapitulatif** : ouvre la fenêtre **Vendre**.
 - **↻** : relit tes ventes en cours et tes mises.
-- Dessous, **Mises en direct** : tes mises en jeu avec leur compte à rebours.
+- **Mises en direct**, dans le récapitulatif : chaque mise en jeu avec son nom, une pastille **verte** (en tête) ou **rouge** (surenchérie), le temps restant et le prix ; clic pour ouvrir l'enchère. Relue **toutes les 2 secondes** (requête légère, onglet visible seulement).
 
 ## Les pages de l'extension
 
 | Entrée | S'ouvre | Contenu |
 | --- | --- | --- |
-| Vendre *(n)* | fenêtre | Les slots à remplir : carte, prix, durée — voir [Vendre](Vendre.md) |
-| Mes ventes *(n)* | fenêtre | Tes enchères en cours |
-| Mes mises *(n)* | fenêtre | Tes mises sur les cartes des autres — voir [Mises et ventes](Mises-et-ventes.md) |
+| Vendre | fenêtre (clic sur le récapitulatif) | Les slots à remplir : carte, prix, durée — voir [Vendre](Vendre.md) |
 | Familles | page | Voir [Familles](Familles.md) |
 | Cartes & prix | page | Ta collection par famille, étiquette, catégorie ou rareté, et les enchères en cours de chaque carte |
-| Ventes conclues | page | Tes ventes terminées et l'écart au prix de la carte |
 | Étiquettes | fenêtre | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
 | Outils | fenêtre | Relire la page, diagnostic, journal, bilan des prix |
 | Réglages Wiky-Traders | page | L'onglet Wiky-Traders de *Paramètres* |
