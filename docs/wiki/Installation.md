@@ -1,3 +1,5 @@
+[← Sommaire de la documentation](README.md)
+
 # Installation
 
 Wiky-Traders n'est pas publiée sur les boutiques d'extensions : on la construit depuis les sources, puis on la charge « non empaquetée ».
@@ -63,7 +65,7 @@ La page de réglages s'ouvre automatiquement après l'installation.
    - les menus **Social** et **Progression** qui regroupent les liens du site ;
    - un onglet **Wiky-Traders** dans *Paramètres*.
 
-Rien de tout ça ? Voir [Dépannage](Depannage#rien-napparait-sur-le-site).
+Rien de tout ça ? Voir [Dépannage](Depannage.md#rien-napparait-sur-le-site).
 
 ## 5. Mettre à jour
 
@@ -86,4 +88,4 @@ Tes réglages, ta collection connue et ton journal sont conservés.
 1. (Facultatif) Réglages → **Effacer toutes les données**.
 2. Page des extensions → **Supprimer**.
 
-Suite : **[Premiers pas](Premiers-pas)**.
+Suite : **[Premiers pas](Premiers-pas.md)**.

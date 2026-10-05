@@ -1,8 +1,10 @@
+[← Sommaire de la documentation](README.md)
+
 # Intégration au site
 
 Avec l'option **Intégration au site** (activée par défaut), Wiky-Traders s'installe dans l'interface de WikiMasters, à la manière des « Familles » (en violet) de l'extension *WikiMasters – Prix moyen collection*, mais en **orange**.
 
-![Barre latérale](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/site-sidebar.png)
+![Barre latérale](../screenshots/site-sidebar.png)
 
 ## Barre latérale compacte
 
@@ -39,24 +41,24 @@ Au-dessus de *Paramètres* :
 
 | Entrée | S'ouvre | Contenu |
 | --- | --- | --- |
-| Vendre *(n)* | fenêtre | Les slots à remplir : carte, prix, durée — voir [Vendre](Vendre) |
+| Vendre *(n)* | fenêtre | Les slots à remplir : carte, prix, durée — voir [Vendre](Vendre.md) |
 | Mes ventes *(n)* | fenêtre | Tes enchères en cours |
-| Mes mises *(n)* | fenêtre | Tes mises sur les cartes des autres — voir [Mises et ventes](Mises-et-ventes) |
+| Mes mises *(n)* | fenêtre | Tes mises sur les cartes des autres — voir [Mises et ventes](Mises-et-ventes.md) |
 | Cartes & prix | page | Ta collection par famille, étiquette, catégorie ou rareté, et les enchères en cours de chaque carte |
 | Ventes conclues | page | Tes ventes terminées et l'écart au prix de la carte |
-| Étiquettes | fenêtre | Étiquetage automatique — voir [Étiquettes](Etiquettes) |
+| Étiquettes | fenêtre | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
 | Outils | fenêtre | Relire la page, diagnostic, journal, bilan des prix |
 | Réglages | page | L'onglet Wiky-Traders de *Paramètres* |
 
 Les **fenêtres** s'affichent par-dessus la page en cours (Échap ou clic à côté pour fermer). Les **pages** prennent la place du contenu du site (adresse `?wiky=…`), sans le quitter.
 
-![Fenêtre Vendre](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/site-modal.png)
+![Fenêtre Vendre](../screenshots/site-modal.png)
 
 ## L'onglet Wiky-Traders dans Paramètres
 
 Sur la page *Paramètres* du site, un onglet **Wiky-Traders** ouvre tous les réglages de l'extension, aux couleurs du site. L'onglet **Général** ramène aux réglages du site.
 
-![Réglages dans Paramètres](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/site-settings.png)
+![Réglages dans Paramètres](../screenshots/site-settings.png)
 
 ## L'icône de l'extension
 

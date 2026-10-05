@@ -1,6 +1,8 @@
+[← Sommaire de la documentation](README.md)
+
 # Premiers pas
 
-Une fois l'extension [installée](Installation), voici la configuration conseillée, dans l'ordre. Compte 10 minutes.
+Une fois l'extension [installée](Installation.md), voici la configuration conseillée, dans l'ordre. Compte 10 minutes.
 
 Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou bloc Wiky-Traders → *Réglages*, ou clic droit sur l'icône → *Options*). Clique sur **Enregistrer** en bas de page après chaque série de modifications.
 
@@ -26,7 +28,7 @@ Chaque règle réserve des slots à une étiquette du site.
 
 Par défaut : **1 slot « 50-100 » + 4 slots « 20-50 »**, à 70 %, en gardant 1 exemplaire. Sous le tableau, les **étiquettes trouvées dans ta collection** s'ajoutent en un clic. La somme des quotas devrait égaler ton nombre de slots.
 
-Voir [Étiquettes](Etiquettes).
+Voir [Étiquettes](Etiquettes.md).
 
 ## Étape 3 – Le prix
 
@@ -39,7 +41,7 @@ Section **Prix et notifications** :
 - **À doublons égaux** : prix le plus haut d'abord, le plus bas (pour écouler), ou aléatoire.
 - **Étiquette de secours** : prend le slot d'une étiquette qui n'a plus de carte vendable.
 
-Puis va une fois sur Marché → onglet **Historique** : ce sont les meilleures données de prix réels. Voir [Prix conseillé](Prix-conseille).
+Puis va une fois sur Marché → onglet **Historique** : ce sont les meilleures données de prix réels. Voir [Prix conseillé](Prix-conseille.md).
 
 ## Étape 4 – La durée des enchères
 
@@ -60,7 +62,7 @@ Sans palier, la durée par défaut du site (1 h) est gardée. La durée conseill
 - **Barre latérale compacte** : regroupe Échanges, Guilde, Amis, Messages, Bataille dans *Social*, et Profil, Succès, Classement dans *Progression*.
 - **Étiquettes visibles sur les cartes** : en libellés ou en simples pastilles de couleur.
 
-Voir [Intégration au site](Integration-au-site).
+Voir [Intégration au site](Integration-au-site.md).
 
 ## Étape 6 – (Facultatif) La lecture via l'API
 
@@ -72,10 +74,10 @@ Section **Automatisations** → **Lecture via l'API du site**. Elle permet :
 - dans la fenêtre de vente : le résumé du marché de la carte et ses enchères en cours ;
 - le rechargement complet de la collection.
 
-Ce sont des **lectures seules** avec ta session, mais l'option demande une confirmation : lis [Automatisations et risques](Automatisations-et-risques).
+Ce sont des **lectures seules** avec ta session, mais l'option demande une confirmation : lis [Automatisations et risques](Automatisations-et-risques.md).
 
 ## Étape 7 – Vérifier
 
 Clique sur le bloc **Wiky-Traders** de la barre latérale : la fenêtre **Vendre** liste les slots à remplir avec une carte, un prix et une durée. Si un slot reste vide, la raison est indiquée.
 
-Tu es prêt : voir **[Vendre](Vendre)**.
+Tu es prêt : voir **[Vendre](Vendre.md)**.

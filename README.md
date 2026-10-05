@@ -8,7 +8,7 @@
 
 ![Wiky-Traders intégré à WikiMasters : barre latérale, résumé et réglages](docs/screenshots/site-settings.png)
 
-📖 **Documentation complète : [le wiki](https://github.com/AndyB31/Wiky-Traders/wiki)** (installation, premiers pas, chaque réglage, dépannage).
+📖 **Documentation complète : [docs/wiki](docs/wiki/README.md)** (installation, premiers pas, chaque réglage, dépannage).
 
 ---
 
@@ -41,7 +41,7 @@ Par défaut, Wiky-Traders fait **tout le travail de réflexion** (quel slot est 
 | Choisit la carte à vendre selon ta répartition | Valides ou changes la carte proposée |
 | Calcule le prix (prix de référence × % de l'étiquette) | Cliques sur « Mettre aux enchères » |
 
-Quelques options **facultatives et désactivées par défaut** (pré-remplissage, mode enchère, étiquetage automatique, lecture de l'API) vont plus loin : elles demandent une confirmation et sont signalées comme contraires aux règles. Voir [Automatisations et risques](https://github.com/AndyB31/Wiky-Traders/wiki/Automatisations-et-risques).
+Quelques options **facultatives et désactivées par défaut** (pré-remplissage, mode enchère, étiquetage automatique, lecture de l'API) vont plus loin : elles demandent une confirmation et sont signalées comme contraires aux règles. Voir [Automatisations et risques](docs/wiki/Automatisations-et-risques.md).
 
 ## Fonctionnalités
 
@@ -144,7 +144,7 @@ Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou 
 
 Enfin, **ouvre ta collection** puis l'onglet **Historique** du Marché une fois : l'extension apprend tes cartes et les prix réels.
 
-Le détail de chaque option est dans le wiki : [Premiers pas](https://github.com/AndyB31/Wiky-Traders/wiki/Premiers-pas) et [Référence des réglages](https://github.com/AndyB31/Wiky-Traders/wiki/Reglages).
+Le détail de chaque option est dans la documentation : [Premiers pas](docs/wiki/Premiers-pas.md) et [Référence des réglages](docs/wiki/Reglages.md).
 
 ## Au quotidien
 
@@ -155,7 +155,7 @@ Le détail de chaque option est dans le wiki : [Premiers pas](https://github.com
 - L'icône de l'extension ouvre ou ferme la fenêtre **Vendre** sur le site.
 - Le **journal** (Outils → 📒) t'aide à ajuster tes pourcentages.
 
-Guide complet : [Vendre](https://github.com/AndyB31/Wiky-Traders/wiki/Vendre), [Mises et ventes](https://github.com/AndyB31/Wiky-Traders/wiki/Mises-et-ventes), [Intégration au site](https://github.com/AndyB31/Wiky-Traders/wiki/Integration-au-site).
+Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises-et-ventes.md), [Intégration au site](docs/wiki/Integration-au-site.md).
 
 ## Référence des réglages
 
@@ -192,7 +192,7 @@ Les réglages s'exportent et s'importent en JSON (Réglages → bas de page).
 | Un slot reste vide | La fenêtre Vendre explique pourquoi (favoris, déjà en vente, « garder au moins »…). |
 | Page « non reconnue » | Outils → **Diagnostic** exporte la structure de la page ; ajuste Réglages → Données → *Sélecteurs avancés* ou ouvre une issue avec le fichier. |
 
-Plus de cas : [Dépannage (wiki)](https://github.com/AndyB31/Wiky-Traders/wiki/Depannage).
+Plus de cas : [Dépannage (documentation)](docs/wiki/Depannage.md).
 
 ## Architecture
 
@@ -232,7 +232,7 @@ npm test             # tests unitaires (Vitest + jsdom)
 npm run demo         # parcours complet dans Chromium + captures du README
 ```
 
-`npm run demo` nécessite le navigateur de Playwright : `npx playwright install chromium`. Voir [Développement (wiki)](https://github.com/AndyB31/Wiky-Traders/wiki/Developpement).
+`npm run demo` nécessite le navigateur de Playwright : `npx playwright install chromium`. Voir [Développement (documentation)](docs/wiki/Developpement.md).
 
 ## Confidentialité
 

@@ -1,3 +1,5 @@
+[← Sommaire de la documentation](README.md)
+
 # Prix conseillé
 
 ```
@@ -27,7 +29,7 @@ Le bilan (ventes par rareté, dernier chargement) est dans **Outils**.
 
 ## Le pourcentage
 
-Chaque règle d'étiquette a son % (70 % par défaut). Vendre un peu sous la référence part plus vite ; le [journal](Mises-et-ventes#journal) montre la part des ventes parties au prix de départ et conseille d'ajuster.
+Chaque règle d'étiquette a son % (70 % par défaut). Vendre un peu sous la référence part plus vite ; le [journal](Mises-et-ventes.md#journal) montre la part des ventes parties au prix de départ et conseille d'ajuster.
 
 ## L'arrondi
 

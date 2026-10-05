@@ -1,3 +1,5 @@
+[← Sommaire de la documentation](README.md)
+
 # Vendre
 
 ## La fenêtre « Vendre »
@@ -37,7 +39,7 @@ Quand tu ouvres la mise en vente d'une carte connue :
 
 Le clic **« Mettre aux enchères »** reste toujours le tien.
 
-![Fenêtre de vente](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/sell-market.png)
+![Fenêtre de vente](../screenshots/sell-market.png)
 
 ## Mode enchère (collection)
 
@@ -50,9 +52,9 @@ Sur la collection, l'interrupteur **Mode enchère** se trouve sur la ligne du ti
 
 Le prix est celui de la règle d'étiquette de la carte, ou à défaut son prix moyen ; sans prix connu, la fenêtre s'ouvre avec le prix à saisir. Le bouton favori et le lien Wikipédia de la carte gardent leur rôle. Le mode est mémorisé dans le navigateur.
 
-![Mode enchère](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/auction-mode.png)
+![Mode enchère](../screenshots/auction-mode.png)
 
-> Le Mode enchère clique sur le site à ta place : voir [Automatisations et risques](Automatisations-et-risques).
+> Le Mode enchère clique sur le site à ta place : voir [Automatisations et risques](Automatisations-et-risques.md).
 
 ## Après la mise en vente
 

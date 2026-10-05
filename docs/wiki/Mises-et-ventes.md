@@ -1,3 +1,5 @@
+[← Sommaire de la documentation](README.md)
+
 # Mises et ventes
 
 ## Mes ventes en cours
@@ -25,7 +27,7 @@ Une vente qui disparaît de la liste est comptée comme terminée (journal, prix
 
 Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant et le **prix de la carte** (médiane de ses ventes) pour juger si tu paies trop cher. Le bloc Wiky-Traders résume les mises en cours et les résultats des dernières 24 h.
 
-![Mises](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/window-bids.png)
+![Mises](../screenshots/window-bids.png)
 
 ## Ventes conclues
 
@@ -35,7 +37,7 @@ Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant e
 - l'écart au **prix de la carte** (médiane de ses autres ventes) ou à la médiane de sa rareté ;
 - le total et l'écart moyen ; option pour afficher les **invendues**.
 
-![Ventes conclues](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/window-sold.png)
+![Ventes conclues](../screenshots/window-sold.png)
 
 ## Cartes & prix
 
@@ -45,4 +47,4 @@ Page **Cartes & prix** : ta collection groupée par **famille** (familles de l'e
 
 Outils → **📒 Journal** : toutes les ventes **proposées**, **créées** et **terminées**, avec par étiquette la part des ventes parties au prix de départ et un conseil pour ajuster ton %.
 
-![Journal](https://raw.githubusercontent.com/AndyB31/Wiky-Traders/main/docs/screenshots/journal.png)
+![Journal](../screenshots/journal.png)

@@ -1,3 +1,5 @@
+[← Sommaire de la documentation](README.md)
+
 # Dépannage
 
 ## Rien n'apparaît sur le site
@@ -42,7 +44,7 @@ La fenêtre Vendre en donne la raison :
 
 ## Le prix semble faux
 
-Le détail du calcul est affiché à côté de chaque prix. Voir [Prix conseillé](Prix-conseille) : visite Marché → *Historique*, ou saisis un prix à la main.
+Le détail du calcul est affiché à côté de chaque prix. Voir [Prix conseillé](Prix-conseille.md) : visite Marché → *Historique*, ou saisis un prix à la main.
 
 ## Le Mode enchère n'ouvre pas la vente
 

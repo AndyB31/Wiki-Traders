@@ -1,3 +1,5 @@
+[← Sommaire de la documentation](README.md)
+
 # Automatisations et risques
 
 > ⚠️ Les [règles de la communauté](https://www.wiki-masters.com/rules) (section 3) et les [conditions d'utilisation](https://www.wiki-masters.com/terms) (section 6) de WikiMasters interdisent les bots, scripts et macros qui jouent ou échangent à ta place. Le risque est un **bannissement définitif, avec perte des cartes**, sans préavis.

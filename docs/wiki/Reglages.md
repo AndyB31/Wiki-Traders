@@ -1,3 +1,5 @@
+[← Sommaire de la documentation](README.md)
+
 # Référence des réglages
 
 Réglages : **Paramètres → onglet Wiky-Traders** sur le site, ou page d'options de l'extension. Clique sur **Enregistrer** pour appliquer.
@@ -28,7 +30,7 @@ Réglages : **Paramètres → onglet Wiky-Traders** sur le site, ou page d'optio
 | Compter les enchères en cours dans le prix moyen | non | |
 | Notifications | oui | Fin d'enchère, slot libéré |
 | Heures silencieuses | 23:00 – 08:00 | Pas de notification |
-| Intégration au site | oui | Voir [Intégration au site](Integration-au-site) |
+| Intégration au site | oui | Voir [Intégration au site](Integration-au-site.md) |
 | Barre latérale compacte | oui | Menus Social et Progression |
 | Étiquettes visibles sur les cartes | oui | |
 | Style des étiquettes sur les cartes | libellés détaillés | Ou pastilles de couleur |
@@ -45,7 +47,7 @@ Une carte par ligne : jamais proposée à la vente.
 
 ## Automatisations
 
-Toutes désactivées par défaut, avec confirmation à l'activation. Voir [Automatisations et risques](Automatisations-et-risques).
+Toutes désactivées par défaut, avec confirmation à l'activation. Voir [Automatisations et risques](Automatisations-et-risques.md).
 
 | Option | Effet |
 | --- | --- |
@@ -64,6 +66,6 @@ Un prix de référence fixe pour une carte (prioritaire sur la médiane de la ra
 ## Données
 
 - Cartes connues, dernière lecture de la collection et des ventes.
-- **Sélecteurs avancés** (JSON) : à ajuster si le site change (voir [Dépannage](Depannage#page-non-reconnue)).
+- **Sélecteurs avancés** (JSON) : à ajuster si le site change (voir [Dépannage](Depannage.md#page-non-reconnue)).
 - **Exporter (JSON)** / **Importer** : sauvegarder ou transférer tes réglages.
 - **Effacer toutes les données**.
