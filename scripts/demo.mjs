@@ -469,10 +469,10 @@ await opened.waitForLoadState();
 // Les onglets ouverts par l'extension échappent au routage Playwright : on recharge la page simulée.
 ok(opened.url().startsWith(`${ORIGIN}/collection`) || opened.url().startsWith(`${ORIGIN}/login`), `« Ouvrir » ouvre la collection (${new URL(opened.url()).pathname})`);
 await opened.goto(`${ORIGIN}/collection`);
-const panel = opened.locator('[data-wiky="panel"]');
+const panel = opened.locator('[data-wiky="toast"][data-id="price"]');
 await panel.waitFor({ state: 'attached', timeout: 5000 });
-const panelText = await panel.evaluate((el) => el.shadowRoot.querySelector('.panel').textContent);
-ok(/Prix conseillé/.test(panelText), `encart : ${panelText.replace(/\s+/g, ' ').slice(0, 90)}…`);
+const panelText = await panel.evaluate((el) => el.textContent);
+ok(/prix conseillé/i.test(panelText), `toast : ${panelText.replace(/\s+/g, ' ').slice(0, 90)}…`);
 ok((await opened.locator('[data-wiky="tags"]').count()) > 0 && !(await opened.evaluate(() => document.body.innerText.includes('🪙'))), 'étiquettes sur les cartes, sans pastille de prix');
 await opened.waitForTimeout(600);
 await opened.screenshot({ path: join(shots, 'overlay.png') });
@@ -484,8 +484,8 @@ await opened.evaluate(() => {
   d.innerHTML = '<div class="card-frame relative"><h2>Mettre aux enchères</h2><p>Colisée</p><label>Mise de départ</label><input type="number" aria-label="Mise de départ"><button>Mettre aux enchères</button></div>';
   document.body.append(d);
 });
-await opened.waitForFunction(() => /Colisée[\s\S]*= 25/.test(document.querySelector('[data-wiky="panel"]')?.shadowRoot?.querySelector('.panel')?.textContent ?? ''), null, { timeout: 5000 });
-const sellText = await panel.evaluate((el) => el.shadowRoot.querySelector('.panel').textContent);
+await opened.waitForFunction(() => /Colisée[\s\S]*= 25/.test(document.querySelector('[data-wiky="toast"][data-id="price"]')?.textContent ?? ''), null, { timeout: 5000 });
+const sellText = await panel.evaluate((el) => el.textContent);
 ok(/Colisée/.test(sellText) && /médiane Rare 35 \(6 ventes\) × 70 % = 25/.test(sellText), 'fenêtre de vente : prix de la proposition ouverte (médiane Rare 35 × 70 % = 24,5 → 25)');
 await opened.screenshot({ path: join(shots, 'sell-dialog.png') });
 
@@ -536,7 +536,7 @@ const res = await sw.evaluate(async () => {
   return chrome.tabs.sendMessage(tab.id, { type: 'autoTag' });
 });
 ok(res?.ok, 'étiquetage automatique lancé');
-await tagPage.waitForFunction(() => /carte\(s\) étiquetée\(s\)/.test(document.querySelector('[data-wiky="panel"]')?.shadowRoot?.textContent ?? ''), null, { timeout: 30000 });
+await tagPage.waitForFunction(() => /carte\(s\) étiquetée\(s\)/.test(document.querySelector('[data-wiky="toast"][data-id="progress"]')?.textContent ?? ''), null, { timeout: 30000 });
 const chips = await tagPage.$$eval('li.card', (lis) => Object.fromEntries(lis.map((li) => [li.querySelector('strong').textContent, li.querySelector('.chip').textContent])));
 ok(chips['Machu Picchu'] === '50-100' && chips['Canis lupus'] === '20-50', `étiquettes appliquées sur le site : Machu Picchu → ${chips['Machu Picchu']}, Canis lupus → ${chips['Canis lupus']}`);
 await tagPage.screenshot({ path: join(shots, 'autotag.png') });

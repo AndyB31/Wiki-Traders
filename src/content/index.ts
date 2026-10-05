@@ -465,13 +465,13 @@ async function runAutoTagApi(plan: TagChange[]): Promise<void> {
   const stop = () => (stopRequested = true);
   let ok = 0;
   let failed = 0;
-  showProgress('Étiquetage (API)', `${plan.length} carte(s) à traiter…`, { onStop: stop });
+  showProgress('Étiquetage (API)', `${plan.length} carte(s) à traiter…`, { onStop: stop, step: 0, total: plan.length });
   try {
     const results = await applyTagsViaApi(
       plan,
       (done, total, step) => {
         log(`[étiquettes API] ${step.cardName}`);
-        showProgress('Étiquetage (API)', `${done}/${total} · ${step.cardName}`, { onStop: stop });
+        showProgress('Étiquetage (API)', `${done}/${total} · ${step.cardName}`, { onStop: stop, step: done, total });
       },
       () => stopRequested,
     );
@@ -513,7 +513,7 @@ async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: numb
     for (const [i, change] of plan.entries()) {
       if (stopRequested) break;
       const head = `${i + 1}/${plan.length} · ${change.cardName} → ${change.target}`;
-      showProgress('Étiquetage automatique', [head, ...lines.slice(-4)].join('\n'), { onStop: stop });
+      showProgress('Étiquetage automatique', [head, ...lines.slice(-4)].join('\n'), { onStop: stop, step: i, total: plan.length });
       try {
         const tile = await findTile(change.cardId, change.cardName, cfg);
         if (!tile) throw new ActionError('carte introuvable dans la collection, même en la recherchant');

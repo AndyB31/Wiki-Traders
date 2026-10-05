@@ -7,25 +7,9 @@ import { openSellDialog, selectSellDuration } from './automation';
 import { durationFor, durationLabel } from '../lib/duration';
 import { joinedText } from './parsers/dom';
 import { qsa, re, type SelectorConfig } from './parsers/selectors';
+import { hideToast, priceToast, progressToast } from './toast';
 
 const PENDING_TTL = 15 * 60 * 1000;
-
-const PANEL_CSS = `
-:host { all: initial; }
-.panel { position: fixed; left: 16px; bottom: 16px; z-index: 2147483646; max-width: 340px;
-  font: 13px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; color: #1c1917; background: #fffbeb;
-  border: 1px solid #f59e0b; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 12px 14px; }
-.head { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 4px; }
-.head .x { margin-left: auto; cursor: pointer; border: 0; background: none; font-size: 16px; color: #78716c; }
-.price { font-size: 22px; font-weight: 700; color: #b45309; }
-.detail { color: #57534e; font-size: 12px; margin: 2px 0 8px; white-space: pre-line; }
-.row { display: flex; gap: 8px; align-items: center; }
-button.copy { cursor: pointer; border: 0; border-radius: 8px; padding: 6px 12px; background: #f59e0b; color: #fff; font-weight: 600; }
-.hint { font-size: 11px; color: #78716c; margin-top: 8px; }
-.progress { white-space: pre-line; font-size: 12px; color: #44403c; max-height: 160px; overflow: auto; }
-.err { color: #b91c1c; }
-button.stop { cursor: pointer; border: 1px solid #b91c1c; color: #b91c1c; background: #fff; border-radius: 8px; padding: 4px 10px; }
-`;
 
 export interface OverlayState {
   store: AllocationInput & { pendingFocus: PendingFocus | null };
@@ -100,92 +84,47 @@ function renderTagChips(host: HTMLElement, tags: string[], colors: Map<string, s
   host.appendChild(box);
 }
 
-let host: HTMLElement | null = null;
-let shadow: ShadowRoot | null = null;
 let scrolledFor: string | null = null;
-/** Une automatisation est en cours : l'encart affiche sa progression. */
+/** Une automatisation est en cours : le toast de progression a la main. */
 let busy = false;
 
-function ensurePanel(): ShadowRoot {
-  if (shadow && host?.isConnected) return shadow;
-  host = document.createElement('div');
-  host.setAttribute('data-wiky', 'panel');
-  shadow = host.attachShadow({ mode: 'open' });
-  document.documentElement.appendChild(host);
-  return shadow;
-}
-
 function hidePanel(): void {
-  host?.remove();
-  host = null;
-  shadow = null;
+  hideToast('price');
 }
 
 function showPanel(title: string, price: number | null, detail: string, onClose: () => void): void {
-  const key = `${title}|${price}|${detail}`;
-  if (host?.isConnected && host.dataset.key === key) return;
-  const root = ensurePanel();
-  host!.dataset.key = key;
-  root.innerHTML = '';
-  const style = document.createElement('style');
-  style.textContent = PANEL_CSS;
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  panel.innerHTML = `
-    <div class="head">🪙 <span class="t"></span><button class="x" title="Fermer">×</button></div>
-    <div class="row"><span class="price"></span><button class="copy">Copier</button></div>
-    <div class="detail"></div>
-    <div class="hint">Wiky-Traders conseille, c'est toi qui cliques sur « Mettre en vente ».</div>`;
-  panel.querySelector('.t')!.textContent = title;
-  panel.querySelector('.price')!.textContent = price != null ? `Prix conseillé : ${formatPrice(price)}` : 'Prix à saisir';
-  panel.querySelector('.detail')!.textContent = detail;
-  const copy = panel.querySelector<HTMLButtonElement>('.copy')!;
-  copy.disabled = price == null;
-  copy.addEventListener('click', async () => {
-    if (price == null) return;
-    await navigator.clipboard.writeText(String(price));
-    copy.textContent = 'Copié ✓';
-    setTimeout(() => (copy.textContent = 'Copier'), 1500);
-  });
-  panel.querySelector('.x')!.addEventListener('click', () => {
-    hidePanel();
-    onClose();
-  });
-  root.append(style, panel);
+  priceToast({ cardName: title, price, priceText: price != null ? formatPrice(price) : 'Prix à saisir', detail, onClose });
 }
 
-/** Encart de progression (automatisations) avec bouton Arrêter. */
-export function showProgress(title: string, text: string, opts: { onStop?: () => void; error?: boolean; done?: boolean } = {}): void {
+/** Toast de progression (automatisations) avec bouton Arrêter. Le texte peut tenir sur plusieurs lignes : la 1re est l'étape. */
+export function showProgress(
+  title: string,
+  text: string,
+  opts: { onStop?: () => void; error?: boolean; done?: boolean; step?: number; total?: number } = {},
+): void {
   busy = !opts.done && !opts.error;
-  const root = ensurePanel();
-  host!.dataset.key = '';
-  root.innerHTML = '';
-  const style = document.createElement('style');
-  style.textContent = PANEL_CSS;
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  panel.innerHTML = `<div class="head">🪙 <span class="t"></span><button class="x" title="Fermer">×</button></div><div class="progress"></div><div class="row" style="margin-top:8px"></div>`;
-  panel.querySelector('.t')!.textContent = title;
-  const progress = panel.querySelector('.progress')!;
-  progress.textContent = text;
-  if (opts.error) progress.classList.add('err');
-  if (opts.onStop && busy) {
-    const stop = document.createElement('button');
-    stop.className = 'stop';
-    stop.textContent = 'Arrêter';
-    stop.addEventListener('click', opts.onStop);
-    panel.querySelector('.row')!.append(stop);
-  }
-  panel.querySelector('.x')!.addEventListener('click', () => {
-    busy = false;
-    opts.onStop?.();
-    hidePanel();
+  // Pendant une automatisation, le prix conseillé laisse la place à la progression.
+  if (busy) hidePanel();
+  const [first, ...lines] = text.split('\n');
+  progressToast({
+    title,
+    text: first,
+    lines,
+    done: opts.step,
+    total: opts.total,
+    error: opts.error,
+    finished: opts.done,
+    onStop: opts.onStop,
+    onClose: () => {
+      busy = false;
+      opts.onStop?.();
+    },
   });
-  root.append(style, panel);
 }
 
 export function endProgress(): void {
   busy = false;
+  hideToast('progress');
 }
 
 /** Fenêtre « mettre en vente » ouverte : renvoie le conteneur et la carte reconnue. */
