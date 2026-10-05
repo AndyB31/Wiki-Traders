@@ -25,6 +25,8 @@ Une vente qui disparaît de la liste est comptée comme terminée (journal, prix
 | Gagnée / Perdue | Enchère terminée |
 | Annulée | Enchère annulée par le vendeur |
 
+La liste est **relue à chaque ouverture** de « Mes mises » (popup ou fenêtre du site). La case **En cours seulement** (mémorisée) n'affiche que les mises encore en jeu, en tête ou surenchéries.
+
 Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant et le **prix de la carte** (médiane de ses ventes) pour juger si tu paies trop cher. Le bloc Wiky-Traders résume les mises en cours et les résultats des dernières 24 h.
 
 ![Mises](../screenshots/window-bids.png)

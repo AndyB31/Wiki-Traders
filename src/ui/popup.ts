@@ -300,6 +300,30 @@ function endText(endsAt: number, now: number): string {
 }
 
 /** Onglet « Mises » : enchères des autres où j'ai misé, lues via l'API (lecture seule). */
+/** « Mes mises » : actualisation en cours (lancée à l'ouverture de l'onglet) et filtre « en cours seulement ». */
+let bidsRefreshing = false;
+let bidsError: string | null = null;
+let bidsCurrentOnly = localStorage.getItem('wiky-bids-current') === '1';
+
+/** Mise toujours en jeu : en tête ou surenchérie, et pas encore terminée. */
+function isCurrentBid(b: MyBid, now: number): boolean {
+  return (b.status === 'leading' || b.status === 'outbid') && (b.endsAt == null || b.endsAt > now);
+}
+
+/** Relit mes mises via l'onglet du site chaque fois que « Mes mises » s'ouvre (la liste affichée est toujours fraîche). */
+async function refreshBidsOnOpen(): Promise<void> {
+  if (currentTab !== 'bids' || bidsRefreshing || !store?.settings.apiRead) return;
+  if (!(await siteTab())) return;
+  bidsRefreshing = true;
+  bidsError = null;
+  render();
+  const res = (await sendToTab({ type: 'api', op: 'myBids' })) as { ok: boolean; error?: string } | null;
+  bidsRefreshing = false;
+  bidsError = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? null : res.error ?? 'Erreur';
+  // Le nouveau relevé arrive aussi par le stockage (onStoreChange) ; on redessine pour retirer « Actualisation… ».
+  render();
+}
+
 function bidsBlock() {
   if (!store.settings.apiRead) {
     const enable = async () => {
@@ -313,7 +337,11 @@ function bidsBlock() {
       h('button', { onclick: enable }, 'Activer la lecture via l\'API…'),
     ];
   }
-  const status = h('span', { class: 'small muted grow' }, store.bidsCache ? `Relevé ${fmtDate(store.bidsCache.at)}` : 'Pas encore de relevé.');
+  const status = h(
+    'span',
+    { class: 'small muted grow' },
+    bidsRefreshing ? 'Actualisation…' : bidsError ?? (store.bidsCache ? `Relevé ${fmtDate(store.bidsCache.at)}` : 'Pas encore de relevé.'),
+  );
   const run = async (op: 'myBids' | 'marketSales', btn: HTMLButtonElement) => {
     if (!(await siteTab())) {
       status.textContent = 'Ouvre un onglet WikiMasters pour interroger l\'API.';
@@ -340,7 +368,9 @@ function bidsBlock() {
     status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `Mise de ${formatPrice(res.amount)} envoyée.` : res.error ?? 'Mise refusée.';
   };
   const order: Record<BidStatus, number> = { leading: 0, outbid: 0, won: 1, lost: 1, cancelled: 2 };
-  const rows = [...(store.bidsCache?.bids ?? [])].sort((a, b) => order[a.status] - order[b.status] || (order[a.status] === 0 ? (a.endsAt ?? 0) - (b.endsAt ?? 0) : b.lastBidAt - a.lastBidAt));
+  const all = store.bidsCache?.bids ?? [];
+  const current = all.filter((b) => isCurrentBid(b, Date.now()));
+  const rows = [...(bidsCurrentOnly ? current : all)].sort((a, b) => order[a.status] - order[b.status] || (order[a.status] === 0 ? (a.endsAt ?? 0) - (b.endsAt ?? 0) : b.lastBidAt - a.lastBidAt));
   const now = Date.now();
   const row = (b: MyBid) => {
     const ref = rarityBase(b.rarity, b.shiny, ctx);
@@ -385,7 +415,27 @@ function bidsBlock() {
       h('button', { title: 'Relire mes mises', onclick: (e: Event) => run('myBids', e.currentTarget as HTMLButtonElement) }, 'Actualiser'),
       h('button', { title: 'Charge les ventes conclues des 7 derniers jours (prix de référence par rareté)', onclick: (e: Event) => run('marketSales', e.currentTarget as HTMLButtonElement) }, 'Prix du marché'),
     ),
-    rows.length ? h('div', { class: 'bids' }, rows.map(row)) : h('p', { class: 'muted empty' }, store.bidsCache ? 'Aucune mise trouvée.' : 'Clique sur « Actualiser ».'),
+    h(
+      'label',
+      { class: 'row small', title: 'Masque les mises gagnées, perdues ou annulées' },
+      h('input', {
+        type: 'checkbox',
+        checked: bidsCurrentOnly,
+        onchange: (e: Event) => {
+          bidsCurrentOnly = (e.target as HTMLInputElement).checked;
+          localStorage.setItem('wiky-bids-current', bidsCurrentOnly ? '1' : '0');
+          render();
+        },
+      }),
+      h('span', { class: 'grow' }, `En cours seulement (${current.length})`),
+    ),
+    rows.length
+      ? h('div', { class: 'bids' }, rows.map(row))
+      : h(
+          'p',
+          { class: 'muted empty' },
+          bidsRefreshing ? 'Actualisation…' : bidsCurrentOnly && all.length ? 'Aucune mise en cours.' : store.bidsCache ? 'Aucune mise trouvée.' : 'Clique sur « Actualiser ».',
+        ),
   ];
 }
 
@@ -1039,6 +1089,7 @@ function render(): void {
               currentTab = t.id;
               localStorage.setItem('wiky-tab', t.id);
               render();
+              void refreshBidsOnOpen();
             },
           },
           t.label,
@@ -1141,6 +1192,7 @@ async function main(): Promise<void> {
   // Dans la fenêtre flottante, l'onglet est celui qui contient l'iframe.
   activeTab = (embedded ? await ext.tabs.getCurrent() : undefined) ?? (await ext.tabs.query({ active: true, currentWindow: true }))[0];
   await refresh();
+  void refreshBidsOnOpen();
   onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'myFamilies', 'journal'], refresh);
   setInterval(render, 15_000);
   // Compte à rebours des mises (sans tout redessiner).

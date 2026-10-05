@@ -633,6 +633,16 @@ const bidRows = await ef.$$eval('.bid', (els) => els.map((e) => e.textContent.re
 ok(bidRows.length === 4 && /Surenchéri/.test(bidRows[0]) && /En tête/.test(bidRows[1]), `4 mises lues : ${bidRows.map((r) => r.split(' ')[0]).join(', ')}…`);
 ok(/carte 80 \(2 ventes\)/.test(bidRows[0]), 'prix de la carte (médiane de ses ventes) affiché');
 ok(apiCalls.length > 0 && apiCalls.every((m) => m === 'GET' || m === 'OPTIONS'), `${apiCalls.length} appels API, uniquement en lecture (tant que l'écriture n'est pas activée)`);
+// Rouvrir « Mises » relit les mises sans clic ; « En cours seulement » masque les terminées.
+const bidsAt = (await storage()).bidsCache.at;
+await ef.click('.tabs .tab:has-text("Vendre")');
+await ef.click('.tabs .tab:has-text("Mises")');
+await waitFor((x) => x.bidsCache?.at > bidsAt, 'mises relues à l\'ouverture', 8000);
+ok(true, '« Mises » actualisée automatiquement à l\'ouverture');
+await ef.click('label:has-text("En cours seulement") input');
+const currentRows = await ef.$$eval('.bid .pill', (els) => els.map((e) => e.textContent));
+ok(currentRows.length > 0 && currentRows.every((t) => /En tête|Surenchéri/.test(t)), `« En cours seulement » : ${currentRows.length} mise(s) en jeu (${currentRows.join(', ')})`);
+await ef.click('label:has-text("En cours seulement") input');
 await market.waitForTimeout(300);
 await market.screenshot({ path: join(shots, 'window-bids.png') });
 
