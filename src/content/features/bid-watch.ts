@@ -283,7 +283,8 @@ function draw(): void {
   }
   const quick = c.flags.quickOutbid && c.apiRead;
   const nav = siteNav();
-  const anchor = nav?.querySelector(':scope > [data-wiky="nav-wiky"]') ?? null;
+  // Sous le récapitulatif Wiky-Traders (barre compacte) ou sous le bloc Wiky-Traders (barre du site intacte).
+  const anchor = nav?.querySelector(':scope > [data-wiky="nav-recap"], :scope > [data-wiky="nav-wiky"]') ?? null;
   // Sans barre latérale (intégration coupée, mobile) : petit bloc flottant, seulement quand une fin approche.
   const floating = !anchor;
   if (floating && !list.some((b) => b.endsAt != null && b.endsAt - now <= SOON_MS)) {

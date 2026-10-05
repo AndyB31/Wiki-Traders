@@ -61,11 +61,59 @@ const ITEMS: { view: View; label: string; title: string; icon: string; page?: st
   { view: 'tools', label: 'Outils', title: 'Outils', icon: 'wrench' },
 ];
 
-/** Menus de la barre latérale : liens du site regroupés. */
-const GROUPS: { id: string; label: string; icon: string; hrefs: string[] }[] = [
-  { id: 'social', label: 'Social', icon: 'users', hrefs: ['/trades', '/friends', '/dms', '/guild', '/battle'] },
-  { id: 'progress', label: 'Progression', icon: 'trending', hrefs: ['/profile', '/achievements', '/leaderboard'] },
+/**
+ * Arborescence de la barre latérale (barre compacte) : « Paquets » reste en haut, le reste est rangé en menus ;
+ * le récapitulatif Wiky-Traders puis « Paramètres » ferment la barre. Les pages de l'extension sont rangées avec
+ * celles du site, reconnaissables à leur icône orange.
+ *  - `site` : lien du site (masqué, reproduit dans le menu ; `label` remplace son libellé) ;
+ *  - `wiky` : fonctionnalité Wiky-Traders (fenêtre ou page) ;
+ *  - `link` : page Wiky-Traders sans vue de popup (réglages).
+ */
+type TreeEntry = { site: string; label?: string } | { wiky: View } | { link: string; label: string; icon: string; route: 'settings' };
+interface TreeGroup {
+  id: string;
+  label: string;
+  /** Icône reprise du lien du site `iconFrom`, sinon icône Wiky-Traders. */
+  icon: string;
+  iconFrom?: string;
+  /** Page ouverte par un clic sur le titre du menu (lien du site). */
+  href?: string;
+  entries: TreeEntry[];
+}
+
+const TREE: TreeGroup[] = [
+  {
+    id: 'collection',
+    label: 'Collection',
+    icon: 'layers',
+    iconFrom: '/collection',
+    href: '/collection',
+    entries: [{ site: '/collection', label: 'Ma collection' }, { site: '/global-collection' }, { site: '/global-collection?wm=themes' }, { wiky: 'families' }, { wiky: 'cards' }, { wiky: 'tags' }],
+  },
+  {
+    id: 'market',
+    label: 'Marché',
+    icon: 'bid',
+    iconFrom: '/marketplace',
+    href: '/marketplace',
+    entries: [{ site: '/marketplace', label: 'Parcourir le marché' }, { site: '/marketplace?wm=bids' }, { wiky: 'sell' }, { wiky: 'running' }, { wiky: 'bids' }, { wiky: 'sold' }],
+  },
+  { id: 'social', label: 'Social', icon: 'users', entries: [{ site: '/trades' }, { site: '/guild' }, { site: '/friends' }, { site: '/dms' }, { site: '/battle' }] },
+  { id: 'progress', label: 'Progression', icon: 'trending', entries: [{ site: '/profile' }, { site: '/achievements' }, { site: '/leaderboard' }] },
 ];
+
+/** Dernier menu, tout en bas, sous le récapitulatif. */
+const SETTINGS_GROUP: TreeGroup = {
+  id: 'settings',
+  label: 'Paramètres',
+  icon: 'sliders',
+  iconFrom: '/settings',
+  href: '/settings',
+  entries: [{ site: '/settings', label: 'Paramètres du site' }, { link: '/settings?wiky=settings', label: 'Réglages Wiky-Traders', icon: 'sliders', route: 'settings' }, { wiky: 'tools' }],
+};
+
+/** Liens du site laissés en haut, hors menus. */
+const TOP_LEVEL = ['/pulls'];
 
 /** Classes d'un lien inactif de la barre latérale du site (pour que nos en-têtes de menu lui ressemblent). */
 const NAV_ITEM_CLASS =
@@ -80,6 +128,19 @@ nav[data-wiky-nav="compact"] > a svg, nav[data-wiky-nav="compact"] .wiky-group-h
 nav[data-wiky-nav] > a[data-wiky-grouped] { display: none !important; }
 .wiky-group-head { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; }
 .wiky-group-head.is-active { color: var(--color-accent) !important; }
+nav[data-wiky-nav] .wiky-group-head.split { padding: 0 !important; gap: 0 !important; }
+.wiky-group-head.split > .wiky-head-main { all: unset; flex: 1; display: flex; align-items: center; gap: 12px; padding: 7px 0 7px 16px; cursor: pointer; border-radius: 12px 0 0 12px; }
+.wiky-group-head.split > .wiky-head-toggle { all: unset; display: inline-grid; place-items: center; width: 34px; align-self: stretch; cursor: pointer; border-radius: 0 12px 12px 0; }
+.wiky-group-head.split > .wiky-head-toggle .wiky-chev { margin: 0; }
+.wiky-group-head > .wiky-head-main svg, .wiky-group-head > span:first-child svg { width: 20px !important; height: 20px !important; }
+.wiky-group-items > .wiky-sub { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 10px; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer;
+  border: 0; background: none; font-family: inherit; text-align: left; width: 100%; box-sizing: border-box; color: color-mix(in srgb, var(--color-foreground) 60%, transparent); transition: all .2s ease; }
+.wiky-group-items > .wiky-sub:hover { color: var(--color-foreground); background: var(--color-surface-light); }
+.wiky-group-items > .wiky-sub.is-active { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.wiky-group-items > .wiky-sub .wiky-ico { display: inline-flex; color: #fb923c; }
+.wiky-group-items > .wiky-sub .wiky-count { margin-left: auto; min-width: 18px; padding: 0 6px; border-radius: 999px; background: #f97316; color: #fff; font-size: 10.5px; font-weight: 700; text-align: center; line-height: 18px; }
+.wiky-group-items > .wm-family-nav { border-color: transparent !important; background: none !important; }
+nav[data-wiky-nav] > [data-wiky="nav-recap"] { margin: auto 0 4px; padding-top: 10px; }
 .wiky-chev { margin-left: auto; display: inline-flex; opacity: .45; transition: transform .2s ease; }
 [data-open="true"] > .wiky-group-head .wiky-chev, [data-open="true"] .wiky-status-toggle .wiky-chev { transform: rotate(90deg); }
 .wiky-group-items { display: none; flex-direction: column; gap: 1px; margin: 2px 0 4px 22px; padding-left: 8px; border-left: 1px solid var(--color-border); }
@@ -208,53 +269,198 @@ function frameUrl(page: 'popup' | 'options', view?: View): string {
 
 // ---------------------------------------------------------------- menus regroupés
 
-function renderGroups(nav: HTMLElement, compact: boolean): void {
-  if (!compact) {
-    nav.removeAttribute('data-wiky-nav');
-    for (const a of nav.querySelectorAll('[data-wiky-grouped]')) a.removeAttribute('data-wiky-grouped');
-    for (const g of nav.querySelectorAll('[data-wiky="nav-group"]')) g.remove();
+/** Lien du site actif (classes de l'élément actif du site, ou aria-current). */
+function isActiveLink(a: Element): boolean {
+  return /color-accent\)\]\/10/.test(a.className) || a.getAttribute('aria-current') === 'page' || a.classList.contains('is-active');
+}
+
+/** Liens de premier niveau de la barre du site, par adresse. */
+function siteLinks(nav: HTMLElement): Map<string, HTMLAnchorElement> {
+  const map = new Map<string, HTMLAnchorElement>();
+  for (const a of nav.querySelectorAll<HTMLAnchorElement>(':scope > a[href]')) map.set(a.getAttribute('href') ?? '', a);
+  return map;
+}
+
+/** Retire l'arborescence et rend la barre du site intacte. */
+function clearTree(nav: HTMLElement): void {
+  nav.removeAttribute('data-wiky-nav');
+  for (const a of nav.querySelectorAll('[data-wiky-grouped]')) a.removeAttribute('data-wiky-grouped');
+  for (const g of nav.querySelectorAll('[data-wiky="nav-group"], [data-wiky="nav-recap"]')) g.remove();
+}
+
+/** Copie d'un lien du site pour un menu : même apparence, navigation par le lien d'origine (sans rechargement). */
+function copyOfSiteLink(a: HTMLAnchorElement, label: string | undefined, inactive: boolean): HTMLAnchorElement {
+  const copy = a.cloneNode(true) as HTMLAnchorElement;
+  copy.removeAttribute('data-wiky-grouped');
+  copy.removeAttribute('id');
+  // Sur une page Wiky-Traders (ex. /collection?wiky=families), le lien du site ne doit pas paraître actif.
+  if (inactive && isActiveLink(copy)) {
+    copy.className = copy.classList.contains('wm-family-nav') ? copy.className.replace(/\bis-active\b/, '') : NAV_ITEM_CLASS;
+    copy.removeAttribute('aria-current');
+    copy.querySelector(':scope > div.ml-auto')?.remove();
+  }
+  if (label) {
+    const text = [...copy.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim()) ?? [...copy.querySelectorAll('span')].reverse().find((n) => n.textContent?.trim());
+    if (text) text.textContent = label;
+  }
+  copy.addEventListener('click', (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    a.click();
+  });
+  return copy;
+}
+
+/** Élément Wiky-Traders d'un menu (icône orange) : fenêtre par-dessus la page, ou page du site. */
+function wikySub(item: (typeof ITEMS)[number], route: View | 'settings' | null, count: number): HTMLElement {
+  const inner = `<span class="wiky-ico">${icon(item.icon, 18)}</span><span>${item.label}</span>${count ? `<span class="wiky-count">${count}</span>` : ''}`;
+  if (item.page) return el('a', { class: `wiky-sub${route === item.view ? ' is-active' : ''}`, href: `${item.page}?wiky=${item.view}`, 'data-wiky-view': item.view }, inner);
+  const b = el('button', { type: 'button', class: 'wiky-sub', 'data-wiky-view': item.view }, inner);
+  b.addEventListener('click', () => openModal(item.view));
+  return b;
+}
+
+/** Icône du titre d'un menu : celle du lien du site correspondant (même rendu), sinon la nôtre. */
+function headIcon(group: TreeGroup, links: Map<string, HTMLAnchorElement>): string {
+  const svg = group.iconFrom ? links.get(group.iconFrom)?.querySelector('svg') : null;
+  return `<span class="${NAV_ICON_CLASS}">${svg ? svg.outerHTML : icon(group.icon, 24)}</span>`;
+}
+
+function buildGroup(
+  group: TreeGroup,
+  links: Map<string, HTMLAnchorElement>,
+  route: View | 'settings' | null,
+  counts: Partial<Record<View, number>>,
+  integration: boolean,
+  flags: ReturnType<typeof featureFlags>,
+): HTMLElement | null {
+  const items: HTMLElement[] = [];
+  let active = false;
+  for (const entry of group.entries) {
+    if ('site' in entry) {
+      const a = links.get(entry.site);
+      if (!a) continue;
+      if (a.getAttribute('data-wiky-grouped') !== group.id) a.setAttribute('data-wiky-grouped', group.id);
+      const on = !route && isActiveLink(a);
+      active ||= on;
+      items.push(copyOfSiteLink(a, entry.label, !!route));
+    } else if (!integration) {
+      continue;
+    } else if ('wiky' in entry) {
+      const item = ITEMS.find((i) => i.view === entry.wiky);
+      if (!item || (item.feature && !flags[item.feature])) continue;
+      active ||= route === item.view;
+      items.push(wikySub(item, route, counts[item.view] ?? 0));
+    } else {
+      const on = route === entry.route;
+      active ||= on;
+      items.push(el('a', { class: `wiky-sub${on ? ' is-active' : ''}`, href: entry.link }, `<span class="wiky-ico">${icon(entry.icon, 18)}</span><span>${entry.label}</span>`));
+    }
+  }
+  if (!items.length) return null;
+  const box = el('div', { 'data-wiky': 'nav-group', 'data-group': group.id });
+  box.dataset.open = String(active || isOpen(group.id, false));
+  const toggle = () => {
+    const open = box.dataset.open !== 'true';
+    box.dataset.open = String(open);
+    box.querySelector('[aria-expanded]')?.setAttribute('aria-expanded', String(open));
+    setOpen(group.id, open);
+  };
+  const chev = `<span class="wiky-chev">${icon('chevron', 16)}</span>`;
+  const target = group.href ? links.get(group.href) : undefined;
+  let head: HTMLElement;
+  if (target) {
+    // Titre = lien vers la page (et ouvre le menu) ; flèche = ouvrir / fermer seulement.
+    head = el('div', { class: `wiky-group-head split ${NAV_ITEM_CLASS}${active ? ' is-active' : ''}` });
+    const main = el('button', { type: 'button', class: 'wiky-head-main', title: `Ouvrir ${group.label}` }, `${headIcon(group, links)}${group.label}`);
+    main.addEventListener('click', () => {
+      if (box.dataset.open !== 'true') toggle();
+      target.click();
+    });
+    const tg = el('button', { type: 'button', class: 'wiky-head-toggle', 'aria-expanded': box.dataset.open, 'aria-label': `Menu ${group.label}` }, chev);
+    tg.addEventListener('click', toggle);
+    head.append(main, tg);
+  } else {
+    head = el('button', { type: 'button', class: `wiky-group-head ${NAV_ITEM_CLASS}${active ? ' is-active' : ''}`, 'aria-expanded': box.dataset.open }, `${headIcon(group, links)}${group.label}${chev}`);
+    head.addEventListener('click', toggle);
+  }
+  const list = el('div', { class: 'wiky-group-items' });
+  list.append(...items);
+  box.append(head, list);
+  return box;
+}
+
+/**
+ * Barre latérale compacte : « Paquets » en haut, puis les menus (liens du site et pages Wiky-Traders mêlés),
+ * le récapitulatif Wiky-Traders et « Paramètres » tout en bas. Reconstruite seulement si quelque chose change.
+ */
+function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions): void {
+  const integration = store.settings.siteIntegration;
+  if (nav.getAttribute('data-wiky-nav') !== 'compact') nav.setAttribute('data-wiky-nav', 'compact');
+  nav.querySelector(':scope > [data-wiky="nav-wiky"]')?.remove();
+  const links = siteLinks(nav);
+  const route = currentRoute();
+  const now = Date.now();
+  const summary = integration ? siteSummary(store, now) : null;
+  const counts: Partial<Record<View, number>> = summary ? { sell: summary.toSell, running: summary.occupied, bids: summary.leading + summary.outbid } : {};
+  const flags = featureFlags(store.settings.features);
+  const groups = integration ? [...TREE, SETTINGS_GROUP] : TREE;
+  const key = JSON.stringify([
+    [...links.entries()].map(([h, a]) => [h, a.className, a.textContent]),
+    route,
+    counts,
+    integration,
+    store.settings.features,
+  ]);
+  const existing = [...nav.querySelectorAll<HTMLElement>(':scope > [data-wiky="nav-group"]')];
+  if (nav.dataset.wikyTree !== key || existing.length === 0) {
+    nav.dataset.wikyTree = key;
+    // Les menus gardent leur état ouvert / fermé d'une reconstruction à l'autre.
+    const openNow = new Map(existing.map((g) => [g.dataset.group!, g.dataset.open === 'true']));
+    for (const [id, open] of openNow) setOpen(id, open);
+    existing.forEach((g) => g.remove());
+    if (!integration) links.get('/settings')?.removeAttribute('data-wiky-grouped');
+    const built = groups.map((g) => [g, buildGroup(g, links, route, counts, integration, flags)] as const);
+    // Ordre : après les liens laissés en haut (Paquets), puis récapitulatif et Paramètres en dernier.
+    let anchor: Element | null = TOP_LEVEL.map((h) => links.get(h)).filter(Boolean).pop() ?? nav.firstElementChild;
+    for (const [g, box] of built) {
+      if (!box) continue;
+      if (g === SETTINGS_GROUP) nav.append(box);
+      else {
+        anchor ? anchor.after(box) : nav.prepend(box);
+        anchor = box;
+      }
+    }
+  }
+  // Récapitulatif juste au-dessus de « Paramètres » (le dernier menu).
+  let recap = nav.querySelector<HTMLElement>(':scope > [data-wiky="nav-recap"]');
+  if (!integration || !summary) {
+    recap?.remove();
     return;
   }
-  if (nav.getAttribute('data-wiky-nav') !== 'compact') nav.setAttribute('data-wiky-nav', 'compact');
-  for (const group of GROUPS) {
-    const originals = [...nav.querySelectorAll<HTMLAnchorElement>(':scope > a[href]')].filter((a) => group.hrefs.includes(a.getAttribute('href') ?? ''));
-    let box = nav.querySelector<HTMLElement>(`:scope > [data-wiky="nav-group"][data-group="${group.id}"]`);
-    if (!originals.length) {
-      box?.remove();
-      continue;
-    }
-    for (const a of originals) if (a.getAttribute('data-wiky-grouped') !== group.id) a.setAttribute('data-wiky-grouped', group.id);
-    const active = originals.some((a) => /color-accent\)\]\/10|aria-current/.test(a.className) || a.getAttribute('aria-current') === 'page');
-    const key = originals.map((a) => `${a.getAttribute('href')}|${a.className}|${a.textContent}`).join('\n');
-    if (!box) {
-      box = el('div', { 'data-wiky': 'nav-group', 'data-group': group.id });
-      nav.insertBefore(box, originals[0]);
-    }
-    if (box.dataset.key === key) continue;
-    box.dataset.key = key;
-    box.dataset.open = String(active || isOpen(group.id, false));
-    const head = el('button', { type: 'button', class: `wiky-group-head ${NAV_ITEM_CLASS}${active ? ' is-active' : ''}`, 'aria-expanded': box.dataset.open },
-      `<span class="${NAV_ICON_CLASS}">${icon(group.icon, 24).replace('<svg ', '<svg class="w-5 h-5 md:w-6 md:h-6 shrink-0" ')}</span>${group.label}<span class="wiky-chev">${icon('chevron', 16)}</span>`);
-    head.addEventListener('click', () => {
-      const open = box!.dataset.open !== 'true';
-      box!.dataset.open = String(open);
-      head.setAttribute('aria-expanded', String(open));
-      setOpen(group.id, open);
-    });
-    const items = el('div', { class: 'wiky-group-items' });
-    for (const a of originals) {
-      const copy = a.cloneNode(true) as HTMLAnchorElement;
-      copy.removeAttribute('data-wiky-grouped');
-      // Le lien d'origine (caché) fait la navigation du site, sans rechargement complet.
-      copy.addEventListener('click', (e) => {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-        e.preventDefault();
-        a.click();
-      });
-      items.append(copy);
-    }
-    box.replaceChildren(head, items);
+  if (!recap) recap = el('div', { 'data-wiky': 'nav-recap' });
+  const settingsBox = nav.querySelector(':scope > [data-wiky="nav-group"][data-group="settings"]');
+  // (« Mises en direct » peut se glisser entre le récapitulatif et Paramètres : seul l'ordre compte.)
+  const misplaced = settingsBox ? recap.parentElement !== nav || !(recap.compareDocumentPosition(settingsBox) & Node.DOCUMENT_POSITION_FOLLOWING) : recap.parentElement !== nav;
+  if (misplaced) {
+    if (settingsBox) nav.insertBefore(recap, settingsBox);
+    else nav.append(recap);
   }
+  const recapKey = JSON.stringify([summary, Math.floor(now / 30_000)]);
+  if (recap.dataset.key === recapKey) return;
+  recap.dataset.key = recapKey;
+  const status = el('div', { class: 'wiky-status', role: 'button', tabindex: '0', title: 'Ouvrir les slots à remplir' }, statusHtml(summary, now, false));
+  status.addEventListener('click', (e) => {
+    const act = (e.target as Element).closest<HTMLElement>('[data-act]');
+    if (act?.dataset.act === 'refresh') {
+      act.classList.add('spin');
+      actions.refresh();
+    } else openModal('sell');
+  });
+  status.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target === status) openModal('sell');
+  });
+  recap.replaceChildren(status);
 }
 
 // ---------------------------------------------------------------- résumé et menu Wiky-Traders
@@ -302,7 +508,7 @@ export function siteSummary(store: SiteUiStore, now = Date.now()): SiteSummary {
   };
 }
 
-function statusHtml(s: SiteSummary, now: number): string {
+function statusHtml(s: SiteSummary, now: number, toggle = true): string {
   const free = Math.max(0, s.slots - s.occupied);
   const stale = s.lastSync == null ? 'none' : now - s.lastSync > STALE_AFTER_MS ? 'stale' : '';
   const segs = Array.from({ length: Math.min(s.slots, 12) }, (_, i) => `<i class="${i < s.occupied ? 'on' : ''}"></i>`).join('');
@@ -314,7 +520,7 @@ function statusHtml(s: SiteSummary, now: number): string {
     : '';
   return `
     <div class="wiky-status-head"><span class="wiky-ico">${icon('coins', 18)}</span>Wiky-Traders<span class="wiky-dot ${stale}" title="${stale === 'none' ? 'Jamais synchronisé' : stale ? 'Données anciennes' : 'Données à jour'}"></span>
-      <span class="wiky-status-toggle" role="button" tabindex="0" data-act="toggle" title="Afficher / masquer le menu"><span class="wiky-chev" style="margin:0">${icon('chevron', 14)}</span></span></div>
+      ${toggle ? `<span class="wiky-status-toggle" role="button" tabindex="0" data-act="toggle" title="Afficher / masquer le menu"><span class="wiky-chev" style="margin:0">${icon('chevron', 14)}</span></span>` : ''}</div>
     <div class="wiky-row"><span>Slots</span><span><b>${s.occupied}/${s.slots}</b> · ${free ? `<b class="wiky-win">${plural(free, 'libre')}</b>` : 'complets'}</span></div>
     <div class="wiky-slots">${segs}</div>
     ${s.nextEnd ? `<div class="wiky-row"><span>Prochaine fin</span><b>${formatDuration(s.nextEnd - now)}</b></div>` : ''}
@@ -523,6 +729,7 @@ export function renderSiteUi(store: SiteUiStore, actions: SiteUiActions): void {
   const nav = siteNav();
   if (!siteIntegration) {
     nav?.querySelector('[data-wiky="nav-wiky"]')?.remove();
+    nav?.querySelector('[data-wiky="nav-recap"]')?.remove();
     document.querySelector('[data-wiky="settings-entry"]')?.remove();
     document.getElementById('wiky-page')?.remove();
     document.documentElement.removeAttribute('data-wiky-route');
@@ -531,8 +738,13 @@ export function renderSiteUi(store: SiteUiStore, actions: SiteUiActions): void {
   if (!siteIntegration && !compactNav && !document.getElementById('wiky-site-style')) return;
   ensureStyle();
   if (nav) {
-    renderGroups(nav, compactNav);
-    if (siteIntegration) renderWikySection(nav, store, actions);
+    if (compactNav) renderTree(nav, store, actions);
+    else {
+      // Barre du site intacte ; Wiky-Traders en un seul bloc (récapitulatif et menu) au-dessus de « Paramètres ».
+      clearTree(nav);
+      delete nav.dataset.wikyTree;
+      if (siteIntegration) renderWikySection(nav, store, actions);
+    }
   }
   if (siteIntegration) {
     renderPage();

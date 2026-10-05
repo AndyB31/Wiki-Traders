@@ -6,23 +6,32 @@ Avec l'option **Intégration au site** (activée par défaut), Wiky-Traders s'in
 
 ![Barre latérale](../screenshots/site-sidebar.png)
 
-## Barre latérale compacte
+## Barre latérale
 
-Option **Barre latérale compacte** (activée par défaut) :
+Avec l'option **Barre latérale compacte** (activée par défaut), toute la barre est rangée en une seule arborescence, où les pages de Wiky-Traders sont mêlées à celles du site et reconnaissables à leur **icône orange** :
 
-- les liens sont plus serrés, pour faire de la place ;
-- **Social** regroupe Échanges, Guilde, Amis, Messages et Bataille ;
-- **Progression** regroupe Profil, Succès et Classement ;
-- un menu s'ouvre d'un clic (son état est mémorisé) et s'ouvre tout seul quand tu es sur une de ses pages ;
-- Paquets, Collection, Marché, Toutes les cartes, Paramètres (et les liens des autres extensions, comme Familles et Mes enchères) restent à leur place.
+| Place | Contenu |
+| --- | --- |
+| En haut | **Paquets** |
+| **Collection ▸** | Ma collection · Toutes les cartes · 🟠 Familles · 🟠 Cartes & prix · 🟠 Étiquettes |
+| **Marché ▸** | Parcourir le marché · 🟠 Vendre · 🟠 Mes ventes · 🟠 Mes mises · 🟠 Ventes conclues |
+| **Social ▸** | Échanges · Guilde · Amis · Messages · Bataille |
+| **Progression ▸** | Profil · Succès · Classement |
+| En bas | Le **récapitulatif Wiky-Traders** (et « Mises en direct ») |
+| Tout en bas | **Paramètres ▸** : Paramètres du site · 🟠 Réglages Wiky-Traders · 🟠 Outils |
 
-Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans les menus, et un clic sur la copie utilise la navigation normale du site. Désactiver l'option rend la barre latérale intacte.
+- Un clic sur **Collection**, **Marché** ou **Paramètres** ouvre la page et déplie le menu ; la **flèche** ne fait que déplier ou replier.
+- Le menu de la page affichée est ouvert et mis en valeur ; l'état des autres menus est mémorisé.
+- 🟠 Les pastilles orange (ex. *Vendre 2*) comptent les slots à remplir, les ventes et les mises en cours.
+- Les liens d'autres extensions (ex. « Familles » et « Mes enchères » de *Prix moyen collection*, en violet) sont rangés au même endroit.
+
+Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans les menus, et un clic utilise la navigation normale du site. Désactiver l'option rend la barre du site intacte, avec un bloc Wiky-Traders (récapitulatif et menu) au-dessus de *Paramètres*.
 
 > La barre du bas, sur mobile, n'est pas modifiée.
 
-## Le bloc Wiky-Traders (toujours visible)
+## Le récapitulatif Wiky-Traders (toujours visible)
 
-Au-dessus de *Paramètres* :
+Juste au-dessus de *Paramètres* :
 
 | Ligne | Contenu |
 | --- | --- |
@@ -33,22 +42,23 @@ Au-dessus de *Paramètres* :
 | 24 h | Mises **gagnées** et **perdues** sur les dernières 24 h |
 | Synchro | Âge des données, bouton **↻** pour actualiser |
 
-- **Clic sur le bloc** : ouvre la fenêtre **Vendre**.
-- **⌄** : replie ou déplie le menu en dessous.
-- **↻** : relit tes ventes en cours et tes mises (via l'API si la lecture via l'API est activée, sinon en passant par Marché → *Mes ventes*).
+- **Clic sur le récapitulatif** : ouvre la fenêtre **Vendre**.
+- **↻** : relit tes ventes en cours et tes mises.
+- Dessous, **Mises en direct** : tes mises en jeu avec leur compte à rebours.
 
-## Le menu Wiky-Traders
+## Les pages de l'extension
 
 | Entrée | S'ouvre | Contenu |
 | --- | --- | --- |
 | Vendre *(n)* | fenêtre | Les slots à remplir : carte, prix, durée — voir [Vendre](Vendre.md) |
 | Mes ventes *(n)* | fenêtre | Tes enchères en cours |
 | Mes mises *(n)* | fenêtre | Tes mises sur les cartes des autres — voir [Mises et ventes](Mises-et-ventes.md) |
+| Familles | page | Voir [Familles](Familles.md) |
 | Cartes & prix | page | Ta collection par famille, étiquette, catégorie ou rareté, et les enchères en cours de chaque carte |
 | Ventes conclues | page | Tes ventes terminées et l'écart au prix de la carte |
 | Étiquettes | fenêtre | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
 | Outils | fenêtre | Relire la page, diagnostic, journal, bilan des prix |
-| Réglages | page | L'onglet Wiky-Traders de *Paramètres* |
+| Réglages Wiky-Traders | page | L'onglet Wiky-Traders de *Paramètres* |
 
 Les **fenêtres** s'affichent par-dessus la page en cours (Échap ou clic à côté pour fermer). Les **pages** prennent la place du contenu du site (adresse `?wiky=…`), sans le quitter.
 

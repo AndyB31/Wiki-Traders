@@ -82,7 +82,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('page Familles dans le site', () => {
   it('entrée « Familles » dans le menu Wiky-Traders, page native (pas d\'iframe)', () => {
     scan([fam('f1', 'Rois', [cc('c1', 'Louis XIV')])]);
-    const link = document.querySelector<HTMLAnchorElement>('[data-wiky="nav-wiky"] a[href="/collection?wiky=families"]')!;
+    const link = document.querySelector<HTMLAnchorElement>('[data-group="collection"] a[href="/collection?wiky=families"]')!;
     expect(link.textContent).toContain('Familles');
     expect(link.className).toContain('is-active');
     const page = document.getElementById('wiky-page')!;

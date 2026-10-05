@@ -37,26 +37,51 @@ describe('barre latérale du site', () => {
     expect(siteNav()!.className).toContain('w-64');
   });
 
-  it('regroupe Échanges, Guilde, Amis, Messages, Bataille (ordre du site) dans « Social » sans déplacer les liens du site', () => {
+  it('arborescence : Paquets en haut, menus, récapitulatif puis Paramètres tout en bas ; pages Wiky-Traders rangées avec celles du site', () => {
     renderSiteUi(store(), actions);
     const nav = siteNav()!;
     expect(nav.getAttribute('data-wiky-nav')).toBe('compact');
-    const social = nav.querySelector<HTMLElement>('[data-wiky="nav-group"][data-group="social"]')!;
-    expect(social.querySelector('.wiky-group-head')!.textContent).toContain('Social');
-    expect([...social.querySelectorAll('.wiky-group-items a')].map((a) => a.getAttribute('href'))).toEqual(['/trades', '/guild', '/friends', '/dms', '/battle']);
-    // Les liens d'origine restent dans la barre (React les gère), masqués.
+    // Seul « Paquets » reste visible hors des menus.
+    expect([...nav.querySelectorAll(':scope > a:not([data-wiky-grouped])')].map((a) => a.textContent!.trim())).toEqual(['Paquets']);
+    // Ordre de la barre : Paquets, Collection, Marché, Social, Progression, récapitulatif, Paramètres.
+    const order = [...nav.children]
+      .filter((c) => (c as HTMLElement).dataset.group || c.getAttribute('data-wiky') === 'nav-recap' || (c.matches('a') && !c.hasAttribute('data-wiky-grouped')))
+      .map((c) => (c as HTMLElement).dataset.group ?? (c.getAttribute('data-wiky') === 'nav-recap' ? 'recap' : c.textContent!.trim()));
+    expect(order).toEqual(['Paquets', 'collection', 'market', 'social', 'progress', 'recap', 'settings']);
+    expect(nav.lastElementChild!.getAttribute('data-group')).toBe('settings');
+    const items = (g: string) => [...nav.querySelectorAll(`[data-group="${g}"] .wiky-group-items > *`)].map((a) => a.textContent!.trim().replace(/\d+$/, ''));
+    expect(items('collection')).toEqual(['Ma collection', 'Toutes les cartes', 'Familles', 'Familles', 'Cartes & prix', 'Étiquettes']);
+    expect(items('market')).toEqual(['Parcourir le marché', 'Mes enchères', 'Vendre', 'Mes ventes', 'Mes mises', 'Ventes conclues']);
+    expect(items('social')).toEqual(['Échanges', 'Guilde', 'Amis', 'Messages', 'Bataille']);
+    expect(items('progress')).toEqual(['Profil', 'Succès', 'Classement']);
+    expect(items('settings')).toEqual(['Paramètres du site', 'Réglages Wiky-Traders', 'Outils']);
+    // Les pages de l'extension se distinguent par leur icône orange (.wiky-ico).
+    expect(nav.querySelectorAll('[data-group="market"] .wiky-sub .wiky-ico')).toHaveLength(4);
+    // Les liens d'origine restent dans la barre (React les gère), masqués ; la copie déclenche l'original.
     const friends = nav.querySelector<HTMLAnchorElement>(':scope > a[href="/friends"]')!;
     expect(friends.getAttribute('data-wiky-grouped')).toBe('social');
-    // Un clic sur la copie déclenche le lien d'origine (navigation du site).
     const clicked = vi.fn((e: Event) => e.preventDefault());
     friends.addEventListener('click', clicked);
-    social.querySelector<HTMLAnchorElement>('.wiky-group-items a[href="/friends"]')!.click();
+    nav.querySelector<HTMLAnchorElement>('[data-group="social"] .wiky-group-items a[href="/friends"]')!.click();
     expect(clicked).toHaveBeenCalledTimes(1);
-    // Progression : Profil, Succès, Classement.
-    expect([...nav.querySelectorAll('[data-group="progress"] .wiky-group-items a')].map((a) => a.textContent)).toEqual(['Profil', 'Succès', 'Classement']);
-    // Restent visibles : Paquets, Collection, Familles, Marché, Mes enchères, Toutes les cartes, Paramètres.
-    const visible = [...nav.querySelectorAll(':scope > a:not([data-wiky-grouped])')].map((a) => a.textContent!.trim());
-    expect(visible).toEqual(['Paquets', 'Collection', 'Familles', 'Marché', 'Mes enchères', 'Toutes les cartes', 'Paramètres']);
+  });
+
+  it('menu de la page affichée ouvert ; clic sur « Marché » : ouvre la page et le menu, la flèche ne fait que replier', () => {
+    renderSiteUi(store(), actions);
+    const nav = siteNav()!;
+    const collection = nav.querySelector<HTMLElement>('[data-group="collection"]')!;
+    expect(collection.dataset.open).toBe('true');
+    expect(collection.querySelector('.wiky-group-head')!.classList.contains('is-active')).toBe(true);
+    const market = nav.querySelector<HTMLElement>('[data-group="market"]')!;
+    const marketLink = nav.querySelector<HTMLAnchorElement>(':scope > a[href="/marketplace"]')!;
+    const go = vi.fn((e: Event) => e.preventDefault());
+    marketLink.addEventListener('click', go);
+    market.querySelector<HTMLButtonElement>('.wiky-head-main')!.click();
+    expect(go).toHaveBeenCalledTimes(1);
+    expect(market.dataset.open).toBe('true');
+    market.querySelector<HTMLButtonElement>('.wiky-head-toggle')!.click();
+    expect(market.dataset.open).toBe('false');
+    expect(go).toHaveBeenCalledTimes(1);
   });
 
   it('ouvre et mémorise un menu ; ne refait rien quand rien ne change', () => {
@@ -91,8 +116,8 @@ describe('résumé Wiky-Traders toujours visible', () => {
     const sum = siteSummary(s, now);
     expect(sum).toMatchObject({ slots: 5, occupied: 1, leading: 2, outbid: 1, won24: 1, lost24: 1 });
     renderSiteUi(s, actions);
-    const section = document.querySelector<HTMLElement>('[data-wiky="nav-wiky"]')!;
-    expect(section.nextElementSibling!.getAttribute('href')).toBe('/settings');
+    const section = document.querySelector<HTMLElement>('[data-wiky="nav-recap"]')!;
+    expect(section.nextElementSibling!.getAttribute('data-group')).toBe('settings');
     const text = section.querySelector('.wiky-status')!.textContent!.replace(/\s+/g, ' ');
     expect(text).toContain('1/5 · 4 libres');
     expect(text).toContain('2 en tête · 1 surenchérie');
@@ -104,7 +129,7 @@ describe('résumé Wiky-Traders toujours visible', () => {
 
   it('les fonctionnalités s\'ouvrent par-dessus la page, aux couleurs du site', () => {
     renderSiteUi(store(), actions);
-    const bids = [...document.querySelectorAll<HTMLButtonElement>('.wiky-items button')].find((b) => b.textContent!.includes('Mes mises'))!;
+    const bids = document.querySelector<HTMLButtonElement>('[data-group="market"] .wiky-sub[data-wiky-view="bids"]')!;
     bids.click();
     const frame = document.querySelector<HTMLIFrameElement>('[data-wiky="modal"] iframe')!;
     expect(frame.src).toContain('popup.html?embed=1&view=bids&theme=');
@@ -120,7 +145,10 @@ describe('résumé Wiky-Traders toujours visible', () => {
     expect(page.querySelector('h1')!.textContent).toBe('Cartes & prix');
     expect(page.querySelector('iframe')!.getAttribute('src')).toContain('view=cards');
     expect(document.querySelector('main h1')!.textContent).toBe('Collection');
-    expect(document.querySelector('.wiky-items a.is-active')!.getAttribute('href')).toBe('/collection?wiky=cards');
+    expect(document.querySelector('.wiky-group-items a.wiky-sub.is-active')!.getAttribute('href')).toBe('/collection?wiky=cards');
+    // Sur une page Wiky-Traders, « Ma collection » (lien du site) ne paraît pas active.
+    const mine = [...document.querySelectorAll('[data-group="collection"] .wiky-group-items a')].find((a) => a.textContent!.includes('Ma collection'))!;
+    expect(mine.className).not.toMatch(/color-accent\)\]\/10/);
   });
 });
 
