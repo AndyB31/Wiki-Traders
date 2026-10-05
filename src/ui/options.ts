@@ -10,6 +10,7 @@ import type { Settings, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { initEmbed } from './embed';
+import { FEATURE_GROUPS, FEATURES, featureFlags, type FeatureGroup } from '../lib/features';
 
 // Onglet Wiky-Traders de la page Paramètres du site (iframe).
 initEmbed();
@@ -237,6 +238,41 @@ function riskyToggle(key: 'prefill' | 'autoTag' | 'apiRead' | 'apiWrite', label:
       },
     }),
     help,
+  );
+}
+
+/** Fonctionnalités reprises de « Prix moyen collection », par groupe ; les automatisations demandent confirmation. */
+function featuresBlock() {
+  const flags = featureFlags(settings.features);
+  return (Object.keys(FEATURE_GROUPS) as FeatureGroup[]).map((group) =>
+    h(
+      'div',
+      { class: 'feature-group' },
+      h('h3', null, FEATURE_GROUPS[group]),
+      h(
+        'div',
+        { class: 'grid' },
+        FEATURES.filter((f) => f.group === group).map((f) =>
+          field(
+            f.label,
+            h('input', {
+              type: 'checkbox',
+              checked: flags[f.key],
+              onchange: (e: Event) => {
+                const box = e.target as HTMLInputElement;
+                if (box.checked && f.risky && !confirm(`${f.label}\n\n${f.help}\n\nLes règles de WikiMasters (section 3) interdisent les outils qui interagissent à ta place : ton compte peut être banni sans préavis.\n\nActiver quand même ?`)) {
+                  box.checked = false;
+                  return;
+                }
+                settings.features = { ...settings.features, [f.key]: box.checked };
+                onEdit();
+              },
+            }),
+            `${f.help}${f.api && !settings.apiRead ? ' (nécessite la lecture via l\'API)' : ''}`,
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -525,6 +561,7 @@ function render(): void {
     h('section', { class: 'card' }, h('h2', null, 'Prix et notifications'), settingsForm()),
     h('section', { class: 'card' }, h('h2', null, 'Durée des enchères'), durationBlock()),
     h('section', { class: 'card' }, h('h2', null, 'Liste noire'), blacklistBlock()),
+    h('section', { class: 'card' }, h('h2', null, 'Fonctionnalités'), featuresBlock()),
     h('section', { class: 'card' }, h('h2', null, 'Automatisations'), automationBlock()),
     h('section', { class: 'card' }, h('h2', null, 'Prix saisis à la main'), manualPricesBlock()),
     h('section', { class: 'card' }, h('h2', null, 'Données'), cardsBlock(), selectorsBlock()),

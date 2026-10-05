@@ -22,3 +22,5 @@ details summary { cursor: pointer; margin: 6px 0; }
 .embed #app { padding: 8px 4px 80px; max-width: none; }
 .embed #app > header { display: none; }
 .embed .sticky { border-radius: 12px 12px 0 0; }
+.feature-group h3 { margin: 14px 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.feature-group:first-child h3 { margin-top: 0; }

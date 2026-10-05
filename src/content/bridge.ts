@@ -7,7 +7,12 @@
  * et ne modifie rien, à part un attribut `data-wiky-ref` qui permet de retrouver l'élément.
  *
  * Protocole : window.postMessage({ __wiky: 'req', id }) → window.postMessage({ __wiky: 'res', id, items }).
+ *
+ * Il relaie aussi, sans les modifier, les réponses de quelques appels que le site fait lui-même (ouverture de
+ * paquet, échanges, collection, marché) : window.postMessage({ __wiky: 'net', url, method, status, body }).
  */
+/** Appels du site dont la réponse est relayée au content script (paquets, échanges, collection, marché). */
+const WATCHED = /\/api\/(packs\/open|trades|my-collection|marketplace|wikibidous)/;
 
 const RARITY_KEYS = new Set(['C', 'PC', 'R', 'SR', 'UR', 'L']);
 const END_KEY = /^(ends?_?at|end_?(time|date)|expires?_?at|expir(y|ation)(_?(at|date))?|closes?_?at|deadline|finish(es)?_?at|ending_?at)$/i;
@@ -138,8 +143,30 @@ declare global {
   }
 }
 
+function watchFetch(): void {
+  const original = window.fetch;
+  window.fetch = async function (this: unknown, input: RequestInfo | URL, init?: RequestInit) {
+    const res = await original.call(this, input, init);
+    try {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (WATCHED.test(url) && res.ok && (res.headers.get('content-type') ?? '').includes('json')) {
+        const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+        void res
+          .clone()
+          .json()
+          .then((body) => window.postMessage({ __wiky: 'net', url: new URL(url, location.href).pathname + new URL(url, location.href).search, method, status: res.status, body }, '*'))
+          .catch(() => {});
+      }
+    } catch {
+      // Jamais d'effet sur la requête du site.
+    }
+    return res;
+  };
+}
+
 if (!window.__wikyBridge) {
   window.__wikyBridge = true;
+  watchFetch();
   window.addEventListener('message', (e) => {
     if (e.source !== window || e.data?.__wiky !== 'req') return;
     let items: BridgeItem[] = [];

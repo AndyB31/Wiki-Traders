@@ -124,6 +124,8 @@ export interface Settings {
   siteIntegration: boolean;
   /** Barre latérale du site plus compacte, avec les menus regroupés (Social, Progression). */
   compactNav: boolean;
+  /** Fonctionnalités reprises de « Prix moyen collection » (voir lib/features.ts) ; absentes = valeur par défaut. */
+  features: Partial<import('./features').FeatureFlags>;
 }
 
 export type JournalType = 'proposed' | 'created' | 'finished';
@@ -218,6 +220,31 @@ export interface Family {
   cards: FamilyCard[];
 }
 
+/** Carte du catalogue du site (table `cards`), possédée ou non. */
+export interface CatalogCard {
+  siteId: string;
+  title: string;
+  rarity: Rarity | null;
+  category: string | null;
+  imageUrl: string | null;
+  wikipediaUrl: string | null;
+  atk: number | null;
+  def: number | null;
+}
+
+/** Famille de cartes (gérée par Wiky-Traders). */
+export interface CardFamily {
+  id: string;
+  name: string;
+  /** Couleur de la pastille (hex). */
+  color: string;
+  cards: CatalogCard[];
+  /** Carte affichée en couverture (sinon les premières cartes illustrées). */
+  coverSiteId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** Enchère en cours sur une carte donnée (lue via l'API). */
 export interface CardAuction {
   id: string;
@@ -289,4 +316,8 @@ export interface StoreShape {
   salesCache: MySalesResult | null;
   /** Familles lues dans la page (autre extension), avec la date du relevé. */
   families: { at: number; list: Family[] } | null;
+  /** Mes familles (Wiky-Traders). */
+  myFamilies: CardFamily[];
+  /** Import des familles de « Prix moyen collection » : date (null = jamais). */
+  familiesImportedAt: number | null;
 }

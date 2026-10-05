@@ -16,6 +16,8 @@ import { initWindow, setOpen as setWindowOpen, toggleWindow } from './window';
 import { enhanceSellDialog } from './sell-market';
 import { closeModal, isModalOpen, openModal, renderSiteUi } from './site-ui';
 import { renderAuctionSwitch } from './auction-mode';
+import { makeContext as featureContext, runFeatures } from './features/runtime';
+import './features';
 import { sellAdvice } from '../lib/allocation';
 import { durationFor } from '../lib/duration';
 import { auctionIdFromHref, hasEmptyState, parseAuctionDetail, parseAuctionList, type ParsedAuction } from './parsers/auctions';
@@ -25,7 +27,7 @@ import { activeTabLabel, detectPage, rootOf, slotsFromTabs } from './parsers/pag
 import { auctionFromItem, cardFromItem, refElement, requestBridge, tagColors, tagDictionary } from './parsers/react';
 import { re, resolveSelectors, type SelectorConfig } from './parsers/selectors';
 
-type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta' | 'bidsCache'>;
+type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta' | 'bidsCache' | 'myFamilies' | 'familiesImportedAt'>;
 
 let store: Store | null = null;
 let lastPayload = '';
@@ -48,7 +50,7 @@ function log(step: string): void {
 }
 
 async function refreshStore(): Promise<void> {
-  store = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta', 'bidsCache');
+  store = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta', 'bidsCache', 'myFamilies', 'familiesImportedAt');
 }
 
 function toObs(a: ParsedAuction, now: number): PriceObs | null {
@@ -625,6 +627,7 @@ async function sellFromCollection(cardId: string, tile: Element): Promise<void> 
 /** Barre latérale, fenêtres et pages Wiky-Traders dans le site. */
 function drawSiteUi(): void {
   if (!store) return;
+  runFeatures(featureContext(store.settings, store.cards, store.myFamilies));
   renderAuctionSwitch({
     findTile: (target) => {
       for (const [cardId, tile] of lastTiles ?? []) {
@@ -687,7 +690,7 @@ async function main(): Promise<void> {
     schedule(200);
   });
   // Le résumé de la barre latérale suit les relevés (sans relancer la lecture de la page).
-  onStoreChange(['bidsCache', 'meta'], async () => {
+  onStoreChange(['bidsCache', 'meta', 'myFamilies', 'familiesImportedAt'], async () => {
     await refreshStore();
     drawSiteUi();
   });

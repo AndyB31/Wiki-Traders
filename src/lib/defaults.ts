@@ -34,6 +34,7 @@ export const DEFAULT_SETTINGS: Settings = {
   selectorOverrides: {},
   siteIntegration: true,
   compactNav: true,
+  features: {},
 };
 
 export const DEFAULT_RULES: TagRule[] = [
@@ -59,6 +60,8 @@ export const DEFAULT_STORE: StoreShape = {
   bidsCache: null,
   salesCache: null,
   families: null,
+  myFamilies: [],
+  familiesImportedAt: null,
 };
 
 /** Au-delà, la popup demande de rouvrir la page des enchères. */
