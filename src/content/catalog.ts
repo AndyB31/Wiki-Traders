@@ -102,6 +102,9 @@ export interface CardPrice {
   median: number | null;
   mean: number | null;
   count: number;
+  /** Vente la plus basse / la plus haute (absentes des anciennes entrées du cache). */
+  min?: number | null;
+  max?: number | null;
   at: number;
 }
 
@@ -157,6 +160,8 @@ async function fetchPrices(ids: string[]): Promise<void> {
       median: median(list),
       mean: list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : null,
       count: list.length,
+      min: list.length ? Math.min(...list) : null,
+      max: list.length ? Math.max(...list) : null,
       at: now,
     });
   }
@@ -195,8 +200,71 @@ export function displayPrice(p: CardPrice | undefined): number | null {
   return p?.median ?? null;
 }
 
+// ---------------------------------------------------------------- titre → identifiant, enchère → carte
+
+const idByTitle = new Map<string, string | null>();
+
+/** Filtre PostgREST `in.(…)` pour des textes quelconques (guillemets échappés, valeurs encodées). */
+function textInList(values: string[]): string {
+  return `in.(${values.map((v) => `"${encodeURIComponent(v.replace(/["\\]/g, '\\$&'))}"`).join(',')})`;
+}
+
+/**
+ * Identifiants du site pour des titres de cartes (collection globale, fiche d'une carte) : lots de 150 titres
+ * par requête, résultats (même absents) gardés en mémoire.
+ */
+export async function cardIdsByTitles(titles: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const missing: string[] = [];
+  for (const t of new Set(titles.map((x) => x.trim()).filter(Boolean))) {
+    if (idByTitle.has(t)) {
+      const id = idByTitle.get(t);
+      if (id) out.set(t, id);
+    } else missing.push(t);
+  }
+  if (!missing.length) return out;
+  const { cfg, session } = await api();
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const batch = missing.slice(i, i + BATCH);
+    const rows = await get<CardRow[]>(cfg, session, `cards?select=${CARD_FIELDS}&wikipedia_title=${textInList(batch)}`);
+    for (const t of batch) idByTitle.set(t, null);
+    const wanted = new Set(batch);
+    for (const r of rows) {
+      const c = toCatalogCard(r);
+      cardCache.set(c.siteId, c);
+      idByTitle.set(c.title, c.siteId);
+      if (wanted.has(c.title)) out.set(c.title, c.siteId);
+    }
+  }
+  return out;
+}
+
+/** Identifiant déjà connu pour un titre (synchrone ; undefined : jamais demandé, null : introuvable). */
+export function knownCardId(title: string): string | null | undefined {
+  return idByTitle.get(title.trim());
+}
+
+/** Carte du catalogue déjà chargée (synchrone). */
+export function knownCard(siteId: string): CatalogCard | undefined {
+  return cardCache.get(siteId);
+}
+
+const cardByAuction = new Map<string, string | null>();
+
+/** Carte (identifiant du site) mise en vente dans une enchère. */
+export async function cardIdForAuction(auctionId: string): Promise<string | null> {
+  if (cardByAuction.has(auctionId)) return cardByAuction.get(auctionId)!;
+  const { cfg, session } = await api();
+  const rows = await get<{ card_id: string }[]>(cfg, session, `auctions?select=card_id&id=eq.${encodeURIComponent(auctionId)}&limit=1`);
+  const id = rows[0]?.card_id ?? null;
+  cardByAuction.set(auctionId, id);
+  return id;
+}
+
 /** Pour les tests. */
 export function resetCatalog(): void {
+  idByTitle.clear();
+  cardByAuction.clear();
   cardCache.clear();
   prices.clear();
   inflight.clear();
