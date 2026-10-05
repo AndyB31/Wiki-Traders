@@ -67,6 +67,7 @@
     {
       "resources": [
         "popup.html",
+        "options.html",
         "assets/*",
         "icons/*"
       ],

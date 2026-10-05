@@ -77,7 +77,7 @@ function finishedEntries(store: StoreShape, finished: MyAuction[], now: number):
 async function handleScan(msg: ScanMessage): Promise<void> {
   const now = Date.now();
   const store = await loadAll();
-  const patch: Partial<StoreShape> = { meta: { ...store.meta, lastPage: msg.status } };
+  const patch: Partial<StoreShape> = { meta: msg.source === 'api' ? { ...store.meta } : { ...store.meta, lastPage: msg.status } };
 
   if (msg.cards?.length) {
     patch.cards = mergeCards(store.cards, msg.cards, now);

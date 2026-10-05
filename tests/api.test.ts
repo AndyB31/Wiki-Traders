@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchCardAuctions, fetchMarketSales, fetchMyBids, fetchMyCollection, fetchMySales, findApiConfig, parseSession, sessionCookie } from '../src/content/api';
+import { fetchCardAuctions, fetchMarketSales, fetchMyAuctions, fetchMyBids, fetchMyCollection, fetchMySales, findApiConfig, parseSession, sessionCookie } from '../src/content/api';
 import { NOW } from './helpers';
 
 const b64url = (s: string) => Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -42,6 +42,32 @@ describe('lectures', () => {
     });
     return calls;
   }
+
+  it('mes ventes en cours : enchères actives dont je suis le vendeur, sans les terminées non réglées ; uniquement des GET', async () => {
+    const future = new Date(Date.now() + 3_600_000).toISOString();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const calls = setup({
+      'auctions?select=id,card_id,base_amount,current_bid,end_at,status': [
+        { id: 'v1', card_id: 'c1', base_amount: 20, current_bid: 26, end_at: future, status: 'active' },
+        { id: 'v2', card_id: 'c2', base_amount: 40, current_bid: null, end_at: future, status: 'active' },
+        { id: 'v3', card_id: 'c3', base_amount: 10, current_bid: null, end_at: past, status: 'active' },
+      ],
+      'cards?': [
+        { id: 'c1', wikipedia_title: 'Mont Fuji', rarity: 'R' },
+        { id: 'c2', wikipedia_title: 'Marie Curie', rarity: 'SR' },
+      ],
+    });
+    const list = await fetchMyAuctions();
+    expect(list.map((a) => [a.id, a.cardId, a.cardName, a.startPrice, a.currentPrice])).toEqual([
+      ['v1', 'mont-fuji', 'Mont Fuji', 20, 26],
+      ['v2', 'marie-curie', 'Marie Curie', 40, 40],
+    ]);
+    expect(list[0].endsAt).toBe(Date.parse(future));
+    const auctionsCall = calls.find((c) => c.url.includes('/auctions?'))!.url;
+    expect(auctionsCall).toContain(`seller_id=eq.${ME}`);
+    expect(auctionsCall).toContain('status=eq.active');
+    expect(calls.every((c) => c.method === 'GET')).toBe(true);
+  });
 
   it('mes mises : statut, mise max, prix de la carte ; uniquement des GET', async () => {
     const future = new Date(Date.now() + 3_600_000).toISOString();

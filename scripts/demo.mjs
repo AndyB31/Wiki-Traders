@@ -162,6 +162,19 @@ document.querySelectorAll('div.card[data-auction]').forEach((el) => attach(el, {
 
 const attr = (o) => JSON.stringify(o).replace(/"/g, '&quot;');
 
+// Barre latérale réelle du site (relevée sur wiki-masters.com, avec l'autre extension) : intégration Wiky-Traders.
+const SITE_NAV = readFileSync(join(root, 'tests/fixtures/site-nav.html'), 'utf8');
+const shell = (body) => `<!doctype html><html lang="fr" class="h-full"><head><meta charset="utf-8"><title>WikiMasters</title><script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&display=swap" rel="stylesheet">
+<style>:root{--color-background:#0c0d0c;--color-foreground:#f2f4f3;--color-surface:#131615;--color-surface-light:#1b1f1d;--color-border:#2e3431;--color-accent:#e0b04a;--font-heading:Outfit}
+body{background:var(--color-background);color:var(--color-foreground);font-family:Inter,sans-serif;margin:0}
+.wm-family-nav{border:1px solid rgba(168,85,247,.24)!important;background:rgba(124,58,237,.07)!important;color:rgb(196,181,253)!important;text-decoration:none!important}
+.wm-family-nav-icon{display:inline-flex;align-items:center;justify-content:center;color:rgb(192,132,252)}</style></head>
+<body class="h-full"><div class="flex h-screen flex-col md:flex-row">${SITE_NAV}<main class="min-h-0 flex-1 overflow-y-auto">${body}</main></div></body></html>`;
+const settingsBody = `<div class="flex-1 p-4 md:p-6 space-y-6"><h1 class="text-2xl md:text-3xl font-bold">Paramètres</h1>
+<div role="tablist" class="flex gap-2"><button role="tab" aria-selected="true" class="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--color-surface-light)]">Compte</button><button role="tab" aria-selected="false" class="px-4 py-2 rounded-xl text-sm font-medium opacity-60">Affichage</button></div>
+<p class="opacity-50">Réglages du site…</p></div>`;
+
 const page = (title, body) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title}</title><style>${CSS}</style></head>
 <body data-tags="${attr(TAG_DEFS)}"><script src="/_next/static/chunks/app.js"></script><script>localStorage.setItem('wm_families_v1', ${JSON.stringify(JSON.stringify(FAMILIES)).replace(/</g, '\\u003c')});</script><header><a href="/collection">Collection</a> · <a href="/marketplace">Marché</a></header><main>${body}</main><script>${FAKE_REACT}</script></body></html>`;
 
@@ -279,7 +292,8 @@ await ctx.route(`${SB_URL}/**`, (route) => {
     table === 'tags' ? TAG_DEFS.map((t) => ({ id: t.id, name: t.name })) :
     table === 'user_card_tags' ? [...apiLinks].map((l) => ({ user_card_id: l.split('|')[0], tag_id: l.split('|')[1] })) :
     table === 'auction_bids' ? SB_DATA.auction_bids :
-    table === 'cards' ? SB_DATA.cards :
+    table === 'cards' ? [...SB_DATA.cards, ...myAuctions.map(([, name, r]) => ({ id: `c-${slug(name)}`, wikipedia_title: name, rarity: r }))] :
+    q.includes('seller_id=eq.') && q.includes('status=eq.active') ? myAuctions.map(([id, name, r, price, ms]) => auctionRow(id, name, r, price, ms)) :
     q.includes('status=eq.settled_sold') && q.includes('end_at=gte.') ? Object.entries(SOLD).flatMap(([r, prices]) =>
       prices.map((p, i) => ({ id: `m-${r}-${i}`, card_id: `mc-${r}-${i}`, final_price: p + 1, snapshot_rarity: r, is_shiny: false, end_at: iso(-3_600_000 * (i + 1)), status: 'settled_sold', card: { wikipedia_title: `Marché ${r} ${i}` } })),
     ) :
@@ -304,6 +318,7 @@ await ctx.route(`${ORIGIN}/**`, (route) => {
   const url = new URL(route.request().url());
   if (/\.(png|jpe?g)$/.test(url.pathname)) return route.fulfill({ body: png, contentType: 'image/png' });
   if (url.pathname === '/_next/static/chunks/app.js') return route.fulfill({ body: `window.__sb={url:"${SB_URL}",key:"${SB_ANON}"};`, contentType: 'application/javascript' });
+  if (url.pathname === '/settings' || url.searchParams.has('wiky')) return route.fulfill({ body: shell(url.pathname === '/settings' ? settingsBody : '<div class="p-6"><h1 class="text-3xl font-bold">Collection</h1></div>'), contentType: 'text/html' });
   if (url.pathname.startsWith('/collection')) return route.fulfill({ body: collection(), contentType: 'text/html' });
   if (url.pathname.startsWith('/marketplace')) return route.fulfill({ body: marketplace(url.searchParams.get('tab') ?? 'browse'), contentType: 'text/html' });
   return route.fulfill({ body: page('WikiMasters', '<h1>Accueil</h1>'), contentType: 'text/html' });
@@ -381,7 +396,11 @@ await sw.evaluate(async () => {
 });
 await site.waitForFunction(() => document.querySelector('[data-wiky="tags"]')?.dataset.style === 'label', null, { timeout: 5000 });
 
-// 2 bis. Fenêtre flottante dans la page
+// 2 bis. Fenêtre flottante dans la page (sans l'intégration au site, qui la remplace)
+await sw.evaluate(async () => {
+  const { settings } = await chrome.storage.local.get('settings');
+  await chrome.storage.local.set({ settings: { ...settings, siteIntegration: false }, floating: { open: true, minimized: false, r: 16, b: 16, w: 390, h: 600 } });
+});
 await site.goto(`${ORIGIN}/collection`);
 const winHost = site.locator('[data-wiky="window"]');
 await winHost.waitFor({ state: 'attached', timeout: 5000 });
@@ -592,6 +611,21 @@ await market.goto(`${ORIGIN}/collection`);
 ef = await embedFrame(market);
 s = await waitFor((x) => x.meta?.lastCollectionApi && x.cards['grande-muraille'], 'collection rechargée via l\'API', 10000);
 ok(!s.cards['origami'] && s.cards['grande-muraille']?.rarity === 'L', 'collection rechargée via l\'API à l\'ouverture : carte vendue retirée, nouvelle carte ajoutée');
+// Mes ventes en cours relues via l'API : 🔄 ne quitte plus la collection.
+myAuctions.push(['a1b2c3d4-0005', 'Hibou', 'PC', 30, 2 * 3_600_000]);
+await ef.click('header button[title^="Actualiser"]');
+s = await waitFor((x) => x.myAuctions.some((a) => a.id === 'a1b2c3d4-0005'), 'ventes en cours relues via l\'API', 10000);
+ok(new URL(market.url()).pathname === '/collection' && s.myAuctions.length === 4 && s.myAuctions.find((a) => a.id === 'a1b2c3d4-0005').cardName === 'Hibou',
+  `🔄 avec l'API : ${s.myAuctions.length} ventes en cours relues sans aller sur Marché → « Mes ventes »`);
+myAuctions.pop();
+await sw.evaluate(async () => {
+  const { meta } = await chrome.storage.local.get('meta');
+  await chrome.storage.local.set({ meta: { ...meta, lastAuctionsScan: 0 } });
+});
+await market.reload();
+s = await waitFor((x) => x.myAuctions.length === 3 && x.meta.lastAuctionsScan > 0, 'relève automatique au chargement', 10000);
+ok(true, 'relève automatique via l\'API au chargement de la page : vente terminée retirée (3 en cours)');
+ef = await embedFrame(market);
 await ef.click('.tabs .tab:has-text("Mises")');
 await ef.click('button[title="Relire mes mises"]');
 await ef.waitForSelector('.bid', { timeout: 8000 });
@@ -713,6 +747,63 @@ await market.waitForFunction(() => document.querySelectorAll('[data-wiky="market
 const listPrices = await market.$$eval('[data-wiky="market-list"] a', (as) => as.map((a) => a.querySelector('span').textContent));
 ok(listPrices.join() === '28,31,60', `liste des enchères de la carte sous la fenêtre : ${listPrices.join(' → ')}`);
 await market.screenshot({ path: join(shots, 'sell-market.png') });
+
+await sw.evaluate(async () => {
+  const { settings } = await chrome.storage.local.get('settings');
+  await chrome.storage.local.set({ settings: { ...settings, siteIntegration: true } });
+});
+// Mode enchère : interrupteur sur la ligne du titre, clic sur une carte → « Mettre aux enchères » pré-rempli.
+const auc = await ctx.newPage();
+await auc.setViewportSize({ width: 1280, height: 860 });
+await auc.goto(`${ORIGIN}/collection`);
+await auc.waitForSelector('[data-wiky="auction-switch"]', { timeout: 10000 });
+await auc.click('[data-wiky="auction-switch"]');
+ok((await auc.getAttribute('[data-wiky="auction-switch"]', 'aria-checked')) === 'true', 'mode enchère activé (interrupteur à côté du titre de la collection)');
+await auc.waitForTimeout(1200);
+await auc.click('li.card:has-text("Colisée") img');
+const aucInput = await auc.waitForSelector('input[aria-label="Mise de départ"]', { timeout: 10000 });
+await auc.waitForFunction(() => document.querySelector('input[aria-label="Mise de départ"]')?.value !== '10', null, { timeout: 5000 });
+s = await storage();
+const aucValue = await aucInput.inputValue();
+ok(s.pendingFocus?.cardName === 'Colisée' && aucValue === String(s.pendingFocus.price), `clic sur Colisée : fenêtre de vente ouverte, mise ${aucValue} (durée ${s.pendingFocus.durationMin} min), le clic final reste le tien`);
+await auc.waitForTimeout(500);
+await auc.screenshot({ path: join(shots, 'auction-mode.png') });
+await auc.keyboard.press('Escape');
+await auc.close();
+
+// Intégration au site : barre latérale compacte, résumé, fenêtres, pages, onglet dans Paramètres.
+const integ = await ctx.newPage();
+await integ.setViewportSize({ width: 1280, height: 860 });
+await integ.goto(`${ORIGIN}/settings`);
+await integ.waitForSelector('[data-wiky="nav-wiky"] .wiky-status', { timeout: 10000 });
+await integ.waitForTimeout(600);
+const navText = await integ.$eval('[data-wiky="nav-wiky"] .wiky-status', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+ok(/Slots ?\d+\/5/.test(navText), `résumé toujours visible : ${navText.slice(0, 90)}…`);
+const social = await integ.$$eval('[data-group="social"] .wiky-group-items a', (as) => as.map((a) => a.textContent.trim()));
+ok(social.join() === 'Échanges,Guilde,Amis,Messages,Bataille', `menu Social : ${social.join(', ')}`);
+ok((await integ.$$eval('[role="tablist"] [role="tab"]', (t) => t.map((x) => x.textContent))).includes('Wiky-Traders'), 'onglet « Wiky-Traders » dans Paramètres');
+await integ.click('[data-group="social"] .wiky-group-head');
+await integ.screenshot({ path: join(shots, 'site-sidebar.png'), clip: { x: 0, y: 0, width: 640, height: 860 } });
+await integ.click('.wiky-status');
+const modalFrame = await (await integ.waitForSelector('[data-wiky="modal"] iframe')).contentFrame();
+await modalFrame.waitForSelector('.panel');
+await integ.waitForTimeout(400);
+ok(await modalFrame.evaluate(() => document.documentElement.classList.contains('site') && !document.querySelector('nav.tabs')), 'Vendre : fenêtre par-dessus la page, aux couleurs du site, sans les onglets de la popup');
+await integ.screenshot({ path: join(shots, 'site-modal.png') });
+await integ.keyboard.press('Escape');
+await integ.click('[data-wiky="settings-entry"]');
+await integ.waitForURL(/wiky=settings/);
+const optFrame = await (await integ.waitForSelector('#wiky-page iframe')).contentFrame();
+await optFrame.waitForSelector('section.card');
+await integ.waitForTimeout(400);
+ok(true, 'réglages Wiky-Traders dans la page Paramètres du site');
+await integ.screenshot({ path: join(shots, 'site-settings.png') });
+await integ.goto(`${ORIGIN}/collection?wiky=cards`);
+const cardsFrame = await (await integ.waitForSelector('#wiky-page iframe')).contentFrame();
+await cardsFrame.waitForSelector('.panel');
+await integ.waitForTimeout(400);
+ok(true, '« Cartes & prix » : page du site');
+await integ.screenshot({ path: join(shots, 'site-page-cards.png') });
 
 await ctx.close();
 console.log(`\nCaptures enregistrées dans ${shots}`);

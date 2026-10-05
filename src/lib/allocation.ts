@@ -1,4 +1,4 @@
-import { computePrice, indexObs, referencePrice, type PriceResult, type PricingContext } from './pricing';
+import { computePrice, indexObs, referencePrice, reliableBase, type PriceResult, type PricingContext } from './pricing';
 import { normalize, sameTag } from './text';
 import type { Card, MyAuction, StoreShape, TagRule } from './types';
 
@@ -207,6 +207,21 @@ export function adviceForCard(input: AllocationInput, cardId: string, now = Date
   if (!rule) return null;
   const peers = Object.values(ctx.cards).filter((c) => cardMatchesRule(c, rule, ctx));
   return { rule, pricing: computePrice(card, rule, ctx, peers) };
+}
+
+/**
+ * Prix à proposer pour mettre une carte aux enchères depuis la collection (mode enchère) : le prix de sa règle
+ * d'étiquette, ou à défaut son prix moyen (ventes ou prix du site).
+ */
+export function sellAdvice(input: AllocationInput, cardId: string, now = Date.now()): { price: number | null; detail: string } {
+  const advice = adviceForCard(input, cardId, now);
+  if (advice?.pricing.price != null) return { price: advice.pricing.price, detail: `${advice.pricing.detail} · étiquette ${advice.rule.tag}` };
+  const ctx = makeContext(input, now);
+  const card = ctx.cards[cardId];
+  const base = card ? reliableBase(card, ctx).value : null;
+  if (base == null) return { price: null, detail: 'Aucun prix connu pour cette carte : saisis-le.' };
+  const price = Math.max(1, Math.round(base));
+  return { price, detail: `prix moyen ${price} (aucune règle d'étiquette pour cette carte)` };
 }
 
 /** Cartes vendables selon les règles (pour les pastilles sur la collection). */

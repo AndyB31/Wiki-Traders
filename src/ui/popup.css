@@ -66,3 +66,6 @@ button.tag-switch.on .knob { left: 17px; width: 11px; height: 11px; margin-top: 
 button.tag-switch:disabled { opacity: .4; }
 .price-status { display: flex; flex-direction: column; gap: 4px; }
 .price-status table td, .price-status table th { padding: 3px 4px; }
+/* Un seul onglet affiché dans une fenêtre ou une page du site. */
+.view #app { padding: 14px 18px 18px; gap: 10px; }
+.view .panel { gap: 10px; }

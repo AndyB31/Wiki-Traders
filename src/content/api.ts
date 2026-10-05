@@ -8,7 +8,7 @@
  * dans le cookie `sb-<ref>-auth-token` posé par le site (format @supabase/ssr, éventuellement découpé
  * en `.0`, `.1`… et préfixé `base64-`).
  */
-import type { BidStatus, CardAuctionsResult, MyBid, MyBidsResult, MySalesResult, PriceObs, Rarity, SoldItem } from '../lib/types';
+import type { BidStatus, CardAuctionsResult, MyAuction, MyBid, MyBidsResult, MySalesResult, PriceObs, Rarity, SoldItem } from '../lib/types';
 import { median } from '../lib/pricing';
 import { slugify } from '../lib/text';
 import type { ScannedCard } from '../lib/messages';
@@ -200,6 +200,39 @@ export async function fetchMyBids(limit = 200): Promise<MyBidsResult> {
     });
   }
   return { at: now, bids: out };
+}
+
+/**
+ * Mes enchères en cours, celles de l'onglet « Mes ventes » du marché, lues sans passer par la page.
+ * Liste complète : une enchère absente est considérée comme terminée (même règle que le relevé de la page).
+ */
+export async function fetchMyAuctions(limit = 100): Promise<MyAuction[]> {
+  const cfg = await discoverConfig();
+  const session = readSession(cfg);
+  const now = Date.now();
+  const rows = await get<AuctionRow[]>(
+    cfg,
+    session,
+    `auctions?select=id,card_id,base_amount,current_bid,end_at,status&seller_id=eq.${session.userId}&status=eq.active&order=end_at.asc&limit=${limit}`,
+  );
+  // Terminée mais pas encore réglée par le site : déjà comptée comme finie par l'extension (heure de fin dépassée).
+  const live = rows.filter((r) => !r.end_at || Date.parse(r.end_at) > now);
+  const cardIds = [...new Set(live.map((r) => r.card_id))];
+  const cards = cardIds.length ? await get<CardRow[]>(cfg, session, `cards?select=id,wikipedia_title,rarity&id=${inList(cardIds)}`) : [];
+  const cardById = new Map(cards.map((c) => [c.id, c]));
+  return live.map((r) => {
+    const card = cardById.get(r.card_id);
+    return {
+      id: r.id,
+      cardId: card ? slugify(card.wikipedia_title) : r.card_id,
+      cardName: card?.wikipedia_title ?? '(carte inconnue)',
+      tag: null,
+      startPrice: r.base_amount,
+      currentPrice: r.current_bid ?? r.base_amount,
+      endsAt: Date.parse(r.end_at) || null,
+      seenAt: now,
+    };
+  });
 }
 
 /** Ventes conclues récentes du marché (toutes cartes), pour les prix de référence par rareté. */

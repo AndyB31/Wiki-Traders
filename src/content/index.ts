@@ -6,14 +6,18 @@ import { load, onStoreChange, save } from '../lib/storage';
 import type { MyAuction, PageKind, PageStatus, PriceObs, StoreShape } from '../lib/types';
 import type { BridgeItem } from './bridge';
 import { ActionError, findByText, pause, realClick, waitFor } from './actions';
-import { fetchCardAuctions, fetchMarketSales, fetchMyBids, fetchMyCollection, fetchMySales } from './api';
+import { fetchCardAuctions, fetchMarketSales, fetchMyAuctions, fetchMyBids, fetchMyCollection, fetchMySales } from './api';
 import { applyTagsViaApi } from './api-tags';
 import { readFamilies } from './families';
 import { applyTags, prefillSale, searchCollection } from './automation';
 import { domOutline } from './diagnostic';
 import { endProgress, lastChipCount, showProgress, updateOverlay } from './overlay';
-import { initWindow, toggleWindow } from './window';
+import { initWindow, setOpen as setWindowOpen, toggleWindow } from './window';
 import { enhanceSellDialog } from './sell-market';
+import { closeModal, isModalOpen, openModal, renderSiteUi } from './site-ui';
+import { renderAuctionSwitch } from './auction-mode';
+import { sellAdvice } from '../lib/allocation';
+import { durationFor } from '../lib/duration';
 import { auctionIdFromHref, hasEmptyState, parseAuctionDetail, parseAuctionList, type ParsedAuction } from './parsers/auctions';
 import { collectionTiles, parseCollection } from './parsers/collection';
 import { isFavorite, labeledNumber, leafTexts } from './parsers/dom';
@@ -21,7 +25,7 @@ import { activeTabLabel, detectPage, rootOf, slotsFromTabs } from './parsers/pag
 import { auctionFromItem, cardFromItem, refElement, requestBridge, tagColors, tagDictionary } from './parsers/react';
 import { re, resolveSelectors, type SelectorConfig } from './parsers/selectors';
 
-type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta'>;
+type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta' | 'bidsCache'>;
 
 let store: Store | null = null;
 let lastPayload = '';
@@ -44,7 +48,7 @@ function log(step: string): void {
 }
 
 async function refreshStore(): Promise<void> {
-  store = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta');
+  store = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta', 'bidsCache');
 }
 
 function toObs(a: ParsedAuction, now: number): PriceObs | null {
@@ -121,6 +125,7 @@ async function scan(force = false): Promise<void> {
   if (!store || scanning) return;
   scanning = true;
   try {
+    drawSiteUi();
     const now = Date.now();
     const cfg = resolveSelectors(store.settings.selectorOverrides);
     const kind = detectPage(document, location, cfg, store.settings);
@@ -291,6 +296,12 @@ function maybeRefreshSales(cfg: SelectorConfig): void {
   const it = store?.intent;
   if (!it || it.type !== 'refreshSales' || automating) return;
   if (it.tabId != null && myTabId != null && it.tabId !== myTabId) return;
+  // Avec l'API, pas besoin d'ouvrir le Marché : la liste est relue directement.
+  if (store?.settings.apiRead) {
+    void save({ intent: null });
+    void refreshMyAuctions(true);
+    return;
+  }
   if (Date.now() - it.at > 30_000) {
     log('[ventes] abandon : délai dépassé');
     void save({ intent: null });
@@ -421,7 +432,7 @@ function priceSummary() {
 }
 
 /** Lectures via l'API (option « apiRead ») : mes mises, ventes récentes du marché. */
-async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales'): Promise<{ ok: boolean; error?: string; count?: number }> {
+async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 'myAuctions'): Promise<{ ok: boolean; error?: string; count?: number }> {
   if (!store?.settings.apiRead && !store?.settings.apiWrite) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Automatisations).' };
   if (op === 'collection') {
     const cards = await fetchMyCollection();
@@ -435,6 +446,14 @@ async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales'): 
     await save({ salesCache: result });
     log(`[api] ${result.items.length} vente(s) terminée(s)`);
     return { ok: true, count: result.items.length };
+  }
+  if (op === 'myAuctions') {
+    const auctions = await fetchMyAuctions();
+    const now = Date.now();
+    const status: PageStatus = { kind: 'myAuctions', url: 'api', recognized: true, message: '', at: now };
+    await ext.runtime.sendMessage({ type: 'scan', status, myAuctions: auctions, source: 'api' } satisfies ScanMessage);
+    log(`[api] ${auctions.length} vente(s) en cours`);
+    return { ok: true, count: auctions.length };
   }
   if (op === 'myBids') {
     const result = await fetchMyBids();
@@ -548,6 +567,87 @@ async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: numb
   return { ok, failed };
 }
 
+const AUCTIONS_EVERY = 60_000;
+let auctionsBusy = false;
+
+/**
+ * Mes ventes en cours relues via l'API (option « apiRead ») : au chargement, puis chaque minute tant que l'onglet est
+ * visible, sans aller sur Marché → « Mes ventes ». Les autres onglets du site profitent du même relevé.
+ */
+async function refreshMyAuctions(force = false): Promise<void> {
+  if (!store?.settings.apiRead || auctionsBusy) return;
+  if (!force && (document.visibilityState !== 'visible' || Date.now() - (store.meta.lastAuctionsScan ?? 0) < AUCTIONS_EVERY)) return;
+  auctionsBusy = true;
+  try {
+    await runApi('myAuctions');
+    // Mes mises suivent le même rythme (résumé « en tête / surenchérie » de la barre latérale).
+    await runApi('myBids');
+  } catch (e) {
+    log(`[api] ventes en cours : ${(e as Error).message}`);
+  } finally {
+    auctionsBusy = false;
+  }
+}
+
+/** Mode enchère : clic sur une carte de la collection → fenêtre « Mettre aux enchères », prix et durée remplis. */
+async function sellFromCollection(cardId: string, tile: Element): Promise<void> {
+  if (!store || automating) return;
+  const cfg = resolveSelectors(store.settings.selectorOverrides);
+  const name = store.cards[cardId]?.name ?? tile.querySelector('h3')?.textContent?.trim() ?? cardId;
+  const { price, detail } = sellAdvice(store, cardId);
+  const durationMin = durationFor(price, store.settings.durationRules);
+  const now = Date.now();
+  automating = true;
+  // Le toast « prix conseillé » et la fenêtre de vente reprennent ce prix, comme pour une proposition de Wiky-Traders.
+  await save({ pendingFocus: { cardId, cardName: name, price, detail, at: now, durationMin, autoOpen: true, arrivedAt: now, prefilledAt: now, ...(myTabId != null ? { tabId: myTabId } : {}) } });
+  showProgress(name, 'Ouverture de la vente…');
+  try {
+    await prefillSale(
+      tile,
+      price,
+      cfg,
+      (step) => {
+        log(`[enchère] ${name} : ${step}`);
+        showProgress(name, `${step}…`);
+      },
+      durationMin,
+    );
+    endProgress();
+  } catch (e) {
+    log(`[enchère] ${name} : échec ${(e as Error).message}`);
+    showProgress(name, `Ouverture de la vente impossible (${(e as Error).message}).${price != null ? `\nPrix conseillé : ${price}.` : ''}`, { error: true });
+  } finally {
+    automating = false;
+    schedule(300);
+  }
+}
+
+/** Barre latérale, fenêtres et pages Wiky-Traders dans le site. */
+function drawSiteUi(): void {
+  if (!store) return;
+  renderAuctionSwitch({
+    findTile: (target) => {
+      for (const [cardId, tile] of lastTiles ?? []) {
+        const host = tile.parentElement?.classList.contains('group') ? tile.parentElement : tile;
+        if (host.contains(target)) return { cardId, tile };
+      }
+      return null;
+    },
+    sell: (cardId, tile) => void sellFromCollection(cardId, tile),
+    prefillAllowed: () => !!store?.settings.prefill,
+    allowPrefill: async () => {
+      if (store) await save({ settings: { ...store.settings, prefill: true } });
+    },
+  });
+  renderSiteUi(store, {
+    refresh: () => {
+      // Via l'API si elle est activée ; sinon Marché → « Mes ventes » (relevé de la page).
+      if (store?.settings.apiRead) void refreshMyAuctions(true);
+      else void save({ intent: { type: 'refreshSales', at: Date.now(), tabId: myTabId } });
+    },
+  });
+}
+
 function schedule(delay = 700): void {
   clearTimeout(timer);
   timer = window.setTimeout(() => void scan(), delay);
@@ -563,7 +663,9 @@ function isOwnMutation(m: MutationRecord): boolean {
 async function main(): Promise<void> {
   myTabId = ((await ext.runtime.sendMessage({ type: 'tabId' }).catch(() => null)) as { tabId: number | null } | null)?.tabId ?? null;
   await refreshStore();
-  await initWindow();
+  // Intégré au site, la fenêtre flottante fait double emploi avec la barre latérale : elle reste fermée.
+  if (store?.settings.siteIntegration) await setWindowOpen(false);
+  else await initWindow();
   await scan(true);
 
   new MutationObserver((muts) => {
@@ -584,6 +686,15 @@ async function main(): Promise<void> {
     await refreshStore();
     schedule(200);
   });
+  // Le résumé de la barre latérale suit les relevés (sans relancer la lecture de la page).
+  onStoreChange(['bidsCache', 'meta'], async () => {
+    await refreshStore();
+    drawSiteUi();
+  });
+  setInterval(drawSiteUi, 30_000);
+  void refreshMyAuctions();
+  setInterval(() => void refreshMyAuctions(), 15_000);
+  document.addEventListener('visibilitychange', () => void refreshMyAuctions());
 
   ext.runtime.onMessage.addListener((raw: unknown, _sender, sendResponse) => {
     const message = raw as ToContent;
@@ -611,6 +722,13 @@ async function main(): Promise<void> {
       return true;
     }
     if (message.type === 'toggleWindow') {
+      // Intégré au site, l'icône de l'extension ouvre (ou ferme) la fenêtre « Vendre » par-dessus la page.
+      if (store?.settings.siteIntegration) {
+        if (isModalOpen()) closeModal();
+        else openModal('sell');
+        sendResponse({ ok: true });
+        return false;
+      }
       void toggleWindow().then(() => sendResponse({ ok: true }));
       return true;
     }

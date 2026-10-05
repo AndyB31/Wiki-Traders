@@ -120,6 +120,10 @@ export interface Settings {
   autoTagClearUnpriced: boolean;
   /** Surcharges des sélecteurs CSS (voir content/parsers/selectors.ts). */
   selectorOverrides: Record<string, string>;
+  /** Intégration au site : résumé et menu Wiky-Traders dans la barre latérale, fenêtres et pages, onglet dans Paramètres. */
+  siteIntegration: boolean;
+  /** Barre latérale du site plus compacte, avec les menus regroupés (Social, Progression). */
+  compactNav: boolean;
 }
 
 export type JournalType = 'proposed' | 'created' | 'finished';

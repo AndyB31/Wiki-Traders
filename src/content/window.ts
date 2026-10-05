@@ -23,7 +23,7 @@ const MIN_W = 300;
 const MIN_H = 220;
 const HEADER = 36;
 
-export const DEFAULT_FLOATING: FloatingState = { open: true, minimized: false, r: 16, b: 16, w: 390, h: 600 };
+export const DEFAULT_FLOATING: FloatingState = { open: false, minimized: false, r: 16, b: 16, w: 390, h: 600 };
 
 const CSS = `
 :host { all: initial; }

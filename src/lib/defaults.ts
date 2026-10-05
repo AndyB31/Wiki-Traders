@@ -32,6 +32,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTagRemoveOthers: true,
   autoTagClearUnpriced: false,
   selectorOverrides: {},
+  siteIntegration: true,
+  compactNav: true,
 };
 
 export const DEFAULT_RULES: TagRule[] = [

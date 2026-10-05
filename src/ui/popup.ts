@@ -11,11 +11,11 @@ import { loadAll, onStoreChange, save } from '../lib/storage';
 import { formatDuration, formatPrice, normalize, RARITIES, slugify } from '../lib/text';
 import type { BidStatus, Card, CardAuctionsResult, FamilyCard, MyBid, Rarity, SoldItem, StoreShape } from '../lib/types';
 import { downloadJson, fmtDate, h, mount } from './dom';
+import { embedded, initEmbed, view } from './embed';
 
 const app = document.getElementById('app')!;
-/** Affichée dans la fenêtre flottante de la page (iframe) plutôt que dans la popup du navigateur. */
-const embedded = new URLSearchParams(location.search).has('embed');
-if (embedded) document.documentElement.classList.add('embed');
+// Affichée dans une fenêtre ou une page du site (iframe) plutôt que dans la popup du navigateur.
+initEmbed();
 
 /** Ferme la popup du navigateur ; dans la fenêtre flottante, elle reste ouverte. */
 function closeUi(): void {
@@ -28,7 +28,7 @@ type GroupBy = 'family' | 'tag' | 'category' | 'rarity';
 let groupBy = localStorage.getItem('wiky-group') as GroupBy | null;
 let cardFilter = '';
 const openGroups = new Set<string>();
-let currentTab = (localStorage.getItem('wiky-tab') as PopupTab | null) ?? 'sell';
+let currentTab = ((view as PopupTab | null) ?? (localStorage.getItem('wiky-tab') as PopupTab | null)) ?? 'sell';
 
 function rarityDot(r: Rarity | null) {
   return r ? h('span', { class: `rarity ${r}`, title: RARITIES[r].label }) : null;
@@ -934,6 +934,12 @@ function render(): void {
     },
   ];
   const current = tabs.find((t) => t.id === currentTab) ?? tabs[0];
+
+  // Un seul onglet, dans une fenêtre ou une page du site : le résumé est déjà dans la barre latérale.
+  if (view) {
+    mount(app, current.id === 'sell' ? warnings : null, h('section', { class: 'panel', role: 'tabpanel' }, current.body()));
+    return;
+  }
 
   mount(
     app,

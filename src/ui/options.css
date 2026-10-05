@@ -18,3 +18,7 @@ details summary { cursor: pointer; margin: 6px 0; }
 .detected { flex-wrap: wrap; margin-top: 8px; }
 .durations { width: auto; }
 .durations input { width: 90px; }
+/* Onglet Wiky-Traders de la page Paramètres du site. */
+.embed #app { padding: 8px 4px 80px; max-width: none; }
+.embed #app > header { display: none; }
+.embed .sticky { border-radius: 12px 12px 0 0; }

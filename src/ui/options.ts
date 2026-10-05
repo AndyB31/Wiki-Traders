@@ -9,6 +9,10 @@ import { formatPrice, RARITIES } from '../lib/text';
 import type { Settings, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
+import { initEmbed } from './embed';
+
+// Onglet Wiky-Traders de la page Paramètres du site (iframe).
+initEmbed();
 
 const app = document.getElementById('app')!;
 let store: StoreShape;
@@ -187,6 +191,8 @@ function settingsForm() {
     field('Proposer une carte déjà en vente', h('input', { type: 'checkbox', checked: s.allowDuplicateListing, onchange: set('allowDuplicateListing', (v) => v === 'true') })),
     field('Compter les enchères en cours dans le prix moyen', h('input', { type: 'checkbox', checked: s.includeListings, onchange: set('includeListings', (v) => v === 'true') }), 'par défaut, seules les ventes terminées comptent'),
     field('Notifications', h('input', { type: 'checkbox', checked: s.notifications, onchange: set('notifications', (v) => v === 'true') })),
+    field('Intégration au site', h('input', { type: 'checkbox', checked: s.siteIntegration, onchange: set('siteIntegration', (v) => v === 'true') }), 'résumé et menu Wiky-Traders dans la barre latérale, onglet dans Paramètres'),
+    field('Barre latérale compacte', h('input', { type: 'checkbox', checked: s.compactNav, onchange: set('compactNav', (v) => v === 'true') }), 'menus regroupés (Social, Progression) pour faire de la place'),
     field('Étiquettes visibles sur les cartes', h('input', { type: 'checkbox', checked: s.showTagOverlay, onchange: set('showTagOverlay', (v) => v === 'true') }), 'sur chaque carte de la collection, aux couleurs du site'),
     field(
       'Style des étiquettes sur les cartes',

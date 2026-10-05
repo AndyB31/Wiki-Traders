@@ -2,25 +2,27 @@
 
 > Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : une extension navigateur qui garde tes slots d'enchères remplis selon tes règles, calcule le bon prix… et te laisse cliquer.
 
-![Statut](https://img.shields.io/badge/statut-v0.1%20b%C3%AAta-orange)
+![Version](https://img.shields.io/badge/version-0.6-orange)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178c6)
 
-![Fenêtre Wiky-Traders sur WikiMasters](docs/screenshots/window.png)
+![Wiky-Traders intégré à WikiMasters : barre latérale, résumé et réglages](docs/screenshots/site-settings.png)
+
+📖 **Documentation complète : [le wiki](https://github.com/AndyB31/Wiky-Traders/wiki)** (installation, premiers pas, chaque réglage, dépannage).
 
 ---
 
 ## Sommaire
 
 - [Pourquoi un copilote et pas un bot](#pourquoi-un-copilote-et-pas-un-bot)
-- [Ce que fait l'extension](#ce-que-fait-lextension)
-- [Captures d'écran](#captures-décran)
-- [Installation](#installation)
-- [Utilisation](#utilisation)
-- [Configuration](#configuration)
+- [Fonctionnalités](#fonctionnalités)
+- [Installation pas à pas](#installation-pas-à-pas)
+- [Configuration pas à pas](#configuration-pas-à-pas)
+- [Au quotidien](#au-quotidien)
+- [Référence des réglages](#référence-des-réglages)
+- [Dépannage](#dépannage)
 - [Architecture](#architecture)
 - [Développement](#développement)
-- [Feuille de route](#feuille-de-route)
 - [Confidentialité](#confidentialité)
 - [Avertissement](#avertissement)
 
@@ -30,165 +32,194 @@
 
 Les [règles de la communauté](https://www.wiki-masters.com/rules) (section 3) et les [conditions d'utilisation](https://www.wiki-masters.com/terms) (section 6) de WikiMasters interdisent les bots, scripts et macros qui jouent ou échangent à ta place, sous peine de bannissement.
 
-Wiky-Traders fait donc **tout le travail de réflexion** (quel slot est libre, quelle carte vendre, à quel prix) mais **c'est toi qui cliques sur « Mettre en vente »**. Tu gardes l'essentiel du gain de temps sans automatiser l'action interdite.
+Par défaut, Wiky-Traders fait **tout le travail de réflexion** (quel slot est libre, quelle carte vendre, à quel prix) mais **c'est toi qui cliques sur « Mettre aux enchères »**.
 
 | L'extension | Toi |
 | --- | --- |
-| Lit tes enchères en cours et tes étiquettes quand tu es sur le site | Ouvres le site |
+| Lit tes enchères, ta collection et tes étiquettes | Ouvres le site |
 | Détecte les slots libres et l'heure de fin de chaque enchère | Cliques sur la notification |
 | Choisit la carte à vendre selon ta répartition | Valides ou changes la carte proposée |
-| Calcule le prix (moyenne × % de l'étiquette) | Cliques sur « Mettre en vente » |
-| T'alerte quand un slot se libère | |
+| Calcule le prix (prix de référence × % de l'étiquette) | Cliques sur « Mettre aux enchères » |
 
-## Ce que fait l'extension
+Quelques options **facultatives et désactivées par défaut** (pré-remplissage, mode enchère, étiquetage automatique, lecture de l'API) vont plus loin : elles demandent une confirmation et sont signalées comme contraires aux règles. Voir [Automatisations et risques](https://github.com/AndyB31/Wiky-Traders/wiki/Automatisations-et-risques).
 
-Exemple de répartition : **1 carte « 50-100 » + 4 cartes « 20-50 »**, chacune à **70 % de son prix moyen**.
+## Fonctionnalités
 
-- **Règles par étiquette** : quota de slots, % du prix moyen, plage de prix plancher/plafond (pour l'étiquetage automatique uniquement), nombre d'exemplaires à garder, étiquette de secours. Les favoris et une liste noire ne sont jamais proposés.
-- **Détection des slots libres** : relevé des enchères en cours, alarme locale à chaque fin d'enchère, notification et badge sur l'icône (ex. « 2 »).
-- **Choix de la carte** : priorité aux cartes ayant le plus de doublons, puis au prix calculé le plus haut (ou le plus bas pour écouler).
-- **Calcul du prix** :
-
-  ```
-  prix = arrondi(prix de référence × %)
-  ```
-
-  Moyenne (ou médiane) sur 7 jours glissants, arrondi à la dizaine, détail toujours visible : « moyenne 86 × 70 % = 60 ».
-- **File de mise en vente** : une ligne par slot à remplir avec les actions *Ouvrir*, *Changer de carte*, *Ignorer*, et un bouton pour copier le prix.
-- **Journal** : historique des ventes proposées, créées et terminées pour ajuster tes pourcentages.
-
-La spécification complète est dans [`docs/specs.md`](docs/specs.md).
-
-## Captures d'écran
-
-| Fenêtre (popup) | Encart sur la page de vente |
+| | |
 | --- | --- |
-| ![Popup](docs/screenshots/popup.png) | ![Encart](docs/screenshots/overlay.png) |
+| **Intégré au site** | Barre latérale compacte (menus *Social* et *Progression*), bloc orange **Wiky-Traders** toujours visible : slots occupés / libres, prochaine fin, mises en tête / surenchéries, gagnées / perdues sur 24 h, dernière synchro. Fonctions en fenêtre par-dessus la page ou en page du site, onglet **Wiky-Traders** dans *Paramètres*. |
+| **Règles par étiquette** | Quota de slots, % du prix de référence, plancher / plafond, exemplaires à garder, étiquette de secours, liste noire ; les favoris ne sont jamais proposés. |
+| **Prix conseillé** | Prix du site, historique de la carte, prix saisi à la main ou médiane de la rareté, × % de l'étiquette, arrondi ; détail toujours affiché (« médiane Rare 36 × 70 % = 25 »). |
+| **Durée conseillée** | Paliers de prix → durée (10 min, 1 h, 3 h…). |
+| **Alertes** | Badge sur l'icône (slots libres), notification à chaque fin d'enchère, heures silencieuses. |
+| **Fenêtre de vente enrichie** | Toast « prix conseillé », résumé du marché de la carte (nombre d'offres, min, médiane, max) et liste de ses enchères en cours. |
+| **Mises et ventes** | Tes mises (en tête, surenchérie, gagnée, perdue) et tes ventes conclues, avec l'écart au prix de la carte. |
+| **Journal** | Ventes proposées, créées et terminées ; conseils pour ajuster tes %. |
+| **Étiquettes sur les cartes** | Pastilles aux couleurs du site sur chaque carte de la collection (libellés ou simples ronds). |
 
-| Réglages | Journal |
-| --- | --- |
-| ![Réglages](docs/screenshots/options.png) | ![Journal](docs/screenshots/journal.png) |
+| Barre latérale | Fenêtre « Vendre » | Mode enchère |
+| --- | --- | --- |
+| ![Barre latérale](docs/screenshots/site-sidebar.png) | ![Fenêtre Vendre](docs/screenshots/site-modal.png) | ![Mode enchère](docs/screenshots/auction-mode.png) |
 
-| V4 – vente ouverte et prix pré-rempli | Étiquetage automatique |
-| --- | --- |
-| ![Pré-remplissage](docs/screenshots/prefill.png) | ![Étiquetage](docs/screenshots/autotag.png) |
+> Les pages du site visibles sur les captures sont une imitation servie par `npm run demo` (le vrai site exige d'être connecté). L'interface de l'extension est réelle.
 
-> Les pages du site visibles sur les captures sont une imitation servie par `npm run demo` (le vrai site exige d'être connecté), qui reproduit la façon dont React rattache les données aux éléments. Seule l'interface de l'extension est réelle.
+## Installation pas à pas
 
-## Installation
+L'extension n'est pas publiée sur les boutiques : on la construit depuis les sources puis on la charge « non empaquetée ». Compte 5 minutes.
 
-### Depuis les sources
+### 1. Prérequis
 
-Prérequis : Node.js 20+.
+- [Node.js](https://nodejs.org) **20 ou plus récent** (vérifie avec `node -v`) ;
+- [Git](https://git-scm.com) ;
+- un navigateur **Chromium** (Chrome, Edge, Brave, Arc, Opera…) ou **Firefox 128+**.
+
+### 2. Récupérer et construire l'extension
 
 ```bash
-git clone git@github.com:AndyB31/Wiky-Traders.git
+git clone https://github.com/AndyB31/Wiky-Traders.git
 cd Wiky-Traders
 npm install
-npm run build        # génère dist/
+npm run build
 ```
 
-Puis, selon le navigateur :
+Le dossier **`dist/`** contient l'extension prête à charger. (`npm run zip` produit en plus `wiky-traders.zip`.)
 
-- **Chrome / Edge / Brave** : ouvrir `chrome://extensions`, activer le *Mode développeur*, cliquer sur *Charger l'extension non empaquetée* et choisir le dossier `dist/`.
-- **Firefox (128+)** : ouvrir `about:debugging#/runtime/this-firefox`, *Charger un module temporaire* et choisir `dist/manifest.json`.
+### 3. Charger l'extension dans le navigateur
 
-`npm run zip` produit `wiky-traders.zip`, prêt à être chargé ou publié.
+**Chrome, Edge, Brave, Opera**
 
-La page de réglages s'ouvre à l'installation.
+1. Ouvre la page des extensions : `chrome://extensions` (Edge : `edge://extensions`, Brave : `brave://extensions`).
+2. Active le **Mode développeur** (interrupteur en haut à droite).
+3. Clique sur **Charger l'extension non empaquetée** et choisis le dossier `dist/`.
 
-## Utilisation
+**Arc**
 
-1. **Régler tes étiquettes** dans la page d'options : quota de slots, % du prix moyen, plancher, plafond. Par défaut : 1 × « 50-100 » + 4 × « 20-50 » à 70 %.
-2. **Ouvrir ta collection** sur [wiki-masters.com/collection](https://www.wiki-masters.com/collection). L'extension relève les cartes, leur quantité, leur rareté et leurs étiquettes. Si les étiquettes ne sont pas affichées sur les cartes, filtre la collection par étiquette : le filtre actif est appliqué à toutes les cartes visibles.
-3. **Ouvrir tes enchères** (onglet « Mes ventes » du marché). Si l'extension ne reconnaît pas la page, clique sur **« C'est la page de mes enchères »** dans la popup.
-4. **La fenêtre Wiky-Traders s'ouvre dans la page** de WikiMasters (uniquement sur ce site) : déplace-la par sa barre de titre, redimensionne-la par le coin en bas à droite, réduis-la (– ou double-clic sur la barre) ou ferme-la (×). Sa position, sa taille et son état sont mémorisés. **Clique sur l'icône de l'extension** pour la rouvrir ou la fermer ; ailleurs que sur WikiMasters, l'icône ouvre le site.
-   La fenêtre est organisée en **onglets** : *À vendre*, *En cours*, *Étiquettes*, *Outils*. Le bouton **🔄** actualise tes ventes : il va sur le Marché, sélectionne l'onglet « Mes ventes » et relit la liste. Le clic sur une notification de fin d'enchère fait de même.
-5. Le **badge** de l'icône affiche le nombre de slots libres. À la fin d'une enchère, une **notification** t'indique l'étiquette à remettre en vente.
-6. Dans la **fenêtre**, chaque slot libre propose une carte et un prix avec le détail du calcul (« moyenne 86 × 70 % = 60 ») :
-   - **Ouvrir** : passe par la collection (depuis n'importe quelle page du site), met la carte en évidence et affiche le prix conseillé avec un bouton *Copier* ; avec la V4, ouvre ensuite la fiche de la carte puis la fenêtre « Mettre aux enchères » ;
-   - le menu déroulant permet de **changer de carte** ;
-   - **Ignorer** laisse ce slot vide jusqu'à la prochaine enchère.
-7. Tu cliques sur **« Mettre en vente »** et tu colles le prix. Quand la fenêtre de mise en vente est ouverte, l'encart affiche le prix conseillé de la carte affichée.
-8. Le **journal** (📒) liste les ventes proposées, créées et terminées, avec par étiquette la part des ventes parties au prix de départ et un conseil pour ajuster ton %.
+1. Ouvre `arc://extensions` (ou `chrome://extensions`).
+2. Active le **Mode développeur**, puis **Load unpacked** → dossier `dist/`.
+3. Vérifie que la carte « Wiky-Traders » indique bien *Loaded from: …/Wiky-Traders/dist*.
 
-### Automatisations (désactivées par défaut)
+**Firefox (128+)**
 
-> ⚠️ Ces options simulent des clics sur le site. Les [règles de WikiMasters](https://www.wiki-masters.com/rules) (section 3) et ses [conditions](https://www.wiki-masters.com/terms) (section 6) l'interdisent : **risque de bannissement définitif, avec perte des cartes**. Elles demandent une confirmation à l'activation, dans Réglages → Automatisations.
+1. Ouvre `about:debugging#/runtime/this-firefox`.
+2. Clique sur **Charger un module complémentaire temporaire** et choisis `dist/manifest.json`.
+3. Firefox oublie les modules temporaires à la fermeture : recommence à chaque démarrage.
 
-- **V4 – Ouvrir et pré-remplir** : le bouton de la popup devient « Ouvrir et pré-remplir ». Dans l'onglet ouvert, l'extension ouvre la carte, puis sa fenêtre de vente, et remplit le prix. **Le clic « Mettre en vente » reste toujours à toi.** Le prix est aussi rempli quand tu ouvres toi-même la fenêtre de vente d'une carte connue.
-- **Lecture via l'API (onglet « Mises »)** : liste des enchères où tu as misé (en tête, surenchéri, gagnée, perdue), ta mise, le prix actuel ou final, et le prix de référence de la carte (médiane de ses ventes, médiane de sa rareté). Le bouton *Prix du marché* charge les ventes conclues des 7 derniers jours. Lectures seules (GET), avec ta session ; l'adresse et la clé publique de l'API sont retrouvées dans les scripts du site.
-- **Étiquetage automatique** : chaque carte au prix moyen connu reçoit l'étiquette dont la plage plancher–plafond contient ce prix (ex. 62 → « 50-100 »). En option, les autres étiquettes gérées sont retirées. La popup montre la liste des changements ; « Lancer » (sur la collection) les applique carte par carte, avec la progression et un bouton **Arrêter** sur la page. L'étiquetage s'arrête seul si l'interface n'est pas reconnue.
+La page de réglages s'ouvre à l'installation. Épingle l'icône 🧩 → Wiky-Traders dans la barre d'outils pour l'avoir sous la main.
 
-### Comment l'extension lit le site
+### 4. Vérifier que tout marche
 
-WikiMasters est une application React (Next.js). Un petit script de page (`bridge.js`) lit les **données des composants affichés** (carte, rareté, quantité, étiquettes, prix moyen, enchère, fin, prix courant). C'est exactement ce que la page affiche, sans aucune requête réseau. Si ces données ne sont pas trouvées, l'extension se rabat sur la lecture du texte de la page. La popup indique la source utilisée (« données de la page » ou « lecture du texte »).
+1. Va sur [wiki-masters.com](https://www.wiki-masters.com) et connecte-toi.
+2. Ouvre (ou recharge) un onglet du site : le bloc orange **Wiky-Traders** apparaît dans la barre latérale, au-dessus de *Paramètres*.
+3. Ouvre ta **collection** : les étiquettes s'affichent sur les cartes et l'interrupteur **Mode enchère** apparaît à côté du titre.
 
-### Si le site change : le diagnostic
+Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
-WikiMasters est une application Next.js dont les classes CSS changent à chaque mise à jour. L'extension lit donc surtout des repères stables (liens `/marketplace/<id>`, images et couleurs de rareté, attributs ARIA, textes) et affiche « page non reconnue » plutôt que des données fausses.
+### 5. Mettre à jour
 
-Si une page n'est pas reconnue :
+```bash
+cd Wiky-Traders
+git pull
+npm install
+npm run build
+```
 
-1. sur la page en question, ouvre la popup et clique sur **Diagnostic** : un fichier JSON est téléchargé, avec le plan de la page (balises, classes, attributs, textes courts, jamais le contenu des champs), un échantillon des données React trouvées et les dernières étapes des automatisations ;
-2. ajuste les sélecteurs dans **Réglages → Données → Sélecteurs avancés** (JSON), ou partage le diagnostic pour mettre à jour les valeurs par défaut de [`selectors.ts`](src/content/parsers/selectors.ts).
+Puis, dans la page des extensions, clique sur **↻ (recharger)** sous Wiky-Traders, et **recharge les onglets WikiMasters** déjà ouverts (une extension rechargée ne remplace pas le script d'une page déjà ouverte). Tes réglages et données sont conservés.
 
-## Configuration
+### 6. Désinstaller
+
+*Supprimer* dans la page des extensions. Pour effacer d'abord les données : Réglages → *Effacer toutes les données*.
+
+## Configuration pas à pas
+
+Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou clic droit sur l'icône → *Options*). Pense à cliquer sur **Enregistrer** en bas de page.
+
+1. **Règles par étiquette** : une ligne par étiquette de ta collection. Par défaut : 1 slot « 50-100 » et 4 slots « 20-50 », à **70 %** du prix de référence, en gardant 1 exemplaire. Les étiquettes trouvées dans ta collection s'ajoutent en un clic.
+2. **Nombre de slots** : le nombre d'enchères simultanées permises par le site (lu automatiquement dans « Mes ventes (2/5) »).
+3. **Prix** : statistique (*médiane* conseillée), fenêtre (7 jours), arrondi (automatique), ordre à doublons égaux, étiquette de secours.
+4. **Durée des enchères** : ajoute des paliers, ex. ≤ 20 → 10 min, 21–100 → 1 h, > 100 → 3 h.
+5. **Notifications** et **heures silencieuses** (23 h – 8 h par défaut).
+6. **Affichage sur le site** : intégration au site, barre latérale compacte, étiquettes sur les cartes (libellés ou pastilles).
+7. **Liste noire** et **prix saisis à la main** si besoin.
+8. **Automatisations** (facultatif, désactivé par défaut, voir l'avertissement) : lecture via l'API (mises, ventes, marché, relève automatique des ventes en cours), pré-remplissage, étiquetage automatique.
+
+Enfin, **ouvre ta collection** puis l'onglet **Historique** du Marché une fois : l'extension apprend tes cartes et les prix réels.
+
+Le détail de chaque option est dans le wiki : [Premiers pas](https://github.com/AndyB31/Wiky-Traders/wiki/Premiers-pas) et [Référence des réglages](https://github.com/AndyB31/Wiky-Traders/wiki/Reglages).
+
+## Au quotidien
+
+- Le **bloc Wiky-Traders** de la barre latérale résume tout ; un clic ouvre **Vendre** (les slots à remplir).
+- Pour chaque slot libre : une carte, un prix et sa durée. **Ouvrir** amène sur la carte dans la collection ; **Copier le prix**, change de carte dans la liste, ou **Ignorer**.
+- Dans la fenêtre « Mettre aux enchères » du site, un **toast** rappelle le prix conseillé ; sous la fenêtre, les enchères en cours de la même carte.
+- Avec le **Mode enchère** (collection), un clic sur une carte ouvre directement sa mise en vente, prix et durée remplis.
+- L'icône de l'extension ouvre ou ferme la fenêtre **Vendre** sur le site.
+- Le **journal** (Outils → 📒) t'aide à ajuster tes pourcentages.
+
+Guide complet : [Vendre](https://github.com/AndyB31/Wiky-Traders/wiki/Vendre), [Mises et ventes](https://github.com/AndyB31/Wiky-Traders/wiki/Mises-et-ventes), [Intégration au site](https://github.com/AndyB31/Wiky-Traders/wiki/Integration-au-site).
+
+## Référence des réglages
 
 | Réglage | Défaut | Description |
 | --- | --- | --- |
-| Nombre de slots | 5 | Nombre d'enchères simultanées |
-| Fenêtre du prix moyen | 7 jours | Période prise en compte |
-| Statistique | médiane | Les prix du marché sont très dispersés : la moyenne est tirée par quelques ventes énormes |
-| Arrondi | automatique | Unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà (ou un pas fixe) |
-| À doublons égaux | prix le plus haut | Ou le plus bas, pour écouler |
+| Nombre de slots | 5 | Enchères simultanées (mis à jour par le site) |
+| Fenêtre du prix moyen | 7 jours | Période des ventes prises en compte |
+| Statistique | médiane | La moyenne est tirée par quelques ventes énormes |
+| Arrondi | automatique | Unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà (ou pas fixe) |
+| À doublons égaux | prix le plus haut | Ou le plus bas (écouler), ou aléatoire |
 | Étiquette de secours | aucune | Reprend le slot d'une étiquette sans carte vendable |
-| Enchères en cours dans la moyenne | non | Par défaut seules les ventes terminées comptent |
-| Durée des enchères | durée du site (1 h) | Paliers de prix → durée (10 min, 30 min, 1 h, 3 h, 6 h, 12 h), ex. ≤ 20 : 10 min, 21–100 : 1 h, > 100 : 3 h |
-| Heures silencieuses | 23 h – 8 h | Pas de notification sur cette plage |
-| Page « mes enchères » | auto | Chemin enregistré depuis la popup |
-| Appartenance (par règle) | étiquette du site | Ou « plage de prix moyen » si les étiquettes ne sont pas lisibles |
+| Proposer une carte déjà en vente | non | |
+| Enchères en cours dans le prix moyen | non | Par défaut seules les ventes terminées comptent |
+| Durée des enchères | durée du site | Paliers prix → durée |
+| Notifications / heures silencieuses | oui / 23 h – 8 h | |
+| Intégration au site | oui | Barre latérale, fenêtres, pages, onglet Paramètres |
+| Barre latérale compacte | oui | Menus Social et Progression |
+| Étiquettes visibles sur les cartes | oui, libellés | Ou pastilles de couleur |
+| Fenêtre de vente : résumé du marché / liste des enchères | oui | Nécessite la lecture via l'API |
+| Lecture via l'API | **non** | Mises, ventes conclues, marché, ventes en cours relues chaque minute |
+| V4 – pré-remplissage (et Mode enchère) | **non** | Ouvre la vente, remplit prix et durée |
+| Étiquetage automatique / par l'API | **non** | Range les cartes par plage de prix |
 
-**Prix de référence** : sur WikiMasters, chaque carte est un article Wikipédia quasi unique. Une même carte n'est presque jamais revendue (3 cartes sur 997 vendues en une journée) : le « prix moyen d'une carte » n'existe en pratique pas. L'extension utilise donc, dans l'ordre :
+Les réglages s'exportent et s'importent en JSON (Réglages → bas de page).
 
-1. le prix affiché par le site, s'il existe ;
-2. l'historique de la carte (au moins 3 ventes) ;
-3. un prix saisi à la main ;
-4. **la médiane des ventes conclues de la même rareté** (au moins 5 ventes ; les cartes brillantes sont cotées à part), observées dans le marché et l'onglet **Historique** ;
-5. à défaut, une estimation (enchères en cours de la même rareté, quelques ventes) affichée « estimation ».
+## Dépannage
 
-Sans aucune donnée, la popup demande un prix. Visite l'onglet **Historique** du marché de temps en temps : c'est la meilleure source de prix réels.
+| Problème | Solution |
+| --- | --- |
+| Rien n'apparaît sur le site | Recharge l'onglet WikiMasters après avoir rechargé l'extension ; vérifie le dossier chargé (`dist/`) et qu'une seule copie est installée. |
+| L'ancienne interface est toujours là | Même chose : recharge la page du site (Cmd/Ctrl + R). |
+| « Aucune carte connue » | Ouvre ta collection une fois. |
+| Slots / ventes pas à jour | Clique ↻ dans le bloc Wiky-Traders, ou active la lecture via l'API pour la relève automatique. |
+| Un slot reste vide | La fenêtre Vendre explique pourquoi (favoris, déjà en vente, « garder au moins »…). |
+| Page « non reconnue » | Outils → **Diagnostic** exporte la structure de la page ; ajuste Réglages → Données → *Sélecteurs avancés* ou ouvre une issue avec le fichier. |
 
-Quand un slot reste vide, la popup explique pourquoi : cartes en favori, déjà en vente, ou bloquées par « garder au moins » (avec un seul exemplaire et « garder 1 », rien n'est vendable). Les étiquettes trouvées dans ta collection (ex. « Mettre au Enchère ») s'ajoutent comme règle en un clic dans les réglages.
-
-Les réglages s'exportent et s'importent en JSON depuis la page d'options, qui permet aussi d'effacer toutes les données.
+Plus de cas : [Dépannage (wiki)](https://github.com/AndyB31/Wiky-Traders/wiki/Depannage).
 
 ## Architecture
 
-Extension **Manifest V3 sans serveur** : tout est calculé et stocké dans le navigateur (`chrome.storage.local`). La seule action sur le site, c'est ton clic.
+Extension **Manifest V3 sans serveur** : tout est calculé et stocké dans le navigateur (`chrome.storage.local`).
 
 ```
-content script (lit le DOM affiché) → service worker (fusionne, alarmes, badge) → popup (propose) → toi (cliques)
+page du site ─ bridge.ts (données React) ─┐
+API du site (facultatif, lecture) ────────┼─ content script ─ service worker (fusion, alarmes, badge, notifications)
+                                          └─ interface dans le site (barre latérale, fenêtres, pages, toasts) / popup
 ```
 
 | Fichier | Rôle |
 | --- | --- |
 | `src/content/bridge.ts` | Script de page : lecture des données React affichées |
-| `src/content/parsers/` | Normalisation des données React (`react.ts`), lecture du texte en secours ; sélecteurs dans `selectors.ts` |
-| `src/content/actions.ts`, `automation.ts` | V4 (ouverture de la vente, pré-remplissage) et étiquetage automatique |
-| `src/lib/autotag.ts` | Plan d'étiquetage par plage de prix |
-| `src/content/window.ts` | Fenêtre flottante (iframe de la popup) : déplacement, redimensionnement, réduction |
-| `src/content/overlay.ts` | Pastilles sur les cartes vendables, encart « prix conseillé » |
-| `src/content/diagnostic.ts` | Export du plan de la page |
-| `src/lib/allocation.ts` | Manque par étiquette, classement des cartes vendables (F1–F3) |
-| `src/lib/pricing.ts` | Prix de référence (moyenne / médiane, rareté), %, arrondi (F4) |
-| `src/lib/journal.ts` | Rapprochement des enchères, statistiques par étiquette (F6) |
-| `src/background/` | Fusion des relevés, alarmes de fin d'enchère, notifications, badge (F2) |
-| `src/ui/` | Popup, page d'options, journal |
+| `src/content/parsers/` | Normalisation des données, lecture du texte en secours, sélecteurs (`selectors.ts`) |
+| `src/content/site-ui.ts` | Barre latérale compacte, bloc Wiky-Traders, fenêtres, pages, onglet Paramètres |
+| `src/content/auction-mode.ts` | Mode enchère de la collection |
+| `src/content/toast.ts`, `overlay.ts` | Toasts (prix conseillé, progression), étiquettes sur les cartes |
+| `src/content/sell-market.ts` | Résumé du marché et enchères de la carte dans la fenêtre de vente |
+| `src/content/api.ts`, `api-tags.ts` | Lecture de l'API du site ; étiquetage par l'API |
+| `src/content/actions.ts`, `automation.ts` | Pré-remplissage, étiquetage par l'interface |
+| `src/lib/allocation.ts`, `pricing.ts` | Slots, choix des cartes, prix de référence et prix conseillé |
+| `src/lib/journal.ts`, `autotag.ts`, `duration.ts` | Journal, plan d'étiquetage, paliers de durée |
+| `src/background/` | Fusion des relevés, alarmes, notifications, badge |
+| `src/ui/` | Popup (et ses vues intégrées au site), réglages, journal |
 
-- Permissions : `storage`, `alarms`, `notifications` ; accès hôte limité à `https://www.wiki-masters.com/*`.
-- Aucune requête réseau, aucun appel aux API internes du site, aucun rechargement en arrière-plan.
-- Firefox 128+ (script de page en `world: MAIN`).
+Permissions : `storage`, `alarms`, `notifications` ; accès limité à `https://www.wiki-masters.com/*`.
 
 ## Développement
 
@@ -201,25 +232,15 @@ npm test             # tests unitaires (Vitest + jsdom)
 npm run demo         # parcours complet dans Chromium + captures du README
 ```
 
-`npm run demo` nécessite le navigateur de Playwright : `npx playwright install chromium`.
-
-Les fixtures HTML de `tests/fixtures/` sont des imitations : à remplacer par de vrais relevés (via **Diagnostic**) dès qu'ils sont disponibles.
-
-## Feuille de route
-
-- [x] **V0 – Lecture** : relevé des enchères, de la collection et des étiquettes ; affichage des slots dans la popup
-- [x] **V1 – Règles et prix** : page d'options, calcul du manque, choix de carte, prix conseillé
-- [x] **V2 – Alertes** : alarmes, notifications, badge, overlay sur la page de vente
-- [x] **V3 – Journal** : historique et statistiques
-- [ ] **Calage sur le vrai site** : vérifier les sélecteurs sur un compte connecté (voir [points à vérifier](docs/specs.md#points-à-vérifier-et-plan-de-développement))
-- [x] **V4 – Pré-remplissage** : ouverture de la vente et prix pré-rempli (désactivé par défaut, contraire aux règles du site)
-- [x] **Étiquetage automatique** (désactivé par défaut, contraire aux règles du site)
+`npm run demo` nécessite le navigateur de Playwright : `npx playwright install chromium`. Voir [Développement (wiki)](https://github.com/AndyB31/Wiky-Traders/wiki/Developpement).
 
 ## Confidentialité
 
-- Aucun appel réseau sortant, aucune donnée envoyée ailleurs.
-- Toutes les données restent dans le stockage local du navigateur et peuvent être effacées depuis la page d'options.
+- Aucune donnée n'est envoyée ailleurs que sur WikiMasters ; pas de serveur Wiky-Traders, pas de statistiques.
+- Sans la **lecture via l'API**, l'extension ne fait aucune requête : elle lit seulement ce que la page affiche.
+- Avec elle, l'extension interroge l'API du site (celle qu'utilise le site lui-même) **avec ta session, en lecture seule** ; l'étiquetage par l'API, s'il est activé, n'écrit que des étiquettes.
+- Toutes les données restent dans le stockage local du navigateur et s'effacent depuis les réglages.
 
 ## Avertissement
 
-Projet personnel, non affilié à WikiMasters. L'extension est conçue pour respecter les règles du site (aucune action sans clic humain), mais son utilisation reste sous ta responsabilité.
+Projet personnel, non affilié à WikiMasters. Par défaut, l'extension n'agit pas sans ton clic ; les automatisations facultatives sont contraires aux règles du site et peuvent entraîner un **bannissement**. Leur utilisation reste sous ta responsabilité.

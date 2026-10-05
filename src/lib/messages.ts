@@ -15,6 +15,8 @@ export interface ScanMessage {
   prices?: PriceObs[];
   /** Compteur affiché par le site (« Mes ventes (2/5) »). */
   siteSlots?: { active: number; slots: number };
+  /** `api` : mes enchères lues via l'API, pas un relevé de la page (la page affichée n'est pas mémorisée). */
+  source?: 'api';
 }
 
 export interface ProposedMessage {
@@ -29,7 +31,7 @@ export interface ProposedMessage {
 export type ToBackground = ScanMessage | ProposedMessage | { type: 'refreshBadge' } | { type: 'tabId' } | { type: 'prices'; prices: PriceObs[]; market?: { count: number; error?: string } } | { type: 'collection'; cards: ScannedCard[] };
 
 /** Messages envoyés par la popup au content script de l'onglet actif. */
-export type ToContent = { type: 'diagnostic' } | { type: 'rescan' } | { type: 'autoTag'; plan?: TagChange[] } | { type: 'stopAutoTag' } | { type: 'toggleWindow' } | { type: 'api'; op: 'myBids' | 'marketSales' | 'collection' | 'mySales' } | { type: 'api'; op: 'cardAuctions'; siteCardId: string };
+export type ToContent = { type: 'diagnostic' } | { type: 'rescan' } | { type: 'autoTag'; plan?: TagChange[] } | { type: 'stopAutoTag' } | { type: 'toggleWindow' } | { type: 'api'; op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 'myAuctions' } | { type: 'api'; op: 'cardAuctions'; siteCardId: string };
 
 export interface DiagnosticResult {
   url: string;
