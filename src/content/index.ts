@@ -651,7 +651,6 @@ async function sellFromCollection(cardId: string, tile: Element): Promise<void> 
 /** Barre latérale, fenêtres et pages Wiky-Traders dans le site. */
 function drawSiteUi(): void {
   if (!store) return;
-  runFeatures(featureContext(store.settings, store.cards, store.myFamilies));
   renderAuctionSwitch({
     findTile: (target) => {
       for (const [cardId, tile] of lastTiles ?? []) {
@@ -673,6 +672,8 @@ function drawSiteUi(): void {
       else void save({ intent: { type: 'refreshSales', at: Date.now(), tabId: myTabId } });
     },
   });
+  // Après la barre latérale : les pages « natives » (Familles) trouvent leur conteneur dès le premier passage.
+  runFeatures(featureContext(store.settings, store.cards, store.myFamilies));
 }
 
 function schedule(delay = 700): void {

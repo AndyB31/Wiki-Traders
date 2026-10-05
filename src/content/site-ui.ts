@@ -10,6 +10,7 @@
 import { allocate, type AllocationInput } from '../lib/allocation';
 import { ext } from '../lib/browser';
 import { STALE_AFTER_MS } from '../lib/defaults';
+import { featureFlags, type FeatureKey } from '../lib/features';
 import { formatDuration } from '../lib/text';
 import type { Meta, MyBidsResult } from '../lib/types';
 
@@ -20,7 +21,7 @@ export interface SiteUiActions {
   refresh: () => void;
 }
 
-type View = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'tags' | 'tools';
+type View = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'families' | 'tags' | 'tools';
 
 const ICONS: Record<string, string> = {
   coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
@@ -37,18 +38,24 @@ const ICONS: Record<string, string> = {
   chevron: '<path d="m9 18 6-6-6-6"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
 };
 
 function icon(name: string, size = 20): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 }
 
-/** Fonctionnalités de la popup : en fenêtre par-dessus la page, ou en page quand la liste est longue. */
-const ITEMS: { view: View; label: string; title: string; icon: string; page?: string; wide?: boolean }[] = [
+/**
+ * Fonctionnalités de la popup : en fenêtre par-dessus la page, ou en page quand la liste est longue.
+ * `native` : page dessinée directement dans le DOM du site par un module (features/), pas d'iframe ;
+ * `feature` : masquée si cette fonctionnalité est désactivée.
+ */
+const ITEMS: { view: View; label: string; title: string; icon: string; page?: string; wide?: boolean; native?: boolean; feature?: FeatureKey }[] = [
   { view: 'sell', label: 'Vendre', title: 'Slots à remplir', icon: 'tag' },
   { view: 'running', label: 'Mes ventes', title: 'Mes ventes en cours', icon: 'hourglass' },
   { view: 'bids', label: 'Mes mises', title: 'Mes mises', icon: 'bid' },
   { view: 'cards', label: 'Cartes & prix', title: 'Cartes & prix', icon: 'layers', page: '/collection' },
+  { view: 'families', label: 'Familles', title: 'Familles', icon: 'folder', page: '/collection', native: true, feature: 'families' },
   { view: 'sold', label: 'Ventes conclues', title: 'Ventes conclues', icon: 'receipt', page: '/marketplace' },
   { view: 'tags', label: 'Étiquettes', title: 'Étiquetage', icon: 'tags' },
   { view: 'tools', label: 'Outils', title: 'Outils', icon: 'wrench' },
@@ -323,11 +330,16 @@ function currentRoute(): View | 'settings' | null {
   return ITEMS.find((i) => i.page && i.view === wiky)?.view ?? null;
 }
 
+/** Conteneur d'une page « native » (dessinée par un module), s'il est affiché. */
+export function nativeMount(view: View): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`#wiky-page [data-wiky-mount="${view}"]`);
+}
+
 function renderWikySection(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions): void {
   const now = Date.now();
   const s = siteSummary(store, now);
   const route = currentRoute();
-  const key = JSON.stringify([s, Math.floor(now / 30_000), route]);
+  const key = JSON.stringify([s, Math.floor(now / 30_000), route, store.settings.features]);
   let box = nav.querySelector<HTMLElement>(':scope > [data-wiky="nav-wiky"]');
   if (!box) {
     box = el('div', { 'data-wiky': 'nav-wiky', class: 'wiky-section' });
@@ -358,7 +370,9 @@ function renderWikySection(nav: HTMLElement, store: SiteUiStore, actions: SiteUi
 
   const items = el('div', { class: 'wiky-items' });
   const counts: Partial<Record<View, number>> = { sell: s.toSell, running: s.occupied, bids: s.leading + s.outbid };
+  const flags = featureFlags(store.settings.features);
   for (const item of ITEMS) {
+    if (item.feature && !flags[item.feature]) continue;
     const count = counts[item.view] ? `<span class="wiky-count">${counts[item.view]}</span>` : '';
     const inner = `<span class="wiky-ico">${icon(item.icon, 18)}</span><span>${item.label}</span>${count}`;
     if (item.page) {
@@ -450,6 +464,12 @@ function renderPage(): void {
     tabs.append(el('a', { class: 'wiky-tab', href: '/settings', role: 'tab', 'aria-selected': 'false' }, 'Général'));
     tabs.append(el('span', { class: 'wiky-tab is-active', role: 'tab', 'aria-selected': 'true' }, 'Wiky-Traders'));
     page.append(tabs);
+  }
+  if (item?.native) {
+    // Rempli par le module de la fonctionnalité (features/), à la relecture suivante.
+    page.append(el('div', { 'data-wiky-mount': route }));
+    main.append(page);
+    return;
   }
   const frameBox = el('div', { class: 'wiky-frame' });
   frameBox.append(el('iframe', { src: route === 'settings' ? frameUrl('options') : frameUrl('popup', route), title: `Wiky-Traders – ${title}` }));

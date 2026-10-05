@@ -95,6 +95,81 @@ export async function cardsByIds(ids: string[]): Promise<Map<string, CatalogCard
   return out;
 }
 
+/**
+ * Cartes du catalogue par titre exact (pour une carte affichée dont on ne connaît que le nom),
+ * en lots de 150 titres. Clé du résultat : titre tel que demandé.
+ */
+export async function cardsByTitles(titles: string[]): Promise<Map<string, CatalogCard>> {
+  const out = new Map<string, CatalogCard>();
+  const wanted = [...new Set(titles.map((t) => t.trim()).filter((t) => t && !/["\\]/.test(t)))];
+  const set = new Set(wanted);
+  for (const c of cardCache.values()) if (set.has(c.title)) out.set(c.title, c);
+  const missing = wanted.filter((t) => !out.has(t));
+  if (!missing.length) return out;
+  const { cfg, session } = await api();
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const list = missing.slice(i, i + BATCH).map((t) => `"${t}"`).join(',');
+    const rows = await get<CardRow[]>(cfg, session, `cards?select=${CARD_FIELDS}&wikipedia_title=in.(${encodeURIComponent(list)})`);
+    for (const r of rows) {
+      const c = toCatalogCard(r);
+      cardCache.set(c.siteId, c);
+      out.set(c.title, c);
+    }
+  }
+  return out;
+}
+
+/** Enchère en cours d'une carte (marché). */
+export interface ActiveAuction {
+  id: string;
+  cardId: string;
+  /** Mise actuelle, sinon prix de départ. */
+  price: number;
+  hasBid: boolean;
+  endsAt: number | null;
+  shiny: boolean;
+}
+
+/**
+ * Enchères en cours de toutes les cartes demandées : une requête par lot de 150 cartes (au lieu d'une
+ * recherche par carte). Résultat groupé par carte, la moins chère d'abord.
+ */
+export async function activeAuctionsFor(ids: string[]): Promise<Map<string, ActiveAuction[]>> {
+  const out = new Map<string, ActiveAuction[]>();
+  const wanted = [...new Set(ids)];
+  if (!wanted.length) return out;
+  const { cfg, session } = await api();
+  const now = Date.now();
+  const batches: Promise<void>[] = [];
+  for (let i = 0; i < wanted.length; i += BATCH) {
+    const batch = wanted.slice(i, i + BATCH);
+    batches.push(
+      get<{ id: string; card_id: string; base_amount: number | null; current_bid: number | null; end_at: string | null; is_shiny: boolean | null; status: string }[]>(
+        cfg,
+        session,
+        `auctions?select=id,card_id,base_amount,current_bid,end_at,is_shiny,status&status=eq.active&card_id=${inList(batch)}&limit=5000`,
+      ).then((rows) => {
+        for (const r of rows) {
+          const endsAt = r.end_at ? Date.parse(r.end_at) || null : null;
+          if (endsAt != null && endsAt <= now) continue;
+          const a: ActiveAuction = {
+            id: r.id,
+            cardId: r.card_id,
+            price: r.current_bid ?? r.base_amount ?? 0,
+            hasBid: r.current_bid != null && r.current_bid > (r.base_amount ?? 0),
+            endsAt,
+            shiny: !!r.is_shiny,
+          };
+          out.set(a.cardId, [...(out.get(a.cardId) ?? []), a]);
+        }
+      }),
+    );
+  }
+  await Promise.all(batches);
+  for (const list of out.values()) list.sort((a, b) => a.price - b.price || (a.endsAt ?? Infinity) - (b.endsAt ?? Infinity));
+  return out;
+}
+
 // ---------------------------------------------------------------- prix moyens
 
 export interface CardPrice {

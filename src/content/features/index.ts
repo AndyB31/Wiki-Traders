@@ -14,5 +14,8 @@ import './packs';
 import './pull-share';
 import './trades';
 import './bid-watch';
+import './families-page';
+import './family-badges';
+import './collection-families';
 
 export {};

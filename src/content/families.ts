@@ -2,7 +2,8 @@
  * Familles de cartes de l'extension « WikiMasters - Prix moyen collection » (kzfamily).
  * Elle les enregistre dans le localStorage du site sous `wm_families_v1` ; on les lit seulement.
  */
-import type { Family, Rarity } from '../lib/types';
+import { parseLegacyFamilies } from '../lib/families';
+import type { CardFamily, Family, Rarity } from '../lib/types';
 
 export const FAMILIES_KEY = 'wm_families_v1';
 const RARITIES = new Set(['C', 'PC', 'R', 'SR', 'UR', 'L']);
@@ -39,6 +40,15 @@ export function parseFamilies(raw: string | null): Family[] {
 export function readFamilies(): Family[] {
   try {
     return parseFamilies(localStorage.getItem(FAMILIES_KEY));
+  } catch {
+    return [];
+  }
+}
+
+/** Familles complètes de « Prix moyen collection » (toutes les cartes, couverture), prêtes à importer. */
+export function readLegacyCardFamilies(existing: CardFamily[] = []): CardFamily[] {
+  try {
+    return parseLegacyFamilies(localStorage.getItem(FAMILIES_KEY), existing);
   } catch {
     return [];
   }
