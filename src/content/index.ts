@@ -13,9 +13,10 @@ import { applyTags, prefillSale, searchCollection } from './automation';
 import { domOutline } from './diagnostic';
 import { endProgress, lastChipCount, showProgress, updateOverlay } from './overlay';
 import { initWindow, toggleWindow } from './window';
+import { enhanceSellDialog } from './sell-market';
 import { auctionIdFromHref, hasEmptyState, parseAuctionDetail, parseAuctionList, type ParsedAuction } from './parsers/auctions';
 import { collectionTiles, parseCollection } from './parsers/collection';
-import { isFavorite } from './parsers/dom';
+import { isFavorite, labeledNumber, leafTexts } from './parsers/dom';
 import { activeTabLabel, detectPage, rootOf, slotsFromTabs } from './parsers/page';
 import { auctionFromItem, cardFromItem, refElement, requestBridge, tagColors, tagDictionary } from './parsers/react';
 import { re, resolveSelectors, type SelectorConfig } from './parsers/selectors';
@@ -63,6 +64,12 @@ interface Extracted {
   filterTag?: string | null;
 }
 
+/** La carte et son conteneur immédiat (où d'autres extensions posent leurs badges). */
+function chipScope(el: Element): Element {
+  const parent = el.parentElement;
+  return parent && /\b(group|isolate)\b/.test(parent.className) && parent.children.length <= 4 ? parent : el;
+}
+
 /** Données React de la page (prioritaires), avec leurs éléments. */
 function fromBridge(items: BridgeItem[], knownTags: string[], now: number, cfg: SelectorConfig): Extracted {
   const tagNames = tagDictionary(items);
@@ -81,6 +88,14 @@ function fromBridge(items: BridgeItem[], knownTags: string[], now: number, cfg: 
       if (!c?.id || cards.some((x) => x.id === c.id)) continue;
       // Le favori n'est pas dans les données de la carte : on lit l'étoile affichée sur sa tuile.
       if (c.favorite == null && el) c.favorite = isFavorite(el, cfg);
+      // Prix moyen affiché sur la carte (badge « Moy. X » d'une autre extension), lu sur sa tuile.
+      if (c.sitePrice == null && el) {
+        const moy = labeledNumber(leafTexts(chipScope(el)), cfg.sitePriceLabelRe);
+        if (moy != null && moy > 0) {
+          c.sitePrice = moy;
+          c.sitePriceAt = now;
+        }
+      }
       cards.push({ ...c, tagsExact: c.tags != null });
       if (el && !tiles.has(c.id)) tiles.set(c.id, el);
     }
@@ -186,7 +201,9 @@ async function scan(force = false): Promise<void> {
     lastStatus = status;
     syncFamilies();
     maybeReloadCollection(kind);
+    if (kind !== 'other') maybeFetchMarket();
     updateOverlay({ store, cfg, kind, root, tiles: lastTiles, tagColors: colors });
+    enhanceSellDialog({ settings: store.settings, cards: store.cards, cfg });
     void maybePrefill(cfg);
     maybeRefreshSales(cfg);
   } finally {
@@ -241,6 +258,16 @@ function dropStaleTags(cards: ScannedCard[]): void {
   }
 }
 let lastApiCollection = 0;
+
+/** Avec l'API activée : ventes du marché rechargées automatiquement au plus toutes les 30 minutes. */
+let marketTried = 0;
+function maybeFetchMarket(): void {
+  if (!store?.settings.apiRead || automating) return;
+  const last = store.meta?.lastMarketFetch?.at ?? 0;
+  if (Date.now() - Math.max(last, marketTried) < 30 * 60_000) return;
+  marketTried = Date.now();
+  void runApi('marketSales').catch(() => {});
+}
 
 /** Sur la collection, avec l'API activée : rechargement complet au plus toutes les 2 minutes. */
 function maybeReloadCollection(kind: PageKind): void {
@@ -372,6 +399,27 @@ async function runCardAuctions(siteCardId: string): Promise<{ ok: boolean; error
   return { ok: true, result: await fetchCardAuctions(siteCardId) };
 }
 
+/** Bilan des prix connus (pour le diagnostic). */
+function priceSummary() {
+  const since = Date.now() - (store?.settings.windowDays ?? 7) * 86_400_000;
+  const byRarity: Record<string, { sold: number; listing: number }> = {};
+  for (const o of store?.priceObs ?? []) {
+    if (o.at < since) continue;
+    const k = `${o.rarity ?? '?'}${o.shiny ? '*' : ''}`;
+    byRarity[k] ??= { sold: 0, listing: 0 };
+    byRarity[k][o.type === 'sold' ? 'sold' : 'listing']++;
+  }
+  const cards = Object.values(store?.cards ?? {});
+  return {
+    observations: store?.priceObs.length ?? 0,
+    recentByRarity: byRarity,
+    cardsWithSitePrice: cards.filter((c) => c.sitePrice != null).length,
+    cards: cards.length,
+    lastMarketFetch: store?.meta?.lastMarketFetch ?? null,
+    apiRead: !!store?.settings.apiRead,
+  };
+}
+
 /** Lectures via l'API (option « apiRead ») : mes mises, ventes récentes du marché. */
 async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales'): Promise<{ ok: boolean; error?: string; count?: number }> {
   if (!store?.settings.apiRead && !store?.settings.apiWrite) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Automatisations).' };
@@ -394,10 +442,17 @@ async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales'): 
     log(`[api] ${result.bids.length} enchère(s) où j'ai misé`);
     return { ok: true, count: result.bids.length };
   }
-  const prices = await fetchMarketSales();
-  await ext.runtime.sendMessage({ type: 'prices', prices });
-  log(`[api] ${prices.length} vente(s) récente(s) du marché`);
-  return { ok: true, count: prices.length };
+  try {
+    const prices = await fetchMarketSales(store?.settings.windowDays ?? 7);
+    await ext.runtime.sendMessage({ type: 'prices', prices, market: { count: prices.length } });
+    log(`[api] ${prices.length} vente(s) récente(s) du marché`);
+    return { ok: true, count: prices.length };
+  } catch (e) {
+    const error = (e as Error).message;
+    await ext.runtime.sendMessage({ type: 'prices', prices: [], market: { count: 0, error } });
+    log(`[api] ventes du marché : ${error}`);
+    throw e;
+  }
 }
 
 /** Étiquetage automatique, carte par carte, avec progression et arrêt possible. */
@@ -544,7 +599,7 @@ async function main(): Promise<void> {
           sendResponse({ ok: false, error: 'Ouvre ta collection pour lancer l\'étiquetage.' });
           return;
         }
-        const plan = message.plan ?? planAutoTags(store!, store!.settings.autoTagRemoveOthers);
+        const plan = message.plan ?? planAutoTags(store!, { removeOthers: store!.settings.autoTagRemoveOthers, clearUnpriced: store!.settings.autoTagClearUnpriced });
         void (store!.settings.apiWrite ? runAutoTagApi(plan) : runAutoTag(plan));
         sendResponse({ ok: true });
       });
@@ -579,6 +634,7 @@ async function main(): Promise<void> {
             : 'script de page indisponible',
           actionLog: actionLog.slice(-60),
           overlay: { tiles: lastTiles?.size ?? 0, tagChips: lastChipCount, colors: Object.fromEntries(colors) },
+          prices: priceSummary(),
           scripts: [...document.scripts].map((sc) => sc.src).filter((src) => src.includes('/_next/')).map((src) => new URL(src).pathname),
           outline: domOutline(rootOf(document, cfg) ?? document.body),
         };

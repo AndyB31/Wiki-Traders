@@ -49,6 +49,8 @@ const FAMILIES = [
     { id: 'c-chat', title: 'Chat', rarity: 'C', category: 'félin', owned: true, ownedCount: 5 },
   ] },
 ];
+// Badges « Moy. X W » de l'autre extension (prix moyen propre à la carte) : seuls ces prix servent à l'étiquetage auto.
+const SITE_AVG = { 'Machu Picchu': 62, 'Canis lupus': 30 };
 const TAG_DEFS = [{ id: 'tag-20-50', name: '20-50', color: '#22c55e' }, { id: 'tag-50-100', name: '50-100', color: '#f59e0b' }];
 const RARITY = { C: ['Commun', 'commun'], PC: ['Peu Commun', 'peu_commun'], R: ['Rare', 'rare'], SR: ['Super Rare', 'super_rare'], UR: ['Ultra Rare', 'ultra_rare'], L: ['Légendaire', 'legendaire'] };
 const slug = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -58,7 +60,7 @@ main{padding:20px}.grid{display:grid;grid-template-columns:repeat(6,150px);gap:1
 .card{background:#1e293b;border-radius:12px;padding:8px;font-size:12px}.card img{width:134px;height:90px;object-fit:cover;border-radius:8px;background:#334155;cursor:pointer}
 .tab{background:#334155;color:#e2e8f0;border:0;border-radius:8px;padding:6px 10px;margin-right:6px}.tab.active{background:#f59e0b;color:#111}
 .fixed.inset-0{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50}.card-frame{position:absolute;top:120px;left:300px;min-width:280px;background:#1e293b;padding:20px;border-radius:12px;box-shadow:0 10px 30px #000}
-[role=menu]{position:fixed;top:200px;left:620px;background:#334155;padding:8px;border-radius:8px;z-index:60}
+[data-wiky=market-list]{background:#1e293b;border-radius:12px;padding:12px;color:#e2e8f0}.z-\\[60\\]{display:flex;align-items:center;justify-content:center}[role=menu]{position:fixed;top:200px;left:620px;background:#334155;padding:8px;border-radius:8px;z-index:60}
 [role=menuitemcheckbox]{padding:4px 10px;cursor:pointer}[role=menuitemcheckbox][aria-checked=true]::before{content:'✓ '}
 .chip{display:inline-block;background:#334155;border-radius:999px;padding:0 6px;margin-top:2px}`;
 
@@ -86,7 +88,8 @@ function openCard(li) {
   d.querySelector('.sell').onclick = () => {
     const sell = document.createElement('div');
     sell.className = 'fixed inset-0 z-[60]';
-    sell.innerHTML = '<div class="card-frame relative" style="left:340px;top:160px"><h2>Mettre aux enchères</h2><p></p><label>Mise de départ</label> <input type="number" inputmode="numeric" aria-label="Mise de départ" value="10"> <label>Durée</label> <button type="button" class="dur">10 min</button> <button type="button" class="dur">1 h</button> <button type="button" class="dur">3 h</button> <button type="button">Annuler</button> <button type="button" class="confirm">Mettre aux enchères</button></div>';
+    const RL = { C: 'Commun', PC: 'Peu Commun', R: 'Rare', SR: 'Super Rare', UR: 'Ultra Rare', L: 'Légendaire' };
+    sell.innerHTML = '<div class="card-frame relative" style="position:relative;left:auto;top:auto"><h2>Mettre aux enchères</h2><p></p><div class="mt-1.5 space-y-1"><p>Marché · ' + RL[uc.snapshot_rarity] + '</p><div><span>Ventes</span> <span>4</span></div><div><span>Moyenne</span> <span>39</span></div></div><label>Mise de départ</label> <input type="number" inputmode="numeric" aria-label="Mise de départ" value="10"> <label>Durée</label> <button type="button" class="dur">10 min</button> <button type="button" class="dur">1 h</button> <button type="button" class="dur">3 h</button> <button type="button">Annuler</button> <button type="button" class="confirm">Mettre aux enchères</button></div>';
     sell.querySelector('p').textContent = uc.snapshot_title;
     sell.querySelector('.confirm').onclick = () => window.__confirmed++;
     window.__duration = '1 h';
@@ -169,7 +172,8 @@ const collection = () =>
     `<h1>Ma collection</h1><ul class="grid">${CARDS.map(([name, r, qty, tag]) => {
       const uc = { id: `uc-${slug(name)}`, card_id: `c-${slug(name)}`, count: qty, starred: false, snapshot_title: name, snapshot_rarity: r, is_shiny: false };
       const tagIds = tag ? [`tag-${tag}`] : [];
-      return `<li class="card" data-uc="${attr(uc)}" data-tags="${attr(tagIds)}"><img alt="${name}" src="/cards/${slug(name)}.jpg"><strong>${name}</strong><div class="chip">${tag}</div></li>`;
+      const moy = SITE_AVG[name];
+      return `<li class="card" data-uc="${attr(uc)}" data-tags="${attr(tagIds)}"><img alt="${name}" src="/cards/${slug(name)}.jpg"><strong>${name}</strong><div class="chip">${tag}</div>${moy != null ? `<div class="wm-average-badge">Moy. ${moy} W</div>` : ''}</li>`;
     }).join('')}</ul>`,
   );
 
@@ -276,6 +280,9 @@ await ctx.route(`${SB_URL}/**`, (route) => {
     table === 'user_card_tags' ? [...apiLinks].map((l) => ({ user_card_id: l.split('|')[0], tag_id: l.split('|')[1] })) :
     table === 'auction_bids' ? SB_DATA.auction_bids :
     table === 'cards' ? SB_DATA.cards :
+    q.includes('status=eq.settled_sold') && q.includes('end_at=gte.') ? Object.entries(SOLD).flatMap(([r, prices]) =>
+      prices.map((p, i) => ({ id: `m-${r}-${i}`, card_id: `mc-${r}-${i}`, final_price: p + 1, snapshot_rarity: r, is_shiny: false, end_at: iso(-3_600_000 * (i + 1)), status: 'settled_sold', card: { wikipedia_title: `Marché ${r} ${i}` } })),
+    ) :
     q.includes('seller_id=eq.') && q.includes('status=in.') ? [
       { id: 'v1', card_id: 'k1', base_amount: 40, final_price: 66, status: 'settled_sold', end_at: iso(-3_600_000), settled_at: iso(-3_590_000), snapshot_rarity: 'SR', is_shiny: false },
       { id: 'v2', card_id: 'k3', base_amount: 10, final_price: 12, status: 'settled_sold', end_at: iso(-7_200_000), settled_at: iso(-7_190_000), snapshot_rarity: 'PC', is_shiny: false },
@@ -661,6 +668,11 @@ ok(!(await ef.$('.tabs .tab:has-text("Outils")')) && !!(await ef.$('header butto
 await ef.click('header button[title^="Outils"]');
 await ef.waitForSelector('.tools-title');
 ok(true, '🧰 ouvre les outils');
+s = await waitFor((x) => x.meta?.lastMarketFetch?.count > 0, 'ventes du marché chargées automatiquement', 10000);
+ok(s.priceObs.some((o) => o.auctionId === 'm-R-0' && o.cardId === 'marche-r-0'), `ventes du marché chargées automatiquement via l'API (${s.meta.lastMarketFetch.count}), rattachées à leur carte`);
+const priceBox = await ef.textContent('.price-status');
+ok(/Ventes du marché \(API\) : 36 chargée/.test(priceBox) && /Rare\s*\d+/.test(priceBox), 'bilan des prix visible dans 🧰 Outils');
+await (await ef.$('.price-status')).screenshot({ path: join(shots, 'price-status.png') });
 await ef.click('.tabs .tab:has-text("Vendues")');
 await ef.click('button[title="Relire mes ventes terminées"]');
 await ef.waitForSelector('.bid', { timeout: 8000 });
@@ -683,6 +695,24 @@ await (await ef.$('header')).screenshot({ path: join(shots, 'header-switch.png')
 await ef.click('.tag-switch');
 await market.waitForFunction(() => document.querySelector('[data-wiky="tags"]')?.dataset.style === 'label', null, { timeout: 5000 });
 ok(true, 'second clic : retour aux libellés');
+
+
+// 17. Fenêtre de vente du site : résumé du marché sous « Marché · … » et liste des enchères de la carte dessous
+await market.goto(`${ORIGIN}/collection`);
+await market.waitForTimeout(1200);
+await market.evaluate(() => {
+  const li = [...document.querySelectorAll('li.card')].find((l) => l.querySelector('strong').textContent === 'Mont Fuji');
+  li.querySelector('img').click();
+});
+await market.click('.fixed.inset-0 .sell');
+await market.waitForSelector('[data-wiky="market-summary"]', { timeout: 8000 });
+await market.waitForFunction(() => /offre/.test(document.querySelector('[data-wiky="market-summary"]')?.textContent ?? ''), null, { timeout: 8000 });
+const summaryText = (await market.textContent('[data-wiky="market-summary"]')).replace(/\s+/g, ' ');
+ok(/3 offres · min 28 · méd\. 31 · max 60/.test(summaryText), `résumé du marché sous « Marché · Rare » : ${summaryText.trim()}`);
+await market.waitForFunction(() => document.querySelectorAll('[data-wiky="market-list"] a').length === 3, null, { timeout: 8000 });
+const listPrices = await market.$$eval('[data-wiky="market-list"] a', (as) => as.map((a) => a.querySelector('span').textContent));
+ok(listPrices.join() === '28,31,60', `liste des enchères de la carte sous la fenêtre : ${listPrices.join(' → ')}`);
+await market.screenshot({ path: join(shots, 'sell-market.png') });
 
 await ctx.close();
 console.log(`\nCaptures enregistrées dans ${shots}`);

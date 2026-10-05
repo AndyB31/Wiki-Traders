@@ -47,3 +47,45 @@ describe('favoris', () => {
     expect(planAutoTags(input({ cards }), true, NOW).map((c) => c.cardId)).toEqual(['autre']);
   });
 });
+
+describe('étiquetage auto : prix propre à la carte uniquement', () => {
+  const rule20100 = { id: 'r', tag: '20-100', quota: 1, pct: 70, floor: 20, ceiling: 100, keepMin: 0, active: true, match: 'tag' as const };
+  const rarityObs = Array.from({ length: 6 }, (_, i) => ({ cardId: `autre${i}`, price: 40, type: 'sold' as const, at: NOW - 1000, rarity: 'C' as const }));
+
+  it('ne classe pas une carte d\'après la médiane de sa rareté', () => {
+    const base = input({ cards: cardsById(card('sans-prix', { rarity: 'C' })), priceObs: rarityObs });
+    base.rules = [rule20100];
+    expect(planAutoTags(base, { removeOthers: true }, NOW)).toEqual([]);
+  });
+
+  it('prix propre hors de toutes les plages (6, 134) : l\'étiquette de plage est retirée', () => {
+    const base = input({ cards: cardsById(card('six', { sitePrice: 6, tags: ['20-100', 'Galaxy'] }), card('cent34', { sitePrice: 134, tags: ['20-100'] }), card('ok', { sitePrice: 50, tags: ['20-100'] })) });
+    base.rules = [rule20100];
+    const plan = planAutoTags(base, { removeOthers: true }, NOW);
+    expect(plan.map((c) => [c.cardId, c.target, c.remove])).toEqual([
+      ['cent34', '', ['20-100']],
+      ['six', '', ['20-100']],
+    ]);
+  });
+
+  it('nettoyage : retire les étiquettes de plage des cartes sans prix propre (si demandé)', () => {
+    const base = input({ cards: cardsById(card('inconnue', { rarity: 'C', tags: ['20-100', 'Galaxy'] })), priceObs: rarityObs });
+    base.rules = [rule20100];
+    expect(planAutoTags(base, { removeOthers: true }, NOW)).toEqual([]);
+    expect(planAutoTags(base, { removeOthers: true, clearUnpriced: true }, NOW)).toEqual([
+      { cardId: 'inconnue', cardName: 'inconnue', base: null, target: '', add: [], remove: ['20-100'] },
+    ]);
+  });
+
+  it('un prix moyen de 0 affiché par le site est ignoré', () => {
+    const base = input({ cards: cardsById(card('zero', { sitePrice: 0, tags: [] })) });
+    base.rules = [{ ...rule20100, floor: 0 }];
+    expect(planAutoTags(base, { removeOthers: true }, NOW)).toEqual([]);
+  });
+
+  it('une seule vente de la carte suffit comme prix propre', () => {
+    const base = input({ cards: cardsById(card('une', { tags: [] })), priceObs: [{ cardId: 'une', price: 60, type: 'sold', at: NOW - 1000 }] });
+    base.rules = [rule20100];
+    expect(planAutoTags(base, { removeOthers: true }, NOW)[0]).toMatchObject({ cardId: 'une', target: '20-100', base: 60 });
+  });
+});

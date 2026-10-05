@@ -133,4 +133,20 @@ describe('lectures', () => {
     expect(calls.some((c) => c.url.includes(`seller_id=eq.${ME}`))).toBe(true);
     expect(calls.every((c) => c.method === 'GET')).toBe(true);
   });
+
+  it('ventes du marché : rattachées à la carte par son titre ; repli sans jointure si refusée', async () => {
+    const row = { id: 'x', card_id: 'c9', final_price: 15, snapshot_rarity: 'R', is_shiny: false, end_at: new Date(NOW).toISOString(), status: 'settled_sold' };
+    setup({ 'auctions?': [{ ...row, card: { wikipedia_title: 'Mont Fuji' } }] });
+    expect((await fetchMarketSales())[0]).toMatchObject({ cardId: 'mont-fuji', price: 15, rarity: 'R' });
+
+    let calls = 0;
+    vi.stubGlobal('fetch', async (url: string) => {
+      if (url.includes('/_next/')) return new Response(`u="https://${REF}.supabase.co";k="${ANON}"`);
+      calls++;
+      if (decodeURIComponent(url).includes('card:cards')) return new Response('{"message":"relation"}', { status: 400 });
+      return new Response(JSON.stringify([row]));
+    });
+    expect((await fetchMarketSales())[0]).toMatchObject({ cardId: 'site:c9', price: 15 });
+    expect(calls).toBe(2);
+  });
 });

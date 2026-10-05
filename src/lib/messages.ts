@@ -26,7 +26,7 @@ export interface ProposedMessage {
   avgPrice: number | null;
 }
 
-export type ToBackground = ScanMessage | ProposedMessage | { type: 'refreshBadge' } | { type: 'tabId' } | { type: 'prices'; prices: PriceObs[] } | { type: 'collection'; cards: ScannedCard[] };
+export type ToBackground = ScanMessage | ProposedMessage | { type: 'refreshBadge' } | { type: 'tabId' } | { type: 'prices'; prices: PriceObs[]; market?: { count: number; error?: string } } | { type: 'collection'; cards: ScannedCard[] };
 
 /** Messages envoyés par la popup au content script de l'onglet actif. */
 export type ToContent = { type: 'diagnostic' } | { type: 'rescan' } | { type: 'autoTag'; plan?: TagChange[] } | { type: 'stopAutoTag' } | { type: 'toggleWindow' } | { type: 'api'; op: 'myBids' | 'marketSales' | 'collection' | 'mySales' } | { type: 'api'; op: 'cardAuctions'; siteCardId: string };
@@ -43,6 +43,8 @@ export interface DiagnosticResult {
   actionLog: string[];
   /** Surcouche : cartes repérées, pastilles d'étiquettes posées, couleurs connues. */
   overlay: { tiles: number; tagChips: number; colors: Record<string, string> };
+  /** Prix connus : observations par rareté, cartes avec prix du site, dernier chargement du marché. */
+  prices: unknown;
   /** Scripts Next.js chargés (pour retrouver les libellés des boutons du site). */
   scripts: string[];
   outline: string;

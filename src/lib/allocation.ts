@@ -103,6 +103,13 @@ export function ruleForAuction(a: MyAuction, rules: TagRule[], ctx: PricingConte
   return active.find((r) => r.match === 'tag' && cardMatchesRule(card, r, ctx)) ?? active.find((r) => cardMatchesRule(card, r, ctx)) ?? null;
 }
 
+/** Rang pseudo-aléatoire stable d'une carte pour une graine donnée (FNV-1a). */
+export function shuffleRank(id: string, seed: number): number {
+  let h = (2166136261 ^ seed) >>> 0;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619) >>> 0;
+  return h;
+}
+
 /** F3 – cartes vendables d'une règle, triées. */
 export function rankCandidates(
   rule: TagRule,
@@ -128,6 +135,8 @@ export function rankCandidates(
   out.sort((a, b) => {
     const dup = b.card.quantity - a.card.quantity;
     if (dup) return dup;
+    // « Aléatoire » : tirage stable tant que la graine ne change pas (pas de clignotement à chaque rendu).
+    if (settings.sortPrice === 'random') return shuffleRank(a.card.id, settings.randomSeed) - shuffleRank(b.card.id, settings.randomSeed);
     const pa = a.pricing.price;
     const pb = b.pricing.price;
     if (pa == null && pb == null) return a.card.name.localeCompare(b.card.name);

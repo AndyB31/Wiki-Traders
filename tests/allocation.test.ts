@@ -134,3 +134,26 @@ describe('explications', () => {
     expect(slot.excluded).toEqual({ total: 2, favorite: 1, blacklist: 0, onSale: 0, keep: 1 });
   });
 });
+
+describe('« À doublons égaux » : aléatoire', () => {
+  const many = () => cardsById(small('dup', { quantity: 5 }), ...Array.from({ length: 12 }, (_, i) => small(`c${i}`, { sitePrice: 20 + i })));
+  const order = (seed: number) => {
+    const base = input({ cards: many() });
+    base.settings.sortPrice = 'random';
+    base.settings.randomSeed = seed;
+    base.settings.slots = 8;
+    base.rules = base.rules.map((r) => (r.tag === '20-50' ? { ...r, quota: 8 } : { ...r, active: false }));
+    return allocate(base, NOW).free.map((s) => s.proposal?.card.id);
+  };
+
+  it('les doublons restent prioritaires, puis tirage stable pour une même graine', () => {
+    const a = order(42);
+    expect(a[0]).toBe('dup');
+    expect(order(42)).toEqual(a);
+    expect(new Set(a).size).toBe(a.length);
+  });
+
+  it('une autre graine donne un autre tirage', () => {
+    expect(order(42).slice(1)).not.toEqual(order(7).slice(1));
+  });
+});

@@ -64,3 +64,5 @@ button.tag-switch .knob { position: absolute; top: 50%; left: 4px; width: 15px; 
 button.tag-switch.on { background: var(--accent-soft); border-color: var(--accent); }
 button.tag-switch.on .knob { left: 17px; width: 11px; height: 11px; margin-top: -5.5px; border-radius: 50%; background: #22c55e; }
 button.tag-switch:disabled { opacity: .4; }
+.price-status { display: flex; flex-direction: column; gap: 4px; }
+.price-status table td, .price-status table th { padding: 3px 4px; }

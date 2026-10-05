@@ -207,14 +207,27 @@ export async function fetchMarketSales(days = 7, limit = 1000): Promise<PriceObs
   const cfg = await discoverConfig();
   const session = readSession(cfg);
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
-  const rows = await get<(AuctionRow & { card_id: string })[]>(
-    cfg,
-    session,
-    `auctions?select=id,card_id,final_price,snapshot_rarity,is_shiny,end_at,status&status=eq.settled_sold&end_at=gte.${since}&order=end_at.desc&limit=${limit}`,
-  );
+  const query = (select: string) =>
+    get<(AuctionRow & { card?: { wikipedia_title?: string } | null })[]>(
+      cfg,
+      session,
+      `auctions?select=${select}&status=eq.settled_sold&end_at=gte.${since}&order=end_at.desc&limit=${limit}`,
+    );
+  const base = 'id,card_id,final_price,snapshot_rarity,is_shiny,end_at,status';
+  // Avec le titre de la carte (jointure), les ventes comptent aussi dans l'historique de CETTE carte ;
+  // si la jointure est refusée, on garde au moins la rareté.
+  const rows = await query(`${base},card:cards(wikipedia_title)`).catch(() => query(base));
   return rows
     .filter((r) => r.final_price != null)
-    .map((r) => ({ cardId: `site:${r.card_id}`, price: r.final_price!, type: 'sold' as const, at: Date.parse(r.end_at), auctionId: r.id, rarity: r.snapshot_rarity, shiny: !!r.is_shiny }));
+    .map((r) => ({
+      cardId: r.card?.wikipedia_title ? slugify(r.card.wikipedia_title) : `site:${r.card_id}`,
+      price: r.final_price!,
+      type: 'sold' as const,
+      at: Date.parse(r.end_at),
+      auctionId: r.id,
+      rarity: r.snapshot_rarity,
+      shiny: !!r.is_shiny,
+    }));
 }
 
 /** Enchères en cours pour une carte (identifiant du site), de la moins chère à la plus chère. */
@@ -339,4 +352,24 @@ export async function fetchMySales(limit = 200): Promise<MySalesResult> {
     };
   });
   return { at: Date.now(), items };
+}
+
+export interface OfferStats {
+  count: number;
+  min: number | null;
+  median: number | null;
+  max: number | null;
+}
+
+export function offerStats(prices: number[]): OfferStats {
+  if (!prices.length) return { count: 0, min: null, median: null, max: null };
+  return { count: prices.length, min: Math.min(...prices), median: median(prices), max: Math.max(...prices) };
+}
+
+/** Identifiant d'une carte du site à partir de son titre Wikipédia. */
+export async function fetchCardIdByTitle(title: string): Promise<string | null> {
+  const cfg = await discoverConfig();
+  const session = readSession(cfg);
+  const rows = await get<{ id: string }[]>(cfg, session, `cards?select=id&wikipedia_title=eq.${encodeURIComponent(title)}&limit=1`);
+  return rows[0]?.id ?? null;
 }

@@ -162,9 +162,16 @@ function settingsForm() {
       'À doublons égaux, proposer',
       h(
         'select',
-        { onchange: set('sortPrice', (v) => v as Settings['sortPrice']) },
+        {
+          onchange: (e: Event) => {
+            s.sortPrice = (e.target as HTMLSelectElement).value as Settings['sortPrice'];
+            if (s.sortPrice === 'random') s.randomSeed = Date.now() % 2_147_483_647;
+            onEdit();
+          },
+        },
         h('option', { value: 'desc', selected: s.sortPrice === 'desc' }, 'le prix le plus haut'),
         h('option', { value: 'asc', selected: s.sortPrice === 'asc' }, 'le prix le plus bas (écouler)'),
+        h('option', { value: 'random', selected: s.sortPrice === 'random' }, 'aléatoire'),
       ),
     ),
     field(
@@ -242,6 +249,16 @@ function automationBlock() {
       riskyToggle('prefill', 'V4 – Ouvrir la vente et pré-remplir le prix', '« Ouvrir » ouvre la carte, sa fenêtre de vente et remplit le prix. Le clic « Mettre en vente » reste toujours à toi.'),
       riskyToggle('apiRead', 'Lecture via l\'API du site', 'Onglet « Mises » (enchères où tu as misé, prix des cartes) et chargement des ventes du marché. Lectures seules, avec ta session.'),
       riskyToggle('apiWrite', 'Étiquetage par l\'API (plus fiable)', 'L\'étiquetage automatique écrit directement les étiquettes, comme le fait le site (table user_card_tags), au lieu de cliquer dans la fiche de chaque carte. Écritures limitées aux étiquettes ; favoris revérifiés avant chaque écriture.'),
+      field(
+        'Fenêtre de vente : résumé du marché',
+        h('input', { type: 'checkbox', checked: settings.sellMarketSummary, onchange: (e: Event) => ((settings.sellMarketSummary = (e.target as HTMLInputElement).checked), onEdit()) }),
+        'sous « Marché · … » : nombre d\'offres en cours, min, médiane, max (nécessite la lecture via l\'API)',
+      ),
+      field(
+        'Fenêtre de vente : liste des enchères de la carte',
+        h('input', { type: 'checkbox', checked: settings.sellMarketList, onchange: (e: Event) => ((settings.sellMarketList = (e.target as HTMLInputElement).checked), onEdit()) }),
+        'sous la fenêtre : enchères en cours de cette carte, prix et durée restante (nécessite la lecture via l\'API)',
+      ),
       riskyToggle('autoTag', 'Étiquetage automatique sur le site', 'Range chaque carte dans l\'étiquette dont la plage plancher–plafond contient son prix moyen. Lancé depuis la popup, sur la collection, avec bouton Arrêter.'),
       field(
         'Retirer les autres étiquettes gérées',

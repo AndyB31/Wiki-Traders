@@ -118,9 +118,10 @@ async function handleScan(msg: ScanMessage): Promise<void> {
     patch.journal = [...store.journal, ...entries].slice(-JOURNAL_MAX);
     patch.meta!.lastAuctionsScan = now;
     if (created.length) {
-      // Une nouvelle enchère : les choix manuels et slots ignorés repartent de zéro.
+      // Une nouvelle enchère : les choix manuels et slots ignorés repartent de zéro (et nouveau tirage aléatoire).
       patch.slotOverrides = {};
       patch.ignoredSlots = [];
+      if (store.settings.sortPrice === 'random') patch.settings = { ...(patch.settings ?? store.settings), randomSeed: (now % 2_147_483_647) || 1 };
       if (store.pendingFocus && created.some((a) => a.cardId === store.pendingFocus!.cardId)) patch.pendingFocus = null;
     }
   }
@@ -226,8 +227,12 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
       await save({ cards: mergeCards(kept, msg.cards, now), meta: { ...meta, lastCollectionScan: now, lastCollectionApi: now } });
     } :
     msg.type === 'prices' ? async () => {
-      const { priceObs } = await load('priceObs');
-      await save({ priceObs: mergeObs(priceObs, msg.prices, Date.now()) });
+      const { priceObs, meta } = await load('priceObs', 'meta');
+      const now = Date.now();
+      await save({
+        priceObs: mergeObs(priceObs, msg.prices, now),
+        ...(msg.market ? { meta: { ...meta, lastMarketFetch: { at: now, ...msg.market } } } : {}),
+      });
     } :
     null;
   if (!run) return false;

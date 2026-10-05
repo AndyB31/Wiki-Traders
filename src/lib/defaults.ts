@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // 0 = arrondi automatique (unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà).
   rounding: 0,
   sortPrice: 'desc',
+  randomSeed: 1,
   allowDuplicateListing: false,
   includeListings: false,
   fallbackTag: null,
@@ -21,12 +22,15 @@ export const DEFAULT_SETTINGS: Settings = {
   sellPath: '/collection',
   durationRules: [],
   apiRead: false,
+  sellMarketSummary: true,
+  sellMarketList: true,
   apiWrite: false,
   showTagOverlay: true,
   tagOverlayStyle: 'label',
   prefill: false,
   autoTag: false,
   autoTagRemoveOthers: true,
+  autoTagClearUnpriced: false,
   selectorOverrides: {},
 };
 

@@ -95,7 +95,8 @@ function stat(values: number[], settings: Settings): number | null {
 
 /** Prix moyen fiable (site ou historique suffisant), sans estimation. */
 export function reliableBase(card: Card, ctx: PricingContext): BasePrice {
-  if (card.sitePrice != null) return { value: card.sitePrice, source: 'site', samples: 0 };
+  // Un prix moyen de 0 (ou négatif) affiché par le site n'a pas de sens : on l'ignore.
+  if (card.sitePrice != null && card.sitePrice > 0) return { value: card.sitePrice, source: 'site', samples: 0 };
   const samples = windowSamples(card.id, ctx);
   if (samples.length >= MIN_SALES) return { value: stat(samples, ctx.settings), source: 'history', samples: samples.length };
   return { value: null, source: 'none', samples: samples.length };
@@ -121,6 +122,18 @@ export function rarityBase(rarity: Card['rarity'], shiny: boolean, ctx: PricingC
   else if (listings.length >= MIN_RARITY_SAMPLES) out = { value: stat(listings, ctx.settings), source: 'estimate', samples: listings.length, group: `${group} en vente` };
   ctx.rarityCache.set(key, out);
   return out;
+}
+
+/**
+ * Prix PROPRE à la carte (jamais la médiane de sa rareté) : moyenne du site, ses ventes (au moins une),
+ * ou prix saisi. Sert à l'étiquetage automatique, pour que des cartes de même rareté ne tombent pas
+ * toutes dans la même plage.
+ */
+export function ownPrice(card: Card, ctx: PricingContext): number | null {
+  if (card.sitePrice != null && card.sitePrice > 0) return card.sitePrice;
+  const samples = windowSamples(card.id, ctx);
+  if (samples.length) return stat(samples, ctx.settings);
+  return ctx.manualPrices[card.id] ?? null;
 }
 
 /** Prix servant à classer une carte dans une étiquette (sans estimation par les pairs). */

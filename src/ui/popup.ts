@@ -100,6 +100,11 @@ async function refreshSales(): Promise<void> {
  * (en boucle), sans proposer deux fois la même carte.
  */
 async function rotateProposals(free: FreeSlot[]): Promise<void> {
+  // Mode aléatoire : un nouveau tirage plutôt qu'une rotation.
+  if (store.settings.sortPrice === 'random') {
+    await save({ slotOverrides: {}, settings: { ...store.settings, randomSeed: (store.settings.randomSeed * 48271 + 11) % 2_147_483_647 } });
+    return;
+  }
   const overrides: Record<string, string> = { ...store.slotOverrides };
   // D'abord des cartes qui ne sont pas déjà proposées ; à défaut, n'importe quelle autre candidate libre.
   const current = new Set(free.map((s) => s.proposal?.card.id).filter((id): id is string => !!id));
@@ -125,9 +130,41 @@ function proposalTools(free: FreeSlot[]) {
   return h(
     'div',
     { class: 'row proposal-tools' },
-    rotatable ? h('button', { title: 'Propose d\'autres cartes pour les slots libres', onclick: () => rotateProposals(free) }, '🔀 Proposer d\'autres cartes') : null,
+    rotatable
+      ? h(
+          'button',
+          { title: store.settings.sortPrice === 'random' ? 'Nouveau tirage aléatoire' : 'Propose d\'autres cartes pour les slots libres', onclick: () => rotateProposals(free) },
+          '🔀 Proposer d\'autres cartes',
+        )
+      : null,
     custom ? h('button', { class: 'small', title: 'Revenir aux meilleures propositions', onclick: () => save({ slotOverrides: {} }) }, '↺ Par défaut') : null,
   );
+}
+
+/**
+ * Options du menu « changer de carte », groupées : d'abord les cartes qui ont un prix à elles
+ * (moyenne du site, ventes de la carte, prix saisi), puis celles estimées par la médiane de leur rareté
+ * (même prix pour toute la rareté : c'est normal, la carte n'a jamais été vendue).
+ */
+function candidateOptions(candidates: FreeSlot['candidates'], selected: string) {
+  const own = candidates.filter((c) => ['site', 'history', 'manual'].includes(c.pricing.base.source));
+  const option = (c: FreeSlot['candidates'][number]) =>
+    h(
+      'option',
+      { value: c.card.id, selected: c.card.id === selected },
+      `${c.card.name}${c.card.quantity > 1 ? ` ×${c.card.quantity}` : ''} · ${formatPrice(c.pricing.price)}`,
+    );
+  const groups: Node[] = [];
+  if (own.length) groups.push(h('optgroup', { label: 'Prix propre à la carte' }, own.slice(0, 200).map(option)));
+  const byRarity = new Map<string, FreeSlot['candidates']>();
+  for (const c of candidates) {
+    if (own.includes(c)) continue;
+    const r = c.card.rarity ? RARITIES[c.card.rarity].label : 'Rareté inconnue';
+    const label = c.pricing.base.source === 'rarity' || c.pricing.base.source === 'estimate' ? `${r} · prix de la rareté` : `${r} · sans prix`;
+    byRarity.set(label, [...(byRarity.get(label) ?? []), c]);
+  }
+  for (const [label, list] of byRarity) groups.push(h('optgroup', { label: `${label} (${formatPrice(list[0].pricing.price)})` }, list.slice(0, 200).map(option)));
+  return groups;
 }
 
 /** Explique pourquoi un slot n'a pas de carte, avec la correction possible. */
@@ -183,9 +220,7 @@ function freeSlotView(slot: FreeSlot) {
         await save({ slotOverrides: { ...store.slotOverrides, [slot.key]: id } });
       },
     },
-    slot.candidates.slice(0, 50).map((c) =>
-      h('option', { value: c.card.id, selected: c.card.id === p.card.id }, `${c.card.name} ×${c.card.quantity} · ${formatPrice(c.pricing.price)}`),
-    ),
+    candidateOptions(slot.candidates, p.card.id),
   );
 
   const priceBlock =
@@ -227,6 +262,9 @@ function freeSlotView(slot: FreeSlot) {
         ? h('span', { class: 'duration' }, ` · durée ${durationLabel(durationFor(p.pricing.price, store.settings.durationRules)!)}`)
         : null,
     ),
+    p.pricing.base.source === 'rarity' || p.pricing.base.source === 'estimate'
+      ? h('div', { class: 'small muted' }, `Prix déduit de la rareté : cette carte n'a pas de vente connue (toutes les cartes ${p.card.rarity ? RARITIES[p.card.rarity].label : ''} sans historique ont ce prix).`)
+      : null,
     !store.settings.prefill
       ? h('div', { class: 'small muted' }, '« Ouvrir » met la carte en évidence. Pour ouvrir aussi la fenêtre de vente : Réglages → Automatisations → V4.')
       : null,
@@ -692,10 +730,10 @@ function autoTagBlock(onCollection: boolean) {
       'div',
       { class: 'card autotag' },
       h('div', { class: 'row' }, h('strong', { class: 'grow' }, 'Étiquetage auto : désactivé'), h('button', { onclick: enable }, 'Activer…')),
-      h('div', { class: 'small muted' }, 'Range tes cartes dans l\'étiquette dont la plage de prix (plancher–plafond) contient leur prix de référence.'),
+      h('div', { class: 'small muted' }, 'Range tes cartes dans l\'étiquette dont la plage de prix (plancher–plafond) contient leur prix propre (moyenne du site, ventes de la carte ou prix saisi).'),
     );
   }
-  const plan = planAutoTags(store, store.settings.autoTagRemoveOthers);
+  const plan = planAutoTags(store, { removeOthers: store.settings.autoTagRemoveOthers, clearUnpriced: store.settings.autoTagClearUnpriced });
   const status = h('div', { class: 'small muted' });
   const owned = collectionStatus('↻ Recharger mes cartes');
   const viaApi = store.settings.apiWrite;
@@ -714,7 +752,7 @@ function autoTagBlock(onCollection: boolean) {
     const d = diagnoseAutoTags(store);
     if (!d.cards) return 'Aucune carte connue : ouvre ta collection.';
     if (!d.rulesWithRange) return 'Aucune règle n\'a de plage de prix : renseigne un plancher et/ou un plafond dans les réglages (ex. « Mettre au Enchère » : 20 à 1000).';
-    if (!d.pricedCards) return 'Aucun prix de référence : ouvre Marché → Historique pour observer des ventes (5 par rareté suffisent).';
+    if (!d.pricedCards) return 'Aucune carte n\'a de prix propre : clique « Charger les prix » (autre extension) sur la collection, ou charge les ventes du marché (🧰 Outils).';
     return `Les ${d.pricedCards} carte(s) au prix connu sont déjà dans la bonne étiquette.`;
   };
   return h(
@@ -737,11 +775,28 @@ function autoTagBlock(onCollection: boolean) {
             'ul',
             { class: 'small plan' },
             plan.map((c) =>
-              h('li', null, `${c.cardName} (${formatPrice(c.base)}) → ${c.target}`, c.remove.length ? h('span', { class: 'muted' }, ` · retire ${c.remove.join(', ')}`) : null),
+              h(
+                'li',
+                null,
+                c.target
+                  ? `${c.cardName} (${formatPrice(c.base)}) → ${c.target}`
+                  : `${c.cardName} (${c.base == null ? 'sans prix connu' : `${formatPrice(c.base)}, hors plages`})`,
+                c.remove.length ? h('span', { class: 'muted' }, ` · retire ${c.remove.join(', ')}`) : null,
+              ),
             ),
           ),
         )
       : h('div', { class: 'small muted' }, why()),
+    h(
+      'label',
+      { class: 'small muted row', title: 'Défait les classements faits sans prix propre (par ex. à partir de la médiane de la rareté)' },
+      h('input', {
+        type: 'checkbox',
+        checked: store.settings.autoTagClearUnpriced,
+        onchange: (e: Event) => save({ settings: { ...store.settings, autoTagClearUnpriced: (e.target as HTMLInputElement).checked } }),
+      }),
+      'Retirer aussi les étiquettes de plage des cartes sans prix connu',
+    ),
     h(
       'div',
       { class: 'small muted row' },
@@ -874,6 +929,7 @@ function render(): void {
           h('button', { onclick: () => ext.runtime.openOptionsPage() }, '⚙️ Réglages'),
         ),
         h('p', { class: 'muted small' }, `Ventes relues : ${fmtDate(store.meta.lastAuctionsScan)} · collection : ${fmtDate(store.meta.lastCollectionScan)}`),
+        priceStatus(),
       ],
     },
   ];
@@ -940,6 +996,61 @@ function render(): void {
         ? '⚠️ Automatisations actives : interdites par les règles de WikiMasters, risque de ban.'
         : 'Conseils uniquement : c\'est toi qui cliques sur « Mettre aux enchères ».',
     ),
+  );
+}
+
+/** Bilan des prix : d'où viennent-ils, combien de ventes par rareté, dernier chargement. */
+function priceStatus() {
+  const now = Date.now();
+  const ctx = makeContext(store, now);
+  const since = now - store.settings.windowDays * 86_400_000;
+  const recent = store.priceObs.filter((o) => o.at >= since);
+  const cards = Object.values(store.cards);
+  const withSite = cards.filter((c) => c.sitePrice != null).length;
+  const market = store.meta.lastMarketFetch;
+  const status = h('span', { class: 'small muted grow' });
+  const load = async (e: Event) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    if (!store.settings.apiRead) {
+      status.textContent = 'Active la lecture via l\'API (onglet Mises) pour charger les ventes du marché.';
+      return;
+    }
+    if (!(await siteTab())) {
+      status.textContent = 'Ouvre un onglet WikiMasters.';
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Chargement…';
+    const res = (await sendToTab({ type: 'api', op: 'marketSales' })) as { ok: boolean; error?: string; count?: number } | null;
+    btn.disabled = false;
+    status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `${res.count} vente(s) chargée(s)` : res.error ?? 'Erreur';
+  };
+  const rows = (Object.keys(RARITIES) as Rarity[]).map((r) => {
+    const sold = recent.filter((o) => o.type === 'sold' && o.rarity === r && !o.shiny).length;
+    const listing = recent.filter((o) => o.type === 'listing' && o.rarity === r && !o.shiny).length;
+    const ref = rarityBase(r, false, ctx);
+    return h(
+      'tr',
+      null,
+      h('td', null, rarityDot(r), ` ${RARITIES[r].label}`),
+      h('td', { class: 'num' }, sold),
+      h('td', { class: 'num' }, listing),
+      h('td', { class: 'num' }, ref?.value != null ? `${formatPrice(ref.value)}${ref.source === 'estimate' ? '*' : ''}` : '—'),
+    );
+  });
+  return h(
+    'div',
+    { class: 'card price-status' },
+    h('strong', null, `Prix (${store.settings.windowDays} derniers jours)`),
+    h('div', { class: 'small muted' }, `Cartes avec un prix moyen du site (« Moy. ») : ${withSite}/${cards.length}`),
+    h(
+      'div',
+      { class: `small ${market?.error ? 'error' : 'muted'}` },
+      market ? `Ventes du marché (API) : ${market.error ? `échec — ${market.error}` : `${market.count} chargée(s)`} · ${fmtDate(market.at)}` : 'Ventes du marché (API) : jamais chargées',
+    ),
+    h('table', { class: 'small' }, h('tr', null, ['Rareté', 'Ventes', 'En vente', 'Médiane'].map((t) => h('th', null, t))), rows),
+    h('div', { class: 'small muted' }, '* estimation à partir des enchères en cours (moins de 5 ventes).'),
+    h('div', { class: 'row' }, status, h('button', { onclick: load }, 'Charger les prix du marché')),
   );
 }
 

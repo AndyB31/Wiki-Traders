@@ -80,7 +80,9 @@ export interface Settings {
   /** Pas d'arrondi du prix conseillé ; 0 = automatique selon le montant. */
   rounding: number;
   /** Classement à doublons égaux : prix le plus haut d'abord, ou le plus bas (pour écouler). */
-  sortPrice: 'desc' | 'asc';
+  sortPrice: 'desc' | 'asc' | 'random';
+  /** Graine du tirage « aléatoire » (stable entre deux rafraîchissements, change à la demande). */
+  randomSeed: number;
   /** Autoriser à proposer une carte déjà en vente. */
   allowDuplicateListing: boolean;
   /** Prendre aussi en compte les enchères en cours dans le prix moyen. */
@@ -102,6 +104,10 @@ export interface Settings {
   tagOverlayStyle: 'label' | 'dot';
   /** Lecture des données via l'API du site (GET uniquement). */
   apiRead: boolean;
+  /** Fenêtre de vente : résumé des offres en cours (min, médiane, max, nombre) sous « Marché · … ». */
+  sellMarketSummary: boolean;
+  /** Fenêtre de vente : liste des enchères en cours de la carte, sous la fenêtre. */
+  sellMarketList: boolean;
   /** Étiquetage automatique par l'API (écritures limitées aux étiquettes) plutôt que par l'interface. */
   apiWrite: boolean;
   /** V4 : ouvre la fenêtre de vente et remplit le prix (le clic final reste humain). */
@@ -110,6 +116,8 @@ export interface Settings {
   autoTag: boolean;
   /** Retirer les autres étiquettes gérées lors de l'étiquetage automatique. */
   autoTagRemoveOthers: boolean;
+  /** Retirer les étiquettes de plage des cartes sans prix propre connu. */
+  autoTagClearUnpriced: boolean;
   /** Surcharges des sélecteurs CSS (voir content/parsers/selectors.ts). */
   selectorOverrides: Record<string, string>;
 }
@@ -147,6 +155,8 @@ export interface Meta {
   lastCollectionScan: number | null;
   /** Dernier relevé complet de la collection via l'API. */
   lastCollectionApi?: number | null;
+  /** Dernier chargement des ventes du marché via l'API : date, nombre, erreur éventuelle. */
+  lastMarketFetch?: { at: number; count: number; error?: string } | null;
   lastPage: PageStatus | null;
 }
 
