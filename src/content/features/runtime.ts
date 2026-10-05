@@ -29,6 +29,8 @@ export interface SiteFeature {
   keys: FeatureKey[];
   /** Le module a besoin de la lecture via l'API. */
   needsApi?: boolean;
+  /** Condition d'activation propre au module (remplace `keys`), ex. « intégration au site activée ». */
+  when?(ctx: FeatureContext): boolean;
   render(ctx: FeatureContext): void;
   /** Retire ce que le module a ajouté (désactivé, ou page quittée si le module le gère). */
   cleanup?(): void;
@@ -56,7 +58,7 @@ export function makeContext(settings: Settings, cards: Record<string, Card>, fam
 /** Lance (ou nettoie) chaque module selon les réglages ; une erreur dans un module n'arrête pas les autres. */
 export function runFeatures(ctx: FeatureContext): void {
   for (const m of modules) {
-    const on = m.keys.some((k) => ctx.flags[k]) && (!m.needsApi || ctx.apiRead);
+    const on = (m.when ? m.when(ctx) : m.keys.some((k) => ctx.flags[k])) && (!m.needsApi || ctx.apiRead);
     try {
       if (on) {
         m.render(ctx);
