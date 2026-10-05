@@ -7,6 +7,7 @@ import { durationFor, durationLabel } from '../lib/duration';
 import { ext } from '../lib/browser';
 import { SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
 import type { DiagnosticResult, ToBackground, ToContent } from '../lib/messages';
+import { featureFlags } from '../lib/features';
 import { loadAll, onStoreChange, save } from '../lib/storage';
 import { formatDuration, formatPrice, normalize, RARITIES, slugify } from '../lib/text';
 import type { BidStatus, Card, CardAuctionsResult, FamilyCard, MyBid, Rarity, SoldItem, StoreShape } from '../lib/types';
@@ -289,6 +290,15 @@ async function copy(btn: HTMLButtonElement, text: string): Promise<void> {
 
 const BID_STATUS: Record<BidStatus, string> = { leading: 'En tête', outbid: 'Surenchéri', won: 'Gagnée', lost: 'Perdue', cancelled: 'Annulée' };
 
+/** Temps restant d'une mise : à la seconde sous 10 minutes. */
+function endText(endsAt: number, now: number): string {
+  const left = endsAt - now;
+  if (left <= 0) return 'terminée';
+  if (left > 10 * 60_000) return `fin ${formatDuration(left)}`;
+  const s = Math.floor(left / 1000);
+  return `fin ${Math.floor(s / 60) ? `${Math.floor(s / 60)} min ` : ''}${String(s % 60).padStart(2, '0')} s`;
+}
+
 /** Onglet « Mises » : enchères des autres où j'ai misé, lues via l'API (lecture seule). */
 function bidsBlock() {
   if (!store.settings.apiRead) {
@@ -316,6 +326,19 @@ function bidsBlock() {
     status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `${res.count} ${op === 'myBids' ? 'enchère(s)' : 'vente(s) chargée(s)'}` : res.error ?? 'Erreur';
   };
   const ctx = makeContext(store, Date.now());
+  // Surenchère en un clic (automatisation) : faite par l'onglet du site, après confirmation dans la page.
+  const quick = featureFlags(store.settings.features).quickOutbid;
+  const outbid = async (auctionId: string, btn: HTMLButtonElement) => {
+    if (!(await siteTab())) {
+      status.textContent = 'Ouvre un onglet WikiMasters pour miser.';
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Confirme la mise dans la page…';
+    const res = (await sendToTab({ type: 'outbid', auctionId })) as { ok: boolean; error?: string; amount?: number } | null;
+    btn.disabled = false;
+    status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `Mise de ${formatPrice(res.amount)} envoyée.` : res.error ?? 'Mise refusée.';
+  };
   const order: Record<BidStatus, number> = { leading: 0, outbid: 0, won: 1, lost: 1, cancelled: 2 };
   const rows = [...(store.bidsCache?.bids ?? [])].sort((a, b) => order[a.status] - order[b.status] || (order[a.status] === 0 ? (a.endsAt ?? 0) - (b.endsAt ?? 0) : b.lastBidAt - a.lastBidAt));
   const now = Date.now();
@@ -341,9 +364,17 @@ function bidsBlock() {
         h('span', null, `ma mise ${formatPrice(b.myMax)}${b.myBids > 1 ? ` (${b.myBids}×)` : ''}`),
         h('span', null, `· ${b.status === 'won' || b.status === 'lost' ? 'final' : 'actuel'} ${formatPrice(b.current)}`),
         h('span', { class: 'grow' }),
-        h('span', null, b.endsAt && b.endsAt > now ? `fin ${formatDuration(b.endsAt - now)}` : fmtDate(b.endsAt)),
+        b.endsAt && b.endsAt > now ? h('span', { 'data-ends': String(b.endsAt) }, endText(b.endsAt, now)) : h('span', null, fmtDate(b.endsAt)),
       ),
       h('div', { class: 'small muted' }, `réf. ${refText}`),
+      quick && b.status === 'outbid' && b.endsAt != null && b.endsAt > now
+        ? h(
+            'div',
+            { class: 'row' },
+            h('span', { class: 'grow' }),
+            h('button', { title: 'Surenchérir au minimum (+10 %) ; confirmation dans la page avec le montant et ton solde', onclick: (e: Event) => outbid(b.auctionId, e.currentTarget as HTMLButtonElement) }, 'Surenchérir (+min)'),
+          )
+        : null,
     );
   };
   return [
@@ -1091,6 +1122,11 @@ async function main(): Promise<void> {
   await refresh();
   onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'journal'], refresh);
   setInterval(render, 15_000);
+  // Compte à rebours des mises (sans tout redessiner).
+  setInterval(() => {
+    const now = Date.now();
+    for (const el of document.querySelectorAll<HTMLElement>('[data-ends]')) el.textContent = endText(Number(el.dataset.ends), now);
+  }, 1000);
 }
 
 void main();

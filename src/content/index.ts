@@ -18,6 +18,8 @@ import { closeModal, isModalOpen, openModal, renderSiteUi } from './site-ui';
 import { renderAuctionSwitch } from './auction-mode';
 import { makeContext as featureContext, runFeatures } from './features/runtime';
 import './features';
+import { bidPollDelay, quickOutbidWithToast } from './features/bid-watch';
+import { featureFlags } from '../lib/features';
 import { sellAdvice } from '../lib/allocation';
 import { durationFor } from '../lib/duration';
 import { auctionIdFromHref, hasEmptyState, parseAuctionDetail, parseAuctionList, type ParsedAuction } from './parsers/auctions';
@@ -591,6 +593,28 @@ async function refreshMyAuctions(force = false): Promise<void> {
   }
 }
 
+let bidsFastAt = 0;
+
+/**
+ * Suivi de mes mises : quand une de mes mises se termine dans les 10 minutes, relecture toutes les 20 s
+ * (onglet visible) ou 60 s (caché), en plus du rythme normal. Les onglets partagent le relevé (`bidsCache.at`).
+ */
+async function refreshBidsFast(): Promise<void> {
+  if (!store?.settings.apiRead || auctionsBusy || !featureFlags(store.settings.features).bidWatch) return;
+  const now = Date.now();
+  const delay = bidPollDelay(store.bidsCache?.bids ?? [], now, document.visibilityState === 'visible');
+  if (delay == null || now - Math.max(bidsFastAt, store.bidsCache?.at ?? 0) < delay) return;
+  bidsFastAt = now;
+  auctionsBusy = true;
+  try {
+    await runApi('myBids');
+  } catch (e) {
+    log(`[api] mes mises : ${(e as Error).message}`);
+  } finally {
+    auctionsBusy = false;
+  }
+}
+
 /** Mode enchère : clic sur une carte de la collection → fenêtre « Mettre aux enchères », prix et durée remplis. */
 async function sellFromCollection(cardId: string, tile: Element): Promise<void> {
   if (!store || automating) return;
@@ -698,6 +722,7 @@ async function main(): Promise<void> {
   void refreshMyAuctions();
   setInterval(() => void refreshMyAuctions(), 15_000);
   document.addEventListener('visibilitychange', () => void refreshMyAuctions());
+  setInterval(() => void refreshBidsFast(), 5_000);
 
   ext.runtime.onMessage.addListener((raw: unknown, _sender, sendResponse) => {
     const message = raw as ToContent;
@@ -722,6 +747,11 @@ async function main(): Promise<void> {
     if (message.type === 'api') {
       const job = message.op === 'cardAuctions' ? runCardAuctions(message.siteCardId) : runApi(message.op);
       void job.then(sendResponse, (e) => sendResponse({ ok: false, error: (e as Error).message }));
+      return true;
+    }
+    if (message.type === 'outbid') {
+      // Surenchère depuis « Mes mises » : confirmation dans la page, option vérifiée au moment d'agir.
+      void quickOutbidWithToast(message.auctionId).then(sendResponse, (e) => sendResponse({ ok: false, error: (e as Error).message }));
       return true;
     }
     if (message.type === 'toggleWindow') {
