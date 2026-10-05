@@ -38,6 +38,9 @@ const ICONS: Record<string, string> = {
   chevron: '<path d="m9 18 6-6-6-6"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  gavel: '<path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381"/><path d="m16 16 6-6"/><path d="m21.5 10.5-8-8"/><path d="m8 8 6-6"/><path d="m8.5 7.5 8 8"/>',
   folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
 };
 
@@ -69,7 +72,16 @@ const ITEMS: { view: View; label: string; title: string; icon: string; page?: st
  *  - `wiky` : fonctionnalité Wiky-Traders (fenêtre ou page) ;
  *  - `link` : page Wiky-Traders sans vue de popup (réglages).
  */
-type TreeEntry = { site: string; label?: string } | { wiky: View } | { link: string; label: string; icon: string; route: 'settings' };
+/** Onglets de la page Marché du site (sans adresse propre : on clique sur l'onglet, voir features/market-tabs.ts). */
+export type MarketTab = 'browse' | 'sales' | 'bids' | 'history';
+type TreeEntry =
+  | { site: string; label?: string }
+  | { wiky: View }
+  | { link: string; label: string; icon: string; route: 'settings' }
+  /** Onglet du Marché du site (icône neutre : c'est une page du site, enrichie par l'extension). */
+  | { tab: MarketTab; label: string; icon: string }
+  /** Lien du site masqué sans être reproduit (remplacé par les onglets ci-dessus). */
+  | { hide: string };
 interface TreeGroup {
   id: string;
   label: string;
@@ -96,7 +108,14 @@ const TREE: TreeGroup[] = [
     icon: 'bid',
     iconFrom: '/marketplace',
     href: '/marketplace',
-    entries: [{ site: '/marketplace', label: 'Parcourir le marché' }, { site: '/marketplace?wm=bids' }, { wiky: 'sell' }, { wiky: 'running' }, { wiky: 'bids' }, { wiky: 'sold' }],
+    entries: [
+      { hide: '/marketplace' },
+      { hide: '/marketplace?wm=bids' },
+      { tab: 'browse', label: 'Parcourir', icon: 'search' },
+      { tab: 'sales', label: 'Mes ventes', icon: 'tag' },
+      { tab: 'bids', label: 'Mes enchères', icon: 'gavel' },
+      { tab: 'history', label: 'Historique', icon: 'history' },
+    ],
   },
   { id: 'social', label: 'Social', icon: 'users', entries: [{ site: '/trades' }, { site: '/guild' }, { site: '/friends' }, { site: '/dms' }, { site: '/battle' }] },
   { id: 'progress', label: 'Progression', icon: 'trending', entries: [{ site: '/profile' }, { site: '/achievements' }, { site: '/leaderboard' }] },
@@ -138,6 +157,7 @@ nav[data-wiky-nav] .wiky-group-head.split { padding: 0 !important; gap: 0 !impor
 .wiky-group-items > .wiky-sub:hover { color: var(--color-foreground); background: var(--color-surface-light); }
 .wiky-group-items > .wiky-sub.is-active { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 .wiky-group-items > .wiky-sub .wiky-ico { display: inline-flex; color: #fb923c; }
+.wiky-group-items > .wiky-sub.site-tab .wiky-ico { color: var(--color-foreground); }
 .wiky-group-items > .wiky-sub .wiky-count { margin-left: auto; min-width: 18px; padding: 0 6px; border-radius: 999px; background: #f97316; color: #fff; font-size: 10.5px; font-weight: 700; text-align: center; line-height: 18px; }
 .wiky-group-items > .wm-family-nav { border-color: transparent !important; background: none !important; }
 nav[data-wiky-nav] > [data-wiky="nav-recap"] { margin: auto 0 4px; padding-top: 10px; }
@@ -337,6 +357,30 @@ function buildGroup(
   const items: HTMLElement[] = [];
   let active = false;
   for (const entry of group.entries) {
+    if ('hide' in entry) {
+      const a = links.get(entry.hide);
+      if (a && a.getAttribute('data-wiky-grouped') !== group.id) a.setAttribute('data-wiky-grouped', group.id);
+      if (a && !route && isActiveLink(a)) active = true;
+      continue;
+    }
+    if ('tab' in entry) {
+      const on = !route && location.pathname === '/marketplace' && (document.documentElement.dataset.wikyMarketTab || 'browse') === entry.tab;
+      active ||= on;
+      const count = entry.tab === 'sales' ? counts.sell ?? 0 : entry.tab === 'bids' ? counts.bids ?? 0 : 0;
+      const a = el(
+        'a',
+        { class: `wiky-sub site-tab${on ? ' is-active' : ''}`, href: `/marketplace?wtab=${entry.tab}`, 'data-wiky-tab': entry.tab },
+        `<span class="wiky-ico">${icon(entry.icon, 18)}</span><span>${entry.label}</span>${count ? `<span class="wiky-count">${count}</span>` : ''}`,
+      );
+      // Déjà sur le Marché : on change d'onglet sur place (sans recharger).
+      a.addEventListener('click', (e) => {
+        if (location.pathname !== '/marketplace' || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('wiky-market-tab', { detail: entry.tab }));
+      });
+      items.push(a);
+      continue;
+    }
     if ('site' in entry) {
       const a = links.get(entry.site);
       if (!a) continue;
@@ -411,6 +455,8 @@ function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions
     counts,
     integration,
     store.settings.features,
+    location.pathname,
+    document.documentElement.dataset.wikyMarketTab ?? '',
   ]);
   const existing = [...nav.querySelectorAll<HTMLElement>(':scope > [data-wiky="nav-group"]')];
   if (nav.dataset.wikyTree !== key || existing.length === 0) {
@@ -449,8 +495,14 @@ function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions
   const recapKey = JSON.stringify([summary, Math.floor(now / 30_000)]);
   if (recap.dataset.key === recapKey) return;
   recap.dataset.key = recapKey;
-  const status = el('div', { class: 'wiky-status', role: 'button', tabindex: '0', title: 'Ouvrir les slots à remplir' }, statusHtml(summary, now, false));
+  // Avec le suivi des mises, la liste « Mises en direct » (bid-watch.ts) remplace le compte en tête / surenchéries.
+  const liveList = flags.bidWatch && store.settings.apiRead;
+  const status = el('div', { class: 'wiky-status', role: 'button', tabindex: '0', title: 'Ouvrir les slots à remplir' }, statusHtml(summary, now, false, !liveList));
+  const live = recap.querySelector('[data-wiky="bid-watch"]');
+  if (live) status.append(live);
   status.addEventListener('click', (e) => {
+    // Les lignes des mises (liens, bouton de surenchère) gardent leur rôle.
+    if ((e.target as Element).closest('[data-wiky="bid-watch"]')) return;
     const act = (e.target as Element).closest<HTMLElement>('[data-act]');
     if (act?.dataset.act === 'refresh') {
       act.classList.add('spin');
@@ -508,7 +560,7 @@ export function siteSummary(store: SiteUiStore, now = Date.now()): SiteSummary {
   };
 }
 
-function statusHtml(s: SiteSummary, now: number, toggle = true): string {
+function statusHtml(s: SiteSummary, now: number, toggle = true, bidsRow = true): string {
   const free = Math.max(0, s.slots - s.occupied);
   const stale = s.lastSync == null ? 'none' : now - s.lastSync > STALE_AFTER_MS ? 'stale' : '';
   const segs = Array.from({ length: Math.min(s.slots, 12) }, (_, i) => `<i class="${i < s.occupied ? 'on' : ''}"></i>`).join('');
@@ -524,7 +576,7 @@ function statusHtml(s: SiteSummary, now: number, toggle = true): string {
     <div class="wiky-row"><span>Slots</span><span><b>${s.occupied}/${s.slots}</b> · ${free ? `<b class="wiky-win">${plural(free, 'libre')}</b>` : 'complets'}</span></div>
     <div class="wiky-slots">${segs}</div>
     ${s.nextEnd ? `<div class="wiky-row"><span>Prochaine fin</span><b>${formatDuration(s.nextEnd - now)}</b></div>` : ''}
-    <div class="wiky-row"><span>Mises</span><span>${bids}</span></div>
+    ${bidsRow || !(s.leading || s.outbid) ? `<div class="wiky-row"><span>Mises</span><span>${bids}</span></div>` : ''}
     ${results}
     <div class="wiky-sync">${s.lastSync ? `Synchro ${ago(s.lastSync, now)}` : 'Pas encore synchronisé'}
       <span class="wiky-refresh" role="button" tabindex="0" data-act="refresh" title="Actualiser mes ventes et mes mises">${icon('refresh', 12)}</span></div>`;

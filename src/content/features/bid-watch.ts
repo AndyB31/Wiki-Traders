@@ -246,9 +246,12 @@ const CSS = `
 [data-wiky="bid-watch"] .wiky-bw-sub { grid-column: 2 / -1; display: flex; align-items: center; gap: 6px; color: color-mix(in srgb, var(--color-foreground, #e7e5e4) 55%, transparent); }
 [data-wiky="bid-watch"] .wiky-bw-sub .wiky-f-btn { margin-left: auto; }
 @keyframes wiky-bw-blink { 50% { background: rgba(239,68,68,.12); } }
+[data-wiky="bid-watch"].in-recap { margin: 8px -12px -10px; padding: 6px 12px 8px; border: 0; border-top: 1px solid rgba(249,115,22,.22); border-radius: 0 0 12px 12px;
+  background: rgba(0,0,0,.12); max-height: 260px; overflow-y: auto; cursor: default; }
+[data-wiky="bid-watch"].in-recap .wiky-bw-sub { font-variant-numeric: tabular-nums; }
 `;
 
-const MAX_ROWS = 4;
+const MAX_ROWS = 8;
 let ctx: FeatureContext | null = null;
 let cache: MyBidsResult | null = null;
 let watching = false;
@@ -283,8 +286,10 @@ function draw(): void {
   }
   const quick = c.flags.quickOutbid && c.apiRead;
   const nav = siteNav();
-  // Sous le récapitulatif Wiky-Traders (barre compacte) ou sous le bloc Wiky-Traders (barre du site intacte).
-  const anchor = nav?.querySelector(':scope > [data-wiky="nav-recap"], :scope > [data-wiky="nav-wiky"]') ?? null;
+  // Dans le récapitulatif Wiky-Traders (barre compacte : la liste remplace le simple compte « en tête / surenchéries »),
+  // sinon sous le bloc Wiky-Traders (barre du site intacte).
+  const inside = nav?.querySelector<HTMLElement>(':scope > [data-wiky="nav-recap"] .wiky-status') ?? null;
+  const anchor = inside ?? nav?.querySelector(':scope > [data-wiky="nav-wiky"]') ?? null;
   // Sans barre latérale (intégration coupée, mobile) : petit bloc flottant, seulement quand une fin approche.
   const floating = !anchor;
   if (floating && !list.some((b) => b.endsAt != null && b.endsAt - now <= SOON_MS)) {
@@ -293,7 +298,7 @@ function draw(): void {
   }
   const shown = list.slice(0, MAX_ROWS);
   const key = JSON.stringify([floating, quick, shown.map((b) => [b.auctionId, b.status, b.current, b.endsAt]), list.length]);
-  const placed = floating ? existing?.parentElement === document.body : existing?.previousElementSibling === anchor;
+  const placed = floating ? existing?.parentElement === document.body : inside ? existing?.parentElement === inside : existing?.previousElementSibling === anchor;
   if (existing && placed && existing.dataset.key === key) {
     tick(existing, now);
     return;
@@ -302,7 +307,7 @@ function draw(): void {
   ensureFeatureStyle(CSS, 'bids');
   const box = existing ?? node('div', 'bid-watch');
   box.dataset.key = key;
-  box.className = floating ? 'floating' : '';
+  box.className = floating ? 'floating' : inside ? 'in-recap' : '';
   const head = node('div', 'part', 'wiky-bw-head', `Mises en direct · ${list.length}`);
   const rows = shown.map((b) => {
     const row = node('div', 'part', rowClass(b, now));
@@ -332,7 +337,10 @@ function draw(): void {
   if (list.length > MAX_ROWS) box.append(node('div', 'part', 'wiky-f-muted', `+ ${list.length - MAX_ROWS} autre(s) dans « Mes mises »`));
   if (floating) {
     if (!placed) document.body.append(box);
-  } else if (!placed) anchor!.after(box);
+  } else if (!placed) {
+    if (inside) inside.append(box);
+    else anchor!.after(box);
+  }
 }
 
 /** Mise à jour à la seconde : temps restant, couleur, bip sous la minute si je suis surenchéri. */

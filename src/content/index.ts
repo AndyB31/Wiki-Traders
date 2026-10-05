@@ -6,7 +6,7 @@ import { load, onStoreChange, save } from '../lib/storage';
 import type { MyAuction, PageKind, PageStatus, PriceObs, StoreShape } from '../lib/types';
 import type { BridgeItem } from './bridge';
 import { ActionError, findByText, pause, realClick, waitFor } from './actions';
-import { fetchCardAuctions, fetchMarketSales, fetchMyAuctions, fetchMyBids, fetchMyCollection, fetchMySales } from './api';
+import { fetchCardAuctions, fetchMarketSales, fetchMyAuctions, fetchMyBids, fetchMyCollection, fetchMySales, refreshBidStates } from './api';
 import { applyTagsViaApi } from './api-tags';
 import { readFamilies } from './families';
 import { applyTags, prefillSale, searchCollection } from './automation';
@@ -615,6 +615,34 @@ async function refreshBidsFast(): Promise<void> {
   }
 }
 
+const LIVE_BIDS_MS = 2_000;
+let liveBusy = false;
+
+/**
+ * Mises en direct (récapitulatif de la barre latérale) : toutes les 2 s, tant que l'onglet est visible et qu'une de
+ * mes mises est en jeu, une seule requête légère relit prix, meilleur enchérisseur et fin de ces enchères. Le
+ * relevé n'est enregistré que s'il a changé (les autres onglets et la popup suivent par le stockage).
+ */
+async function refreshLiveBids(): Promise<void> {
+  if (liveBusy || !store?.settings.apiRead || document.visibilityState !== 'visible' || !featureFlags(store.settings.features).bidWatch) return;
+  const cache = store.bidsCache;
+  const now = Date.now();
+  const live = (cache?.bids ?? []).filter((b) => (b.status === 'leading' || b.status === 'outbid') && (b.endsAt == null || b.endsAt > now - 60_000));
+  if (!cache || !live.length) return;
+  liveBusy = true;
+  try {
+    const updated = await refreshBidStates(live);
+    if (updated) {
+      const byId = new Map(updated.map((b) => [b.auctionId, b]));
+      await save({ bidsCache: { ...cache, bids: cache.bids.map((b) => byId.get(b.auctionId) ?? b) } });
+    }
+  } catch (e) {
+    log(`[api] mises en direct : ${(e as Error).message}`);
+  } finally {
+    liveBusy = false;
+  }
+}
+
 /** Mode enchère : clic sur une carte de la collection → fenêtre « Mettre aux enchères », prix et durée remplis. */
 async function sellFromCollection(cardId: string, tile: Element): Promise<void> {
   if (!store || automating) return;
@@ -724,6 +752,11 @@ async function main(): Promise<void> {
   setInterval(() => void refreshMyAuctions(), 15_000);
   document.addEventListener('visibilitychange', () => void refreshMyAuctions());
   setInterval(() => void refreshBidsFast(), 5_000);
+  setInterval(() => void refreshLiveBids(), LIVE_BIDS_MS);
+  // Demandes d'actualisation des onglets du Marché (Mes ventes, Mes enchères, Historique) : voir features/market-tabs.ts.
+  window.addEventListener('wiky-refresh-sales', () => void refreshMyAuctions(true));
+  window.addEventListener('wiky-refresh-bids', () => void runApi('myBids').catch(() => {}));
+  window.addEventListener('wiky-refresh-sales-history', () => void runApi('mySales').catch(() => {}));
 
   ext.runtime.onMessage.addListener((raw: unknown, _sender, sendResponse) => {
     const message = raw as ToContent;

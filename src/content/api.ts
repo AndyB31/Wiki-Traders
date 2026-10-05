@@ -150,6 +150,32 @@ function bidStatus(a: AuctionRow, me: string, now: number): BidStatus {
   return a.current_bidder_id === me ? 'leading' : 'outbid';
 }
 
+/**
+ * Mise à jour légère de mes mises en cours (une requête, quelques champs) : prix actuel, qui est en tête, fin.
+ * Sert au suivi « en direct » toutes les 2 secondes ; le relevé complet (`fetchMyBids`) garde son rythme.
+ */
+export async function refreshBidStates(bids: MyBid[]): Promise<MyBid[] | null> {
+  if (!bids.length) return null;
+  const cfg = await discoverConfig();
+  const session = readSession(cfg);
+  const now = Date.now();
+  const rows = await get<AuctionRow[]>(
+    cfg,
+    session,
+    `auctions?select=id,card_id,base_amount,current_bid,current_bidder_id,final_price,status,end_at,winner_id,snapshot_rarity,is_shiny&id=${inList(bids.map((b) => b.auctionId))}`,
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  let changed = false;
+  const next = bids.map((b) => {
+    const a = byId.get(b.auctionId);
+    if (!a) return b;
+    const upd: MyBid = { ...b, current: a.final_price ?? a.current_bid ?? a.base_amount, status: bidStatus(a, session.userId, now), endsAt: Date.parse(a.end_at) || b.endsAt };
+    if (upd.current !== b.current || upd.status !== b.status || upd.endsAt !== b.endsAt) changed = true;
+    return upd;
+  });
+  return changed ? next : null;
+}
+
 /** Enchères des autres joueurs sur lesquelles j'ai misé, avec l'historique de prix de chaque carte. */
 export async function fetchMyBids(limit = 200): Promise<MyBidsResult> {
   const cfg = await discoverConfig();
