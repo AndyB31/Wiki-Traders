@@ -8,7 +8,7 @@
  */
 import type { TagChange } from '../lib/autotag';
 import { sameTag, slugify } from '../lib/text';
-import { ApiError, discoverConfig, get, inList, readSession, type ApiConfig, type Session } from './api';
+import { ApiError, discoverConfig, get, getAll, inList, readSession, type ApiConfig, type Session } from './api';
 
 const WRITABLE = new Set(['user_card_tags', 'tags']);
 const TAG_COLORS = ['#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ef4444', '#14b8a6', '#ec4899'];
@@ -51,10 +51,10 @@ export async function applyTagsViaApi(
   const me = session.userId;
 
   // Mes lignes de collection (une carte peut en avoir plusieurs) et mes étiquettes.
-  const rows = await get<{ id: string; snapshot_title: string | null; starred: boolean | null }[]>(
+  const rows = await getAll<{ id: string; snapshot_title: string | null; starred: boolean | null }>(
     cfg,
     session,
-    `user_cards?select=id,snapshot_title,starred&user_id=eq.${me}&limit=10000`,
+    `user_cards?select=id,snapshot_title,starred&user_id=eq.${me}`,
   );
   const rowsByCard = new Map<string, { id: string; starred: boolean }[]>();
   for (const r of rows) {

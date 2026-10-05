@@ -10,7 +10,7 @@
 import { ext } from '../lib/browser';
 import { median } from '../lib/pricing';
 import type { CatalogCard, Rarity } from '../lib/types';
-import { discoverConfig, get, inList, readSession } from './api';
+import { discoverConfig, get, getAll, inList, readSession } from './api';
 
 const RARITIES = new Set<Rarity>(['C', 'PC', 'R', 'SR', 'UR', 'L']);
 const CARD_FIELDS = 'id,wikipedia_title,rarity,category,image_url,wikipedia_url,atk,def';
@@ -144,10 +144,10 @@ export async function activeAuctionsFor(ids: string[]): Promise<Map<string, Acti
   for (let i = 0; i < wanted.length; i += BATCH) {
     const batch = wanted.slice(i, i + BATCH);
     batches.push(
-      get<{ id: string; card_id: string; base_amount: number | null; current_bid: number | null; end_at: string | null; is_shiny: boolean | null; status: string }[]>(
+      getAll<{ id: string; card_id: string; base_amount: number | null; current_bid: number | null; end_at: string | null; is_shiny: boolean | null; status: string }>(
         cfg,
         session,
-        `auctions?select=id,card_id,base_amount,current_bid,end_at,is_shiny,status&status=eq.active&card_id=${inList(batch)}&limit=5000`,
+        `auctions?select=id,card_id,base_amount,current_bid,end_at,is_shiny,status&status=eq.active&card_id=${inList(batch)}`,
       ).then((rows) => {
         for (const r of rows) {
           const endsAt = r.end_at ? Date.parse(r.end_at) || null : null;
@@ -195,8 +195,8 @@ export interface CardPrice {
   at: number;
 }
 
-// v2 : moyenne par rareté (les anciennes entrées, sans `byRarity`, sont ignorées).
-const PRICE_KEY = 'cardPrices2';
+// v3 : ventes lues en entier (pagination) ; les entrées des versions précédentes, parfois tronquées, sont ignorées.
+const PRICE_KEY = 'cardPrices3';
 const PRICE_TTL = 6 * 3600_000;
 const prices = new Map<string, CardPrice>();
 let loaded: Promise<void> | null = null;
@@ -234,10 +234,12 @@ export function knownPrice(siteId: string): CardPrice | undefined {
 
 async function fetchPrices(ids: string[]): Promise<void> {
   const { cfg, session } = await api();
-  const rows = await get<{ card_id: string; final_price: number | null; snapshot_rarity: string | null }[]>(
+  // Toutes les ventes du lot, page par page : le serveur plafonne chaque réponse (1 000 lignes), et un lot de cartes
+  // courantes en dépasse vite le total — sans pagination, des cartes apparaîtraient sans vente (« — »).
+  const rows = await getAll<{ card_id: string; final_price: number | null; snapshot_rarity: string | null }>(
     cfg,
     session,
-    `auctions?select=card_id,final_price,snapshot_rarity&status=eq.settled_sold&card_id=${inList(ids)}&limit=20000`,
+    `auctions?select=card_id,final_price,snapshot_rarity&status=eq.settled_sold&card_id=${inList(ids)}`,
   );
   const byCard = new Map<string, number[]>();
   const byCardRarity = new Map<string, Map<Rarity, number[]>>();

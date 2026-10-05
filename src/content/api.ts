@@ -116,6 +116,43 @@ export async function get<T>(cfg: ApiConfig, session: Session, path: string): Pr
   return res.json() as Promise<T>;
 }
 
+/** Taille de page demandée ; le serveur peut plafonner plus bas (Supabase : 1 000 lignes par défaut). */
+export const PAGE_SIZE = 1000;
+
+/**
+ * Lecture complète d'une requête, page par page. L'API (PostgREST de Supabase) plafonne chaque réponse
+ * (1 000 lignes par défaut), même si l'on demande plus : sans pagination, les ventes d'un lot de cartes ou une
+ * grosse collection sont tronquées. Le total est demandé à la première page (`Prefer: count=exact`), puis les pages
+ * suivantes sont lues jusqu'à l'avoir atteint. Un ordre stable est imposé (`order=id` par défaut).
+ */
+export async function getAll<T>(cfg: ApiConfig, session: Session, path: string, max = 100_000): Promise<T[]> {
+  const sep = path.includes('?') ? '&' : '?';
+  const ordered = /[?&]order=/.test(path) ? path : `${path}${sep}order=id`;
+  const out: T[] = [];
+  let total: number | null = null;
+  while (out.length < max) {
+    const res = await fetch(`${cfg.url}/rest/v1/${ordered}&limit=${PAGE_SIZE}&offset=${out.length}`, {
+      method: 'GET',
+      headers: {
+        apikey: cfg.anonKey,
+        Authorization: `Bearer ${session.accessToken}`,
+        Accept: 'application/json',
+        ...(total == null ? { Prefer: 'count=exact' } : {}),
+      },
+    });
+    if (!res.ok) throw new ApiError(`API ${res.status} sur ${path.split('?')[0]}`);
+    if (total == null) {
+      const m = /\/(\d+)\s*$/.exec(res.headers.get('content-range') ?? '');
+      total = m ? Number(m[1]) : null;
+    }
+    const rows = (await res.json()) as T[];
+    out.push(...rows);
+    // Fin : plus rien, total atteint, ou (sans total connu) une page incomplète par rapport à la taille demandée.
+    if (!rows.length || (total != null ? out.length >= total : rows.length < PAGE_SIZE)) break;
+  }
+  return out;
+}
+
 export const inList = (ids: string[]) => `in.(${ids.map((i) => `"${i}"`).join(',')})`;
 
 interface BidRow {
@@ -193,7 +230,7 @@ export async function fetchMyBids(limit = 200): Promise<MyBidsResult> {
   const cardIds = [...new Set(auctions.map((a) => a.card_id))];
   const [cards, sales] = await Promise.all([
     get<CardRow[]>(cfg, session, `cards?select=id,wikipedia_title,rarity&id=${inList(cardIds)}`),
-    get<{ card_id: string; final_price: number | null }[]>(cfg, session, `auctions?select=card_id,final_price&status=eq.settled_sold&card_id=${inList(cardIds)}&limit=2000`).catch(
+    getAll<{ card_id: string; final_price: number | null }>(cfg, session, `auctions?select=card_id,final_price&status=eq.settled_sold&card_id=${inList(cardIds)}`).catch(
       () => [] as { card_id: string; final_price: number | null }[],
     ),
   ]);
@@ -296,7 +333,7 @@ export async function fetchCardAuctions(siteCardId: string): Promise<CardAuction
   const id = encodeURIComponent(siteCardId);
   const [active, sales] = await Promise.all([
     get<AuctionRow[]>(cfg, session, `auctions?select=id,seller_id,base_amount,current_bid,end_at,is_shiny,status&card_id=eq.${id}&status=eq.active&limit=200`),
-    get<{ final_price: number | null }[]>(cfg, session, `auctions?select=final_price&card_id=eq.${id}&status=eq.settled_sold&limit=500`).catch(() => []),
+    getAll<{ final_price: number | null }>(cfg, session, `auctions?select=final_price&card_id=eq.${id}&status=eq.settled_sold`).catch(() => []),
   ]);
   const now = Date.now();
   const auctions = active
@@ -330,10 +367,10 @@ export async function fetchMyCollection(): Promise<ScannedCard[]> {
   const cfg = await discoverConfig();
   const session = readSession(cfg);
   const [rows, tags] = await Promise.all([
-    get<UserCardRow[]>(
+    getAll<UserCardRow>(
       cfg,
       session,
-      `user_cards?select=id,card_id,count,starred,snapshot_title,snapshot_rarity,snapshot_category,is_shiny&user_id=eq.${session.userId}&limit=10000`,
+      `user_cards?select=id,card_id,count,starred,snapshot_title,snapshot_rarity,snapshot_category,is_shiny&user_id=eq.${session.userId}`,
     ),
     get<{ id: string; name: string }[]>(cfg, session, `tags?select=id,name&user_id=eq.${session.userId}`),
   ]);
@@ -386,10 +423,10 @@ export async function fetchMySales(limit = 200): Promise<MySalesResult> {
   if (!cardIds.length) return { at: Date.now(), items: [] };
   const [cards, sales] = await Promise.all([
     get<CardRow[]>(cfg, session, `cards?select=id,wikipedia_title,rarity&id=${inList(cardIds)}`),
-    get<{ id: string; card_id: string; final_price: number | null }[]>(
+    getAll<{ id: string; card_id: string; final_price: number | null }>(
       cfg,
       session,
-      `auctions?select=id,card_id,final_price&status=eq.settled_sold&card_id=${inList(cardIds)}&limit=2000`,
+      `auctions?select=id,card_id,final_price&status=eq.settled_sold&card_id=${inList(cardIds)}`,
     ).catch(() => [] as { id: string; card_id: string; final_price: number | null }[]),
   ]);
   const cardById = new Map(cards.map((c) => [c.id, c]));
