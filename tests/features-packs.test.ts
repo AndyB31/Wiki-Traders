@@ -214,3 +214,14 @@ describe('statistiques de tirage : import et ouverture', () => {
     expect(merged.packs).toBe(9);
   });
 });
+
+describe('écran d\'ouverture', () => {
+  it('compteur « Carte 1 / 5 » découpé en plusieurs éléments (comme sur le site), même sans titre de page', async () => {
+    const { pullCounter } = await import('../src/content/features/packs');
+    history.replaceState(null, '', '/pulls');
+    document.body.innerHTML = '<main><div><p class="text-sm">Carte <span class="text-xl font-bold">1</span> / 5</p><div class="card"></div><button>Encore 4 cartes</button></div></main>';
+    expect(pullCounter()).toMatchObject({ current: 1, total: 5 });
+    document.body.innerHTML = '<main><h1>Ouvrir un paquet</h1><button>Ouvrir</button></main>';
+    expect(pullCounter()).toBeNull();
+  });
+});

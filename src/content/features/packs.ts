@@ -18,7 +18,7 @@ import { ext } from '../../lib/browser';
 import { sharePack } from './pull-image';
 
 const CSS = `
-[data-wiky="pulls-tools"][data-opening] .wiky-pt-box { display: none; }
+[data-wiky="pulls-tools"][data-opening] { display: none !important; }
 [data-wiky="pulls-tools"] { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .wiky-pt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wiky-pt-box { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border, rgba(255,255,255,.12)); background: var(--color-surface, #1c1917); }
@@ -78,7 +78,7 @@ export function pullCounter(root: ParentNode = document): { current: number; tot
   if (!location.pathname.startsWith('/pull')) return null;
   const main = root.querySelector('main');
   if (!main) return null;
-  for (const el of main.querySelectorAll<HTMLElement>('div, p, span')) {
+  for (const el of main.querySelectorAll<HTMLElement>('div, p, span, h1, h2, h3')) {
     if (el.closest('[data-wiky]')) continue;
     const m = (el.textContent ?? '').replace(/\s+/g, ' ').trim().match(/^Carte\s*(\d+)\s*\/\s*(\d+)$/i);
     if (!m) continue;
@@ -431,12 +431,14 @@ function drawTools(c: FeatureContext): void {
     existing?.remove();
     return;
   }
+  // Pendant l'ouverture des cartes (compteur « Carte X / N » du site, le titre de la page disparaît), le bloc est
+  // masqué ; il revient à la fin de l'ouverture. Vérifié avant tout le reste : le titre peut être absent.
+  const opening = !!pullCounter();
+  if (existing && existing.hasAttribute('data-opening') !== opening) existing.toggleAttribute('data-opening', opening);
+  if (opening) return;
   const main = document.querySelector('main');
   const h1 = main?.querySelector('h1');
   if (!main || !h1) return;
-  // Pendant l'ouverture des cartes (compteur « Carte X / N » du site), les statistiques sont masquées.
-  const opening = !!pullCounter();
-  if (existing && existing.hasAttribute('data-opening') !== opening) existing.toggleAttribute('data-opening', opening);
   const key = JSON.stringify([wantStats && stats, wantOpen, busy, wantAuto && auto, wantAuto && auto?.nextAt ? Math.floor((auto.nextAt - Date.now()) / 60_000) : 0, otherStatsAvailable()]);
   if (existing?.isConnected && existing.dataset.key === key) return;
   ensureFeatureStyle();
