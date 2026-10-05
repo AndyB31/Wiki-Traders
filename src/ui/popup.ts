@@ -9,7 +9,7 @@ import { SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
 import type { DiagnosticResult, ToBackground, ToContent } from '../lib/messages';
 import { loadAll, onStoreChange, save } from '../lib/storage';
 import { formatDuration, formatPrice, normalize, RARITIES, slugify } from '../lib/text';
-import type { BidStatus, Card, CardAuctionsResult, FamilyCard, MyBid, Rarity, SoldItem, StoreShape } from '../lib/types';
+import type { BidStatus, Card, CardAuctionsResult, Family, FamilyCard, MyBid, Rarity, SoldItem, StoreShape } from '../lib/types';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { embedded, initEmbed, view } from './embed';
 
@@ -376,6 +376,11 @@ function compareGroups(a: string, b: string): number {
   return normalize(a).localeCompare(normalize(b));
 }
 
+/** Identifiants du site des cartes possédées (pour la possession dans les familles). */
+function ownedIds(): Set<string> {
+  return new Set(Object.values(store.cards).flatMap((c) => (c.siteId && c.quantity > 0 ? [c.siteId] : [])));
+}
+
 /** Carte d'une famille, complétée par ce que l'extension sait de ma collection. */
 function familyCardToCard(f: FamilyCard): Card {
   const mine = Object.values(store.cards).find((c) => c.siteId === f.siteId) ?? store.cards[slugify(f.name)];
@@ -396,22 +401,38 @@ function familyCardToCard(f: FamilyCard): Card {
   );
 }
 
-/** Familles de l'extension « Prix moyen collection » : toutes leurs cartes, possédées ou non. */
+/**
+ * Familles à afficher : celles de Wiky-Traders (page Familles du site), sinon celles lues dans l'extension
+ * « Prix moyen collection ». La possession est recalculée d'après ma collection.
+ */
+function shownFamilies(): Family[] {
+  if (store.myFamilies?.length) {
+    return store.myFamilies.map((f) => ({
+      id: f.id,
+      name: f.name,
+      cards: f.cards.map((c) => ({ siteId: c.siteId, name: c.title, rarity: c.rarity, category: c.category, owned: null })),
+    }));
+  }
+  return store.families?.list ?? [];
+}
+
+/** Familles (Wiky-Traders, ou « Prix moyen collection ») : toutes leurs cartes, possédées ou non. */
 function familyList() {
-  const families = store.families?.list ?? [];
+  const families = shownFamilies();
   if (!families.length) {
     return [
       h(
         'p',
         { class: 'muted small' },
-        'Aucune famille trouvée. Les familles viennent de l\'extension « WikiMasters - Prix moyen collection » (page Familles) : ouvre WikiMasters dans le navigateur où elle est installée.',
+        'Aucune famille. Crée-les sur WikiMasters : menu Wiky-Traders → Familles (celles de « Prix moyen collection » y sont importées).',
       ),
     ];
   }
   const q = normalize(cardFilter);
+  const mine = ownedIds();
   return families.map((fam) => {
     const cards = fam.cards.filter((c) => !q || normalize(`${c.name} ${c.category ?? ''} ${fam.name}`).includes(q));
-    const ownedOf = (c: FamilyCard) => c.owned ?? !!Object.values(store.cards).find((m) => m.siteId === c.siteId);
+    const ownedOf = (c: FamilyCard) => c.owned ?? mine.has(c.siteId);
     const owned = fam.cards.filter(ownedOf).length;
     const details = h(
       'details',
@@ -472,7 +493,7 @@ function cardList() {
 
 /** Onglet « Cartes » : familles (autre extension), ou mes cartes par étiquette, catégorie ou rareté. */
 function cardsBlock() {
-  groupBy ??= store.families?.list.length ? 'family' : 'tag';
+  groupBy ??= shownFamilies().length ? 'family' : 'tag';
   const list = h('div', { class: 'families' }, cardList());
   const redraw = () => mount(list, cardList());
   const search = h('input', {
@@ -1089,7 +1110,7 @@ async function main(): Promise<void> {
   // Dans la fenêtre flottante, l'onglet est celui qui contient l'iframe.
   activeTab = (embedded ? await ext.tabs.getCurrent() : undefined) ?? (await ext.tabs.query({ active: true, currentWindow: true }))[0];
   await refresh();
-  onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'journal'], refresh);
+  onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'myFamilies', 'journal'], refresh);
   setInterval(render, 15_000);
 }
 

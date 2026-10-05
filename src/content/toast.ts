@@ -4,7 +4,7 @@
  * --color-accent, --color-border). Les styles en ligne ne servent que de repli et à la mise en page.
  */
 
-export type ToastId = 'price' | 'progress';
+export type ToastId = 'price' | 'progress' | 'notice';
 
 /** Couleur du texte du site à une opacité donnée (équivalent de `text-[var(--color-foreground)]/45`). */
 export const fg = (pct: number) => `color-mix(in srgb, var(--color-foreground, #e7e5e4) ${pct}%, transparent)`;
@@ -175,4 +175,24 @@ export function progressToast(p: ProgressToast): void {
   }
   // Un résumé sans erreur disparaît de lui-même, comme une notification du site.
   if (p.finished && !p.error) timers.set('progress', setTimeout(() => hideToast('progress'), AUTO_HIDE));
+}
+
+/** Toast court (familles, ajouts…) : un texte, un bouton d'action facultatif ; disparaît seul après 5 s. */
+export function noticeToast(text: string, opts: { title?: string; error?: boolean; action?: { label: string; onClick: () => void } } = {}): void {
+  const { toast } = slot('notice');
+  toast.dataset.key = '';
+  toast.replaceChildren();
+  toast.setAttribute('role', opts.error ? 'alert' : 'status');
+  toast.append(header(`Wiky-Traders · ${opts.title ?? 'Familles'}`, () => hideToast('notice'), opts.error));
+  toast.append(el('p', 'text-xs font-semibold text-[var(--color-foreground)]/85', { margin: '0', fontSize: '12px', fontWeight: '600', whiteSpace: 'pre-line', color: opts.error ? DANGER : fg(85) }, text));
+  if (opts.action) {
+    const { onClick } = opts.action;
+    const actions = el('div', 'flex justify-end', { display: 'flex', justifyContent: 'flex-end', marginTop: '10px' });
+    actions.append(button(opts.action.label, 'accent', () => {
+      hideToast('notice');
+      onClick();
+    }));
+    toast.append(actions);
+  }
+  timers.set('notice', setTimeout(() => hideToast('notice'), opts.error ? 8000 : 5000));
 }
