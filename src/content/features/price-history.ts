@@ -5,15 +5,14 @@
  * glissante, mise actuelle en pointillé), filtres de rareté et de période, liste des ventes.
  * Données : toutes les enchères terminées de la carte (une requête paginée), mises en cache 5 min.
  */
-import { formatDuration, RARITIES as RARITY_INFO } from '../../lib/text';
+import { formatDuration } from '../../lib/text';
 import type { Rarity } from '../../lib/types';
 import { auctionInfo, cardSalesHistory, type AuctionInfo, type CardSale } from '../catalog';
-import { filterSales, historyStats, niceTicks, rollingMean, type HistoryFilter } from './price-history-logic';
+import { filterSales, historyStats, niceTicks, rollingMean, type HistoryFilter, type OutcomeFilter } from './price-history-logic';
 import { registerFeature } from './runtime';
 
 const AUCTION_RE = /^\/marketplace\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
 const OPEN_KEY = 'wiky-price-history-open';
-const ORDER: Rarity[] = ['C', 'PC', 'R', 'SR', 'UR', 'L'];
 /** Couleur de rareté du site (variables CSS du site), avec une valeur de secours distincte par rareté. */
 const RARITY_FALLBACK: Record<Rarity, string> = { C: '#9ca3af', PC: '#22c55e', R: '#3b82f6', SR: '#a855f7', UR: '#ef4444', L: '#f59e0b' };
 const rarityColor = (r: Rarity | null) => (r ? `var(--color-rarity-${r.toLowerCase()}, ${RARITY_FALLBACK[r]})` : '#9ca3af');
@@ -47,14 +46,15 @@ const CSS = `
 .ph-chart .cur { stroke: var(--color-foreground); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .55; }
 .ph-chart .cur-label { fill: var(--color-foreground); font-size: 10.5px; opacity: .75; }
 .ph-chart .dot { stroke: var(--color-surface); stroke-width: 2; }
-.ph-chart .dot.dim { opacity: .35; }
+.ph-chart .dot.unsold { fill: var(--color-surface); stroke: color-mix(in srgb, var(--color-foreground) 55%, transparent); stroke-width: 1.5; }
 .ph-chart .hit { fill: transparent; cursor: default; }
 .ph-tip { position: absolute; pointer-events: none; transform: translate(-50%, calc(-100% - 10px)); padding: 6px 9px; border-radius: 8px; font-size: 11.5px; white-space: nowrap;
   background: var(--color-background, #0c0d0c); border: 1px solid var(--color-border); box-shadow: 0 6px 20px rgba(0,0,0,.4); }
 .ph-tip b { font-variant-numeric: tabular-nums; }
 .ph-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: color-mix(in srgb, var(--color-foreground) 65%, transparent); }
 .ph-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.ph-legend i { width: 9px; height: 9px; border-radius: 50%; }
+.ph-legend i { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; }
+.ph-legend i.hollow { border: 1.5px solid color-mix(in srgb, var(--color-foreground) 55%, transparent); }
 .ph-legend .ln { width: 16px; height: 2px; border-radius: 2px; background: #f97316; }
 .ph-legend .dash { width: 16px; height: 0; border-top: 1.5px dashed var(--color-foreground); opacity: .6; }
 .ph-empty { padding: 16px; text-align: center; color: color-mix(in srgb, var(--color-foreground) 50%, transparent); }
@@ -70,7 +70,7 @@ let current: string | null = null;
 let info: AuctionInfo | null = null;
 let sales: CardSale[] | null = null;
 let error: string | null = null;
-let filter: HistoryFilter = { rarity: null, days: null };
+let filter: HistoryFilter = { outcome: 'all', days: null };
 let resizeObs: ResizeObserver | null = null;
 
 function ensureStyle(): void {
@@ -105,8 +105,8 @@ function anchor(): { parent: Element; after: Element | null } | null {
 function summaryText(): string {
   if (error) return 'indisponible';
   if (!sales) return 'chargement…';
-  const s = historyStats(filterSales(sales, { rarity: info?.rarity ?? null, days: null }));
-  return s.sold ? `${s.sold} vente${s.sold > 1 ? 's' : ''}${info?.rarity ? ` en ${info.rarity}` : ''} · moyenne ${w(s.mean)}` : 'aucune vente conclue';
+  const s = historyStats(sales);
+  return s.sold ? `${s.sold} vente${s.sold > 1 ? 's' : ''} · moyenne ${w(s.mean)}` : 'aucune vente conclue';
 }
 
 function tilesHtml(): string {
@@ -117,7 +117,7 @@ function tilesHtml(): string {
   const vsMean = cur != null && s.mean ? Math.round(((cur - s.mean) / s.mean) * 100) : null;
   const tile = (label: string, value: string, sub = '') => `<div class="ph-tile"><small>${label}</small>${value}${sub ? `<span>${sub}</span>` : ''}</div>`;
   return [
-    tile('Ventes', `<b>${s.sold}</b>`, `${s.unsold} invendue${s.unsold > 1 ? 's' : ''}`),
+    tile('Ventes', `<b>${s.sold}</b>`, `${s.unsold} sans acheteur${s.cancelled ? ` (dont ${s.cancelled} annulée${s.cancelled > 1 ? 's' : ''})` : ''}`),
     tile('Moyenne', `<b>${w(s.mean)}</b>`, `médiane ${w(s.median)}`),
     tile('Plus bas · haut', `<b>${w(s.min)}</b>`, `jusqu'à ${w(s.max)}`),
     tile('Dernière vente', `<b>${w(s.last?.price)}</b>`, s.last ? `il y a ${formatDuration(Date.now() - s.last.at)}` : ''),
@@ -127,88 +127,102 @@ function tilesHtml(): string {
   ].join('');
 }
 
-/** Graphique : un point par vente (couleur = rareté), moyenne glissante, mise actuelle. */
+/** Enchères affichées sur le graphique : vendues (au prix final), sans acheteur / annulées (à la mise de départ). */
+function plotted(): { r: CardSale; v: number }[] {
+  return filterSales(sales ?? [], filter).flatMap((r) => {
+    const v = r.sold ? r.price : r.start;
+    return v != null ? [{ r, v }] : [];
+  });
+}
+
+/** Graphique : un point plein par vente (couleur de la rareté), un point vide par enchère sans acheteur, moyenne glissante, mise actuelle. */
 function chartSvg(width: number): string {
-  const all = filterSales(sales ?? [], { rarity: null, days: filter.days });
-  const sold = all.filter((r) => r.sold && r.price != null);
-  const focus = filterSales(sales ?? [], filter).filter((r) => r.sold);
-  if (!sold.length) return '';
+  const pts = plotted();
+  if (!pts.length) return '';
   const H = 240;
   const pad = { l: 44, r: 12, t: 12, b: 24 };
   const now = Date.now();
-  const t0 = Math.min(...sold.map((r) => r.at));
-  const t1 = Math.max(now, ...sold.map((r) => r.at));
+  const t0 = Math.min(...pts.map((p) => p.r.at));
+  const t1 = Math.max(now, ...pts.map((p) => p.r.at));
   const span = Math.max(t1 - t0, 86_400_000);
-  const maxY = Math.max(...sold.map((r) => r.price!), info?.current ?? 0) * 1.08;
+  const maxY = Math.max(...pts.map((p) => p.v), info?.current ?? 0) * 1.08;
   const ticks = niceTicks(maxY);
   const top = ticks[ticks.length - 1] || 1;
   const x = (t: number) => pad.l + ((t - t0) / span) * (width - pad.l - pad.r);
   const y = (v: number) => pad.t + (1 - v / top) * (H - pad.t - pad.b);
+  const color = rarityColor(info?.rarity ?? pts.find((p) => p.r.rarity)?.r.rarity ?? null);
   const grid = ticks.map((v) => `<line x1="${pad.l}" x2="${width - pad.r}" y1="${y(v)}" y2="${y(v)}"/>`).join('');
   const ylabels = ticks.map((v) => `<text x="${pad.l - 6}" y="${y(v) + 3.5}" text-anchor="end">${v.toLocaleString('fr-FR')}</text>`).join('');
   const xticks = [0, 1 / 3, 2 / 3, 1].map((f) => t0 + f * span);
   const xlabels = xticks.map((t, i) => `<text x="${x(t)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === 3 ? 'end' : 'middle'}">${dateFr(t)}</text>`).join('');
-  const dots = sold
-    .map((r) => {
-      const dim = filter.rarity && r.rarity !== filter.rarity ? ' dim' : '';
-      return `<circle class="dot${dim}" cx="${x(r.at).toFixed(1)}" cy="${y(r.price!).toFixed(1)}" r="${r.shiny ? 5 : 4}" fill="${rarityColor(r.rarity)}"/>`;
-    })
+  const dots = pts
+    .map(({ r, v }) =>
+      r.sold
+        ? `<circle class="dot" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${r.shiny ? 5 : 4}" fill="${color}"/>`
+        : `<circle class="dot unsold" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4"/>`,
+    )
     .join('');
-  const avgPts = rollingMean(focus);
+  const avgPts = filter.outcome === 'unsold' ? [] : rollingMean(pts.map((p) => p.r));
   const avg = avgPts.length > 1 ? `<polyline class="avg" points="${avgPts.map((p) => `${x(p.at).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')}"/>` : '';
   const cur =
     info?.current != null
       ? `<line class="cur" x1="${pad.l}" x2="${width - pad.r}" y1="${y(info.current)}" y2="${y(info.current)}"/><text class="cur-label" x="${width - pad.r}" y="${y(info.current) - 5}" text-anchor="end">cette enchère ${w(info.current)}</text>`
       : '';
   // Zones de survol plus larges que les points.
-  const hits = sold.map((r, i) => `<circle class="hit" data-i="${i}" cx="${x(r.at).toFixed(1)}" cy="${y(r.price!).toFixed(1)}" r="10"/>`).join('');
+  const hits = pts.map(({ r, v }, i) => `<circle class="hit" data-i="${i}" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="10"/>`).join('');
   return `<svg viewBox="0 0 ${width} ${H}" role="img" aria-label="Évolution du prix de vente de la carte">
     <g class="grid">${grid}</g><g class="axis">${ylabels}${xlabels}</g>${avg}${cur}<g>${dots}</g><g>${hits}</g></svg><div class="ph-tip" hidden></div>`;
 }
 
 function filtersHtml(): string {
-  const present = ORDER.filter((r) => sales?.some((s) => s.rarity === r && s.sold));
-  const chip = (attr: string, label: string, on: boolean, dot?: string) =>
-    `<button type="button" class="ph-chip" ${attr} aria-pressed="${on}">${dot ? `<i style="background:${dot}"></i>` : ''}${label}</button>`;
-  const rar = [chip('data-rarity=""', 'Toutes raretés', !filter.rarity), ...present.map((r) => chip(`data-rarity="${r}"`, RARITY_INFO[r].label, filter.rarity === r, rarityColor(r)))];
+  const all = sales ?? [];
+  const nSold = all.filter((r) => r.sold).length;
+  const chip = (attr: string, label: string, on: boolean) => `<button type="button" class="ph-chip" ${attr} aria-pressed="${on}">${label}</button>`;
+  const out = ([['all', `Toutes (${all.length})`], ['sold', `Vendues (${nSold})`], ['unsold', `Sans acheteur (${all.length - nSold})`]] as const).map(([o, l]) =>
+    chip(`data-outcome="${o}"`, l, filter.outcome === o),
+  );
   const per = ([[30, '30 j'], [90, '90 j'], [null, 'Tout']] as const).map(([d, l]) => chip(`data-days="${d ?? ''}"`, l, filter.days === d));
-  return `${rar.join('')}<span class="ph-sep"></span>${per.join('')}`;
+  return `${out.join('')}<span class="ph-sep"></span>${per.join('')}`;
 }
 
 function legendHtml(): string {
-  const present = ORDER.filter((r) => filterSales(sales ?? [], { rarity: null, days: filter.days }).some((s) => s.rarity === r && s.sold));
+  const pts = plotted();
+  const color = rarityColor(info?.rarity ?? null);
   return [
-    ...present.map((r) => `<span><i style="background:${rarityColor(r)}"></i>${RARITY_INFO[r].label}</span>`),
-    '<span><span class="ln"></span>moyenne glissante (5 ventes)</span>',
+    pts.some((p) => p.r.sold) ? `<span><i style="background:${color}"></i>vendue (prix final)</span>` : '',
+    pts.some((p) => !p.r.sold) ? '<span><i class="hollow"></i>sans acheteur ou annulée (mise de départ)</span>' : '',
+    filter.outcome !== 'unsold' ? '<span><span class="ln"></span>moyenne glissante (5 ventes)</span>' : '',
     info?.current != null ? '<span><span class="dash"></span>cette enchère</span>' : '',
-    '<span>✨ point plus gros : brillante</span>',
+    pts.some((p) => p.r.shiny) ? '<span>✨ point plus gros : brillante</span>' : '',
   ].join('');
 }
+
+const OUTCOME_LABEL = { sold: 'vendue', unsold: 'sans enchère', cancelled: 'annulée' } as const;
 
 function tableHtml(): string {
   const rows = filterSales(sales ?? [], filter).slice().reverse();
   if (!rows.length) return '';
   return `<details><summary>Voir les ${rows.length} enchère${rows.length > 1 ? 's' : ''} terminée${rows.length > 1 ? 's' : ''}</summary><div class="ph-table"><table>
-    <thead><tr><th>Date</th><th>Rareté</th><th>Départ</th><th>Prix final</th></tr></thead><tbody>${rows
-      .map((r) => `<tr><td>${dateFr(r.at)}</td><td>${r.rarity ?? '—'}${r.shiny ? ' ✨' : ''}</td><td>${w(r.start)}</td><td>${r.sold ? w(r.price) : 'invendue'}</td></tr>`)
+    <thead><tr><th>Date</th><th>Résultat</th><th>Départ</th><th>Prix final</th></tr></thead><tbody>${rows
+      .map((r) => `<tr><td>${dateFr(r.at)}${r.shiny ? ' ✨' : ''}</td><td>${OUTCOME_LABEL[r.outcome ?? (r.sold ? 'sold' : 'unsold')]}</td><td>${w(r.start)}</td><td>${r.sold ? w(r.price) : '—'}</td></tr>`)
       .join('')}</tbody></table></div></details>`;
 }
 
 function bodyHtml(width: number): string {
   if (error) return `<div class="ph-empty">Historique indisponible (${esc(error)}).</div>`;
   if (!sales) return '<div class="ph-empty">Chargement des ventes de la carte…</div>';
-  if (!sales.some((s) => s.sold)) return `<div class="ph-empty">Cette carte n'a encore jamais été vendue${sales.length ? ` (${sales.length} enchère${sales.length > 1 ? 's' : ''} sans acheteur)` : ''}.</div>`;
+  if (!sales.length) return '<div class="ph-empty">Aucune enchère terminée pour cette carte.</div>';
   const chart = chartSvg(width);
   return `<div class="ph-filters">${filtersHtml()}</div><div class="ph-tiles">${tilesHtml()}</div>
-    ${chart ? `<div class="ph-chart">${chart}</div><div class="ph-legend">${legendHtml()}</div>` : '<div class="ph-empty">Aucune vente sur cette période.</div>'}
+    ${chart ? `<div class="ph-chart">${chart}</div><div class="ph-legend">${legendHtml()}</div>` : '<div class="ph-empty">Aucune enchère sur cette période.</div>'}
     ${tableHtml()}`;
 }
 
 function bindBody(box: HTMLDetailsElement): void {
   const body = box.querySelector<HTMLElement>('.ph-body')!;
-  body.querySelectorAll<HTMLButtonElement>('[data-rarity]').forEach((b) =>
+  body.querySelectorAll<HTMLButtonElement>('[data-outcome]').forEach((b) =>
     b.addEventListener('click', () => {
-      filter = { ...filter, rarity: (b.dataset.rarity || null) as Rarity | null };
+      filter = { ...filter, outcome: b.dataset.outcome as OutcomeFilter };
       paintBody(box);
     }),
   );
@@ -222,18 +236,20 @@ function bindBody(box: HTMLDetailsElement): void {
   const chart = body.querySelector<HTMLElement>('.ph-chart');
   const tip = chart?.querySelector<HTMLElement>('.ph-tip');
   if (!chart || !tip) return;
-  const sold = filterSales(sales ?? [], { rarity: null, days: filter.days }).filter((r) => r.sold && r.price != null);
+  const pts = plotted();
   chart.addEventListener('mousemove', (e) => {
     const hit = (e.target as Element).closest<SVGCircleElement>('.hit');
     if (!hit) {
       tip.hidden = true;
       return;
     }
-    const r = sold[Number(hit.dataset.i)];
+    const r = pts[Number(hit.dataset.i)]?.r;
     if (!r) return;
     const box2 = chart.getBoundingClientRect();
     const c = hit.getBoundingClientRect();
-    tip.innerHTML = `<b>${w(r.price)}</b> · ${r.rarity ? RARITY_INFO[r.rarity].label : '—'}${r.shiny ? ' ✨' : ''}<br>${dateFr(r.at)}${r.start != null ? ` · départ ${w(r.start)}` : ''}`;
+    tip.innerHTML = r.sold
+      ? `<b>${w(r.price)}</b> · vendue${r.shiny ? ' ✨' : ''}<br>${dateFr(r.at)}${r.start != null ? ` · départ ${w(r.start)}` : ''}`
+      : `<b>${w(r.start)}</b> · ${OUTCOME_LABEL[r.outcome ?? 'unsold']} (mise de départ)<br>${dateFr(r.at)}`;
     tip.style.left = `${c.left + c.width / 2 - box2.left}px`;
     tip.style.top = `${c.top - box2.top}px`;
     tip.hidden = false;
@@ -308,13 +324,11 @@ async function load(auctionId: string): Promise<void> {
     if (current !== auctionId) return;
     if (!i) throw new Error('enchère introuvable');
     info = i;
-    // Par défaut : la rareté de cette enchère (comme la moyenne du site).
-    filter = { rarity: i.rarity, days: null };
+    filter = { outcome: 'all', days: null };
     paint();
     const list = await cardSalesHistory(i.cardId);
     if (current !== auctionId) return;
     sales = list;
-    if (filter.rarity && !list.some((s) => s.rarity === filter.rarity && s.sold)) filter = { ...filter, rarity: null };
   } catch (e) {
     if (current === auctionId) error = (e as Error).message;
   }

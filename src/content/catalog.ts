@@ -403,12 +403,13 @@ export interface CardSale {
   shiny: boolean;
   at: number;
   sold: boolean;
+  outcome: 'sold' | 'unsold' | 'cancelled';
 }
 
 const historyCache = new Map<string, { at: number; value: Promise<CardSale[]> }>();
 const HISTORY_TTL = 5 * 60_000;
 
-/** Toutes les enchères terminées d'une carte (vendues et invendues), de la plus ancienne à la plus récente. */
+/** Toutes les enchères terminées d'une carte (vendues, sans acheteur, annulées), de la plus ancienne à la plus récente. */
 export function cardSalesHistory(siteId: string, force = false): Promise<CardSale[]> {
   const hit = historyCache.get(siteId);
   if (!force && hit && Date.now() - hit.at < HISTORY_TTL) return hit.value;
@@ -417,7 +418,7 @@ export function cardSalesHistory(siteId: string, force = false): Promise<CardSal
     const rows = await getAll<{ id: string; final_price: number | null; base_amount: number | null; snapshot_rarity: string | null; is_shiny: boolean | null; end_at: string | null; settled_at: string | null; status: string }>(
       cfg,
       session,
-      `auctions?select=id,final_price,base_amount,snapshot_rarity,is_shiny,end_at,settled_at,status&card_id=eq.${encodeURIComponent(siteId)}&status=in.(settled_sold,settled_unsold)&order=end_at.asc`,
+      `auctions?select=id,final_price,base_amount,snapshot_rarity,is_shiny,end_at,settled_at,status&card_id=eq.${encodeURIComponent(siteId)}&status=in.(settled_sold,settled_unsold,cancelled)&order=end_at.asc`,
     );
     return rows.flatMap((r) => {
       const at = Date.parse(r.settled_at ?? r.end_at ?? '');
@@ -430,6 +431,7 @@ export function cardSalesHistory(siteId: string, force = false): Promise<CardSal
         shiny: !!r.is_shiny,
         at,
         sold: r.status === 'settled_sold' && r.final_price != null,
+        outcome: r.status === 'settled_sold' && r.final_price != null ? ('sold' as const) : r.status === 'cancelled' ? ('cancelled' as const) : ('unsold' as const),
       }];
     });
   })();

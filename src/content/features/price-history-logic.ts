@@ -15,17 +15,25 @@ export interface SaleRow {
   /** Date de fin (ms). */
   at: number;
   sold: boolean;
+  /** Terminée sans acheteur (aucune mise) ou annulée. */
+  outcome?: 'sold' | 'unsold' | 'cancelled';
 }
 
+/** Enchères à montrer : toutes, vendues, ou sans acheteur (terminées sans mise ou annulées). */
+export type OutcomeFilter = 'all' | 'sold' | 'unsold';
+
 export interface HistoryFilter {
-  rarity: Rarity | null;
+  outcome: OutcomeFilter;
   /** Fenêtre en jours (null : tout l'historique). */
   days: number | null;
 }
 
 export interface HistoryStats {
   sold: number;
+  /** Sans acheteur : terminées sans mise ou annulées. */
   unsold: number;
+  /** Dont annulées. */
+  cancelled: number;
   /** Ventes conclues / (conclues + invendues), en %. */
   sellRate: number | null;
   mean: number | null;
@@ -41,8 +49,10 @@ export interface HistoryStats {
 
 const DAY = 86_400_000;
 
-export function filterSales(rows: SaleRow[], f: HistoryFilter, now = Date.now()): SaleRow[] {
-  return rows.filter((r) => (!f.rarity || r.rarity === f.rarity) && (f.days == null || now - r.at <= f.days * DAY));
+export function filterSales<T extends SaleRow>(rows: T[], f: HistoryFilter, now = Date.now()): T[] {
+  return rows.filter(
+    (r) => (f.outcome === 'all' || (f.outcome === 'sold' ? r.sold : !r.sold)) && (f.days == null || now - r.at <= f.days * DAY),
+  );
 }
 
 const mean = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
@@ -59,6 +69,7 @@ export function historyStats(rows: SaleRow[], now = Date.now()): HistoryStats {
   return {
     sold: sold.length,
     unsold,
+    cancelled: rows.filter((r) => r.outcome === 'cancelled').length,
     sellRate: rows.length ? Math.round((sold.length / rows.length) * 100) : null,
     mean: mean(prices),
     median: median(prices),

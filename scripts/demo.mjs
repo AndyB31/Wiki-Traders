@@ -297,13 +297,14 @@ await ctx.route(`${SB_URL}/**`, (route) => {
     q.includes('status=eq.settled_sold') && q.includes('end_at=gte.') ? Object.entries(SOLD).flatMap(([r, prices]) =>
       prices.map((p, i) => ({ id: `m-${r}-${i}`, card_id: `mc-${r}-${i}`, final_price: p + 1, snapshot_rarity: r, is_shiny: false, end_at: iso(-3_600_000 * (i + 1)), status: 'settled_sold', card: { wikipedia_title: `Marché ${r} ${i}` } })),
     ) :
-    q.includes('status=in.(settled_sold,settled_unsold)') && q.includes('card_id=eq.') ? Array.from({ length: 34 }, (_, i) => {
+    q.includes('status=in.(settled_sold,settled_unsold,cancelled)') && q.includes('card_id=eq.') ? Array.from({ length: 34 }, (_, i) => {
       const daysAgo = 88 - i * 2.6;
-      const rarity = i % 7 === 3 ? 'UR' : 'SR';
-      const base = rarity === 'UR' ? 120 : 30 + i * 1.4;
-      const sold = i % 9 !== 4;
+      const rarity = 'SR';
+      const base = 30 + i * 1.4;
+      const cancelled = i % 11 === 7;
+      const sold = i % 9 !== 4 && !cancelled;
       const price = Math.round(base * (0.8 + ((i * 37) % 10) / 20));
-      return { id: `h${i}`, final_price: sold ? price : null, base_amount: Math.round(base * 0.6), snapshot_rarity: rarity, is_shiny: i === 20, end_at: iso(-daysAgo * 86_400_000), settled_at: iso(-daysAgo * 86_400_000), status: sold ? 'settled_sold' : 'settled_unsold' };
+      return { id: `h${i}`, final_price: sold ? price : null, base_amount: Math.round(base * 0.6), snapshot_rarity: rarity, is_shiny: i === 20, end_at: iso(-daysAgo * 86_400_000), settled_at: iso(-daysAgo * 86_400_000), status: sold ? 'settled_sold' : cancelled ? 'cancelled' : 'settled_unsold' };
     }) :
     q.includes('select=card_id,snapshot_rarity,is_shiny,current_bid') ? [{ card_id: 'k1', snapshot_rarity: 'SR', is_shiny: false, current_bid: 72, base_amount: 40 }] :
     q.includes('seller_id=eq.') && q.includes('status=in.') ? [
@@ -847,7 +848,7 @@ await integ.keyboard.press('Escape');
 await integ.goto(`${ORIGIN}/marketplace/0f0e0d0c-0b0a-4909-8807-060504030201?detail=1`);
 await integ.waitForSelector('[data-wiky="price-history"] circle.dot', { timeout: 15000 });
 const phText = await integ.$eval('[data-wiky="price-history"] summary', (e) => e.textContent.replace(/\s+/g, ' ').trim());
-ok(/ventes en SR/.test(phText), `historique des prix : ${phText}`);
+ok(/ventes · moyenne/.test(phText), `historique des prix : ${phText}`);
 await integ.waitForTimeout(500);
 await integ.evaluate(() => document.querySelector('[data-wiky="price-history"]').scrollIntoView({ block: 'start' }));
 await integ.waitForTimeout(300);

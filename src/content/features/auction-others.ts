@@ -33,7 +33,6 @@ const CSS = `
 [data-wiky="auction-others"] .ao-time { font-variant-numeric: tabular-nums; font-weight: 600; }
 [data-wiky="auction-others"] .ao-time.soon { color: #fdba74; }
 [data-wiky="auction-others"] .ao-empty { padding: 10px 12px 12px; color: color-mix(in srgb, var(--color-foreground, #f2f4f3) 50%, transparent); }
-[data-wiky="auction-others"][data-side="inline"] { position: static; width: auto; max-height: none; margin-top: 16px; box-shadow: none; animation: none; }
 @keyframes wiky-ao-in { from { opacity: 0; transform: translateY(6px); } }
 `;
 
@@ -71,33 +70,20 @@ async function load(auctionId: string): Promise<void> {
 
 const PANEL_W = 280;
 
-/**
- * Place la liste dans un espace libre : à droite du contenu de la page, sinon à gauche (après la barre latérale) ;
- * s'il n'y a pas la place, elle s'insère comme un bloc juste sous l'historique des prix (sans rien recouvrir).
- */
+/** Fenêtre flottante : à droite du contenu s'il y a la place, sinon en bas à gauche (à côté de la barre latérale). */
 function place(box: HTMLElement): void {
   const main = document.querySelector('main');
   const history = document.querySelector<HTMLElement>('[data-wiky="price-history"]');
   const column = (history?.parentElement ?? main?.querySelector('h1')?.closest('div.flex-1, div[class*="space-y"]') ?? main) as HTMLElement | null;
   const content = column?.getBoundingClientRect();
-  const mainBox = main?.getBoundingClientRect();
-  const freeRight = content ? innerWidth - content.right - 16 : 0;
-  const freeLeft = content && mainBox ? content.left - mainBox.left - 16 : 0;
-  const side = freeRight >= PANEL_W + 16 ? 'right' : freeLeft >= PANEL_W + 16 ? 'left' : 'inline';
+  const right = !!content && innerWidth - content.right - 16 >= PANEL_W + 16;
+  const side = right ? 'right' : 'left';
   if (box.dataset.side !== side) {
     box.dataset.side = side;
     box.style.left = box.style.right = '';
   }
-  if (side === 'inline') {
-    // Bloc dans la page : sous l'historique des prix (ou à la fin du contenu).
-    const after = history ?? column?.lastElementChild ?? null;
-    if (after && box.previousElementSibling !== after) after.after(box);
-    else if (!after && column && box.parentElement !== column) column.append(box);
-    return;
-  }
-  if (box.parentElement !== document.body) document.body.append(box);
-  if (side === 'right') box.style.right = '16px';
-  else box.style.left = `${Math.round((mainBox?.left ?? 0) + 16)}px`;
+  if (right) box.style.right = '16px';
+  else box.style.left = `${Math.max(16, Math.round((main?.getBoundingClientRect().left ?? 0) + 16))}px`;
 }
 
 function paint(): void {
