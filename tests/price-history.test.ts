@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { filterSales, historyStats, niceTicks, rollingMean, type SaleRow } from '../src/content/features/price-history-logic';
+import { candles, filterSales, historyStats, niceTicks, rollingMean, rollingMeanByTime, saleLine, type SaleRow } from '../src/content/features/price-history-logic';
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 6);
@@ -30,6 +30,33 @@ describe('historique des prix : calculs', () => {
     expect(rollingMean(rows, 2).map((p) => p.value)).toEqual([20, 25, 35, 50]);
     expect(niceTicks(540)).toEqual([0, 200, 400, 600]);
     expect(niceTicks(0)).toEqual([0]);
+  });
+});
+
+describe('historique des prix : moyenne sur N jours, bougies, ligne', () => {
+  const H = 3_600_000;
+  const at = (d: number, h = 0) => NOW - d * DAY + h * H;
+  const rows: SaleRow[] = [
+    sale(0, 10, { at: at(3, 1) }),
+    sale(0, 30, { at: at(3, 5) }),
+    sale(0, 20, { at: at(3, 9) }),
+    sale(0, 40, { at: at(1, 2) }),
+    sale(0, 44, { at: at(1, 2) + 600_000 }),
+    sale(0, null, { at: at(1, 4) }),
+  ];
+
+  it('moyenne glissante sur 1 jour : seules les ventes des dernières 24 h comptent', () => {
+    expect(rollingMeanByTime(rows, 1).map((p) => p.value)).toEqual([10, 20, 20, 40, 42]);
+    expect(rollingMeanByTime(rows, 3).at(-1)!.value).toBe(29);
+  });
+
+  it('bougies par jour : ouverture, clôture, plus haut, plus bas, nombre de ventes', () => {
+    const c = candles(rows);
+    expect(c.map((x) => [x.open, x.close, x.high, x.low, x.count])).toEqual([[10, 20, 30, 10, 3], [40, 44, 44, 40, 2]]);
+  });
+
+  it('ligne : ventes d\'une même heure moyennées, invendues ignorées', () => {
+    expect(saleLine(rows).map((l) => [l.value, l.count])).toEqual([[10, 1], [30, 1], [20, 1], [42, 2]]);
   });
 });
 
@@ -67,6 +94,16 @@ describe('page d\'une enchère : section « Historique des prix »', () => {
     expect(text).toContain('75 %');
     expect(box.querySelector('.cur')).not.toBeNull();
     expect(box.querySelector('table')!.querySelectorAll('tbody tr')).toHaveLength(4);
+    // Bougies, puis ligne : le choix est mémorisé, la moyenne reste dessinée par-dessus.
+    document.querySelector<HTMLButtonElement>('[data-view="candles"]')!.click();
+    expect(document.querySelectorAll('[data-wiky="price-history"] .candle').length).toBeGreaterThan(0);
+    document.querySelector<HTMLButtonElement>('[data-view="line"]')!.click();
+    expect(document.querySelector('[data-wiky="price-history"] .sales-line')).not.toBeNull();
+    expect(localStorage.getItem('wiky-ph-view')).toBe('line');
+    document.querySelector<HTMLButtonElement>('[data-avg="1"]')!.click();
+    expect(localStorage.getItem('wiky-ph-avg')).toBe('1');
+    const svg = document.querySelector('[data-wiky="price-history"] .ph-chart svg')!;
+    expect(svg.lastElementChild!.previousElementSibling!.getAttribute('class')).toBe('avg');
     // Replier : mémorisé.
     box.open = false;
     box.dispatchEvent(new Event('toggle'));

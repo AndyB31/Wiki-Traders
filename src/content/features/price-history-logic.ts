@@ -101,3 +101,67 @@ export function niceTicks(max: number, count = 4): number[] {
   if (ticks[ticks.length - 1] < max) ticks.push(Math.round((ticks[ticks.length - 1] + step) * 100) / 100);
   return ticks;
 }
+
+const HOUR = 3_600_000;
+
+/** Ventes conclues, de la plus ancienne à la plus récente. */
+function soldSorted(rows: SaleRow[]): SaleRow[] {
+  return rows.filter((r) => r.sold && r.price != null).sort((a, b) => a.at - b.at);
+}
+
+/**
+ * Moyenne glissante sur une durée : à chaque vente, moyenne des ventes des `days` derniers jours (vente comprise).
+ * Plus parlante qu'une moyenne sur N ventes quand le rythme des ventes varie.
+ */
+export function rollingMeanByTime(rows: SaleRow[], days: number): { at: number; value: number }[] {
+  const sold = soldSorted(rows);
+  const span = days * DAY;
+  let start = 0;
+  let sum = 0;
+  return sold.map((r, i) => {
+    sum += r.price!;
+    while (sold[start].at <= r.at - span) sum -= sold[start++].price!;
+    return { at: r.at, value: Math.round(sum / (i - start + 1)) };
+  });
+}
+
+export interface Candle {
+  /** Début de la période (ms). */
+  at: number;
+  open: number;
+  close: number;
+  high: number;
+  low: number;
+  count: number;
+}
+
+/** Bougies : ventes regroupées par période (un jour par défaut) — premier, dernier, plus haut, plus bas. */
+export function candles(rows: SaleRow[], bucket = DAY): Candle[] {
+  const out: Candle[] = [];
+  for (const r of soldSorted(rows)) {
+    const at = Math.floor(r.at / bucket) * bucket;
+    const last = out[out.length - 1];
+    if (last && last.at === at) {
+      last.close = r.price!;
+      last.high = Math.max(last.high, r.price!);
+      last.low = Math.min(last.low, r.price!);
+      last.count++;
+    } else out.push({ at, open: r.price!, close: r.price!, high: r.price!, low: r.price!, count: 1 });
+  }
+  return out;
+}
+
+/** Ligne des ventes : une vente par point, moyenne des ventes tombées dans la même heure. */
+export function saleLine(rows: SaleRow[], bucket = HOUR): { at: number; value: number; count: number }[] {
+  const out: { at: number; value: number; count: number; sum: number }[] = [];
+  for (const r of soldSorted(rows)) {
+    const key = Math.floor(r.at / bucket);
+    const last = out[out.length - 1];
+    if (last && Math.floor(last.at / bucket) === key) {
+      last.sum += r.price!;
+      last.count++;
+      last.value = Math.round(last.sum / last.count);
+    } else out.push({ at: r.at, value: r.price!, count: 1, sum: r.price! });
+  }
+  return out.map(({ at, value, count }) => ({ at, value, count }));
+}

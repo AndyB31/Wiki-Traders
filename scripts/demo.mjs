@@ -297,13 +297,13 @@ await ctx.route(`${SB_URL}/**`, (route) => {
     q.includes('status=eq.settled_sold') && q.includes('end_at=gte.') ? Object.entries(SOLD).flatMap(([r, prices]) =>
       prices.map((p, i) => ({ id: `m-${r}-${i}`, card_id: `mc-${r}-${i}`, final_price: p + 1, snapshot_rarity: r, is_shiny: false, end_at: iso(-3_600_000 * (i + 1)), status: 'settled_sold', card: { wikipedia_title: `Marché ${r} ${i}` } })),
     ) :
-    q.includes('status=in.(settled_sold,settled_unsold,cancelled)') && q.includes('card_id=eq.') ? Array.from({ length: 34 }, (_, i) => {
-      const daysAgo = 88 - i * 2.6;
+    q.includes('status=in.(settled_sold,settled_unsold,cancelled)') && q.includes('card_id=eq.') ? Array.from({ length: 120 }, (_, i) => {
+      const daysAgo = 88 - i * 0.73;
       const rarity = 'SR';
-      const base = 30 + i * 1.4;
+      const base = 30 + i * 0.4 + 12 * Math.sin(i / 9);
       const cancelled = i % 11 === 7;
       const sold = i % 9 !== 4 && !cancelled;
-      const price = Math.round(base * (0.8 + ((i * 37) % 10) / 20));
+      const price = Math.round(base * (0.7 + ((i * 37) % 13) / 18));
       return { id: `h${i}`, final_price: sold ? price : null, base_amount: Math.round(base * 0.6), snapshot_rarity: rarity, is_shiny: i === 20, end_at: iso(-daysAgo * 86_400_000), settled_at: iso(-daysAgo * 86_400_000), status: sold ? 'settled_sold' : cancelled ? 'cancelled' : 'settled_unsold' };
     }) :
     q.includes('select=card_id,snapshot_rarity,is_shiny,current_bid') ? [{ card_id: 'k1', snapshot_rarity: 'SR', is_shiny: false, current_bid: 72, base_amount: 40 }] :
@@ -853,6 +853,12 @@ await integ.waitForTimeout(500);
 await integ.evaluate(() => document.querySelector('[data-wiky="price-history"]').scrollIntoView({ block: 'start' }));
 await integ.waitForTimeout(300);
 await integ.screenshot({ path: join(shots, 'price-history.png') });
+for (const v of ['candles', 'line']) {
+  await integ.click(`[data-wiky="price-history"] [data-view="${v}"]`);
+  await integ.waitForTimeout(250);
+  await integ.screenshot({ path: join(shots, `price-history-${v}.png`) });
+}
+await integ.click('[data-wiky="price-history"] [data-view="points"]');
 
 // Familles : import automatique des familles de « Prix moyen collection », page native du site.
 await integ.evaluate((f) => localStorage.setItem('wm_families_v1', f), JSON.stringify(FAMILIES));

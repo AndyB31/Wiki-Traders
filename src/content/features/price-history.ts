@@ -8,7 +8,7 @@
 import { formatDuration } from '../../lib/text';
 import type { Rarity } from '../../lib/types';
 import { auctionInfo, cardSalesHistory, type AuctionInfo, type CardSale } from '../catalog';
-import { filterSales, historyStats, niceTicks, rollingMean, type HistoryFilter, type OutcomeFilter } from './price-history-logic';
+import { candles, filterSales, historyStats, niceTicks, rollingMeanByTime, saleLine, type HistoryFilter, type OutcomeFilter } from './price-history-logic';
 import { registerFeature } from './runtime';
 
 const AUCTION_RE = /^\/marketplace\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
@@ -42,7 +42,14 @@ const CSS = `
 .ph-chart svg { display: block; width: 100%; height: 240px; overflow: visible; }
 .ph-chart .grid line { stroke: color-mix(in srgb, var(--color-foreground) 9%, transparent); }
 .ph-chart .axis text { fill: color-mix(in srgb, var(--color-foreground) 50%, transparent); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.ph-chart .avg { fill: none; stroke: #f97316; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ph-chart .avg { fill: none; stroke: #f97316; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.ph-chart .avg-halo { fill: none; stroke: var(--color-surface); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; opacity: .9; }
+.ph-chart .dot.soft { opacity: .55; }
+.ph-chart .sales-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ph-chart .candle line { stroke-width: 1.5; }
+.ph-chart .candle.up line, .ph-chart .candle.up rect { stroke: #22c55e; fill: #22c55e; }
+.ph-chart .candle.down line, .ph-chart .candle.down rect { stroke: #ef4444; fill: #ef4444; }
+.ph-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: color-mix(in srgb, var(--color-foreground) 50%, transparent); margin-right: 2px; }
 .ph-chart .cur { stroke: var(--color-foreground); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .55; }
 .ph-chart .cur-label { fill: var(--color-foreground); font-size: 10.5px; opacity: .75; }
 .ph-chart .dot { stroke: var(--color-surface); stroke-width: 2; }
@@ -54,6 +61,7 @@ const CSS = `
 .ph-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: color-mix(in srgb, var(--color-foreground) 65%, transparent); }
 .ph-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .ph-legend i { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; }
+.ph-legend i.sq { border-radius: 2px; } .ph-legend i.sq.up { background: #22c55e; } .ph-legend i.sq.down { background: #ef4444; }
 .ph-legend i.hollow { border: 1.5px solid color-mix(in srgb, var(--color-foreground) 55%, transparent); }
 .ph-legend .ln { width: 16px; height: 2px; border-radius: 2px; background: #f97316; }
 .ph-legend .dash { width: 16px; height: 0; border-top: 1.5px dashed var(--color-foreground); opacity: .6; }
@@ -72,6 +80,12 @@ let sales: CardSale[] | null = null;
 let error: string | null = null;
 let filter: HistoryFilter = { outcome: 'all', days: null };
 let resizeObs: ResizeObserver | null = null;
+/** Affichage du graphique et moyenne glissante (jours, 0 = aucune), mémorisés. */
+type ChartView = 'points' | 'candles' | 'line';
+let view: ChartView = (localStorageGet('wiky-ph-view') as ChartView | null) ?? 'points';
+let avgDays = Number(localStorageGet('wiky-ph-avg') ?? 2);
+/** Texte des info-bulles, dans l'ordre des zones de survol du graphique. */
+let tips: string[] = [];
 
 function ensureStyle(): void {
   if (document.getElementById('wiky-price-history-style')) return;
@@ -127,7 +141,7 @@ function tilesHtml(): string {
   ].join('');
 }
 
-/** Enchères affichées sur le graphique : vendues (au prix final), sans acheteur / annulées (à la mise de départ). */
+/** Enchères affichées en mode points : vendues (au prix final), sans acheteur / annulées (à la mise de départ). */
 function plotted(): { r: CardSale; v: number }[] {
   return filterSales(sales ?? [], filter).flatMap((r) => {
     const v = r.sold ? r.price : r.start;
@@ -135,43 +149,89 @@ function plotted(): { r: CardSale; v: number }[] {
   });
 }
 
-/** Graphique : un point plein par vente (couleur de la rareté), un point vide par enchère sans acheteur, moyenne glissante, mise actuelle. */
+const tipOf = (r: CardSale) =>
+  r.sold
+    ? `<b>${w(r.price)}</b> · vendue${r.shiny ? ' ✨' : ''}<br>${dateFr(r.at)}${r.start != null ? ` · départ ${w(r.start)}` : ''}`
+    : `<b>${w(r.start)}</b> · ${OUTCOME_LABEL[r.outcome ?? 'unsold']} (mise de départ)<br>${dateFr(r.at)}`;
+
+/**
+ * Graphique de l'évolution du prix, selon l'affichage choisi :
+ *  - points : une vente = un point plein, une enchère sans acheteur = un point vide (mise de départ) ;
+ *  - bougies : une bougie par jour (premier, dernier, plus haut, plus bas) ;
+ *  - ligne : les ventes reliées (moyenne des ventes d'une même heure).
+ * La moyenne glissante (1 à 3 jours) est dessinée par-dessus, avec un liseré, pour rester visible.
+ */
 function chartSvg(width: number): string {
-  const pts = plotted();
-  if (!pts.length) return '';
+  const rows = filterSales(sales ?? [], filter);
+  const sold = rows.filter((r) => r.sold && r.price != null);
+  const pts = view === 'points' ? plotted() : [];
+  const cdl = view === 'candles' ? candles(sold) : [];
+  const line = view === 'line' ? saleLine(sold) : [];
+  const values = view === 'points' ? pts.map((p) => p.v) : view === 'candles' ? cdl.flatMap((c) => [c.high, c.low]) : line.map((l) => l.value);
+  const times = view === 'points' ? pts.map((p) => p.r.at) : view === 'candles' ? cdl.map((c) => c.at + 43_200_000) : line.map((l) => l.at);
+  if (!values.length) return '';
   const H = 240;
   const pad = { l: 44, r: 12, t: 12, b: 24 };
   const now = Date.now();
-  const t0 = Math.min(...pts.map((p) => p.r.at));
-  const t1 = Math.max(now, ...pts.map((p) => p.r.at));
+  const t0 = Math.min(...times);
+  const t1 = Math.max(now, ...times);
   const span = Math.max(t1 - t0, 86_400_000);
-  const maxY = Math.max(...pts.map((p) => p.v), info?.current ?? 0) * 1.08;
+  const maxY = Math.max(...values, info?.current ?? 0) * 1.08;
   const ticks = niceTicks(maxY);
   const top = ticks[ticks.length - 1] || 1;
-  const x = (t: number) => pad.l + ((t - t0) / span) * (width - pad.l - pad.r);
+  const plotW = width - pad.l - pad.r;
+  const x = (t: number) => pad.l + ((t - t0) / span) * plotW;
   const y = (v: number) => pad.t + (1 - v / top) * (H - pad.t - pad.b);
-  const color = rarityColor(info?.rarity ?? pts.find((p) => p.r.rarity)?.r.rarity ?? null);
+  const color = rarityColor(info?.rarity ?? sold.find((r) => r.rarity)?.rarity ?? null);
+  const showAvg = avgDays > 0 && sold.length > 1 && filter.outcome !== 'unsold';
   const grid = ticks.map((v) => `<line x1="${pad.l}" x2="${width - pad.r}" y1="${y(v)}" y2="${y(v)}"/>`).join('');
   const ylabels = ticks.map((v) => `<text x="${pad.l - 6}" y="${y(v) + 3.5}" text-anchor="end">${v.toLocaleString('fr-FR')}</text>`).join('');
-  const xticks = [0, 1 / 3, 2 / 3, 1].map((f) => t0 + f * span);
-  const xlabels = xticks.map((t, i) => `<text x="${x(t)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === 3 ? 'end' : 'middle'}">${dateFr(t)}</text>`).join('');
-  const dots = pts
-    .map(({ r, v }) =>
-      r.sold
-        ? `<circle class="dot" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${r.shiny ? 5 : 4}" fill="${color}"/>`
-        : `<circle class="dot unsold" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4"/>`,
-    )
+  const xlabels = [0, 1 / 3, 2 / 3, 1]
+    .map((f, i) => `<text x="${x(t0 + f * span)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === 3 ? 'end' : 'middle'}">${dateFr(t0 + f * span)}</text>`)
     .join('');
-  const avgPts = filter.outcome === 'unsold' ? [] : rollingMean(pts.map((p) => p.r));
-  const avg = avgPts.length > 1 ? `<polyline class="avg" points="${avgPts.map((p) => `${x(p.at).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')}"/>` : '';
+  tips = [];
+  const hits: string[] = [];
+  const hit = (cx: number, cy: number, tip: string, r = 10) => {
+    hits.push(`<circle class="hit" data-i="${tips.length}" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}"/>`);
+    tips.push(tip);
+  };
+  let marks = '';
+  if (view === 'points') {
+    marks = pts
+      .map(({ r, v }) => {
+        hit(x(r.at), y(v), tipOf(r));
+        return r.sold
+          ? `<circle class="dot${showAvg ? ' soft' : ''}" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${r.shiny ? 5 : 4}" fill="${color}"/>`
+          : `<circle class="dot unsold" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4"/>`;
+      })
+      .join('');
+  } else if (view === 'candles') {
+    const dayW = (86_400_000 / span) * plotW;
+    const bw = Math.max(3, Math.min(14, dayW * 0.65));
+    marks = cdl
+      .map((c) => {
+        const cx = x(c.at + 43_200_000);
+        const up = c.close >= c.open;
+        const yTop = y(Math.max(c.open, c.close));
+        const yBot = y(Math.min(c.open, c.close));
+        hit(cx, (yTop + yBot) / 2, `<b>${dateFr(c.at)}</b> · ${c.count} vente${c.count > 1 ? 's' : ''}<br>ouverture ${w(c.open)} · clôture ${w(c.close)}<br>plus haut ${w(c.high)} · plus bas ${w(c.low)}`, Math.max(10, bw));
+        return `<g class="candle ${up ? 'up' : 'down'}"><line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${y(c.high).toFixed(1)}" y2="${y(c.low).toFixed(1)}"/><rect x="${(cx - bw / 2).toFixed(1)}" y="${yTop.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(2, yBot - yTop).toFixed(1)}" rx="2"/></g>`;
+      })
+      .join('');
+  } else {
+    marks = `<polyline class="sales-line" stroke="${color}" points="${line.map((l) => `${x(l.at).toFixed(1)},${y(l.value).toFixed(1)}`).join(' ')}"/>`;
+    for (const l of line) hit(x(l.at), y(l.value), `<b>${w(l.value)}</b>${l.count > 1 ? ` · moyenne de ${l.count} ventes` : ' · vente'}<br>${dateFr(l.at)}`, 8);
+  }
+  const avgPts = showAvg ? rollingMeanByTime(sold, avgDays) : [];
+  const avgLine = avgPts.length > 1 ? avgPts.map((p) => `${x(p.at).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ') : '';
+  const avg = avgLine ? `<polyline class="avg-halo" points="${avgLine}"/><polyline class="avg" points="${avgLine}"/>` : '';
   const cur =
     info?.current != null
       ? `<line class="cur" x1="${pad.l}" x2="${width - pad.r}" y1="${y(info.current)}" y2="${y(info.current)}"/><text class="cur-label" x="${width - pad.r}" y="${y(info.current) - 5}" text-anchor="end">cette enchère ${w(info.current)}</text>`
       : '';
-  // Zones de survol plus larges que les points.
-  const hits = pts.map(({ r, v }, i) => `<circle class="hit" data-i="${i}" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="10"/>`).join('');
+  // Ordre : grille, mise de l'enchère, ventes, puis la moyenne par-dessus (toujours visible), puis les zones de survol.
   return `<svg viewBox="0 0 ${width} ${H}" role="img" aria-label="Évolution du prix de vente de la carte">
-    <g class="grid">${grid}</g><g class="axis">${ylabels}${xlabels}</g>${avg}${cur}<g>${dots}</g><g>${hits}</g></svg><div class="ph-tip" hidden></div>`;
+    <g class="grid">${grid}</g><g class="axis">${ylabels}${xlabels}</g>${cur}<g>${marks}</g>${avg}<g>${hits.join('')}</g></svg><div class="ph-tip" hidden></div>`;
 }
 
 function filtersHtml(): string {
@@ -182,18 +242,24 @@ function filtersHtml(): string {
     chip(`data-outcome="${o}"`, l, filter.outcome === o),
   );
   const per = ([[30, '30 j'], [90, '90 j'], [null, 'Tout']] as const).map(([d, l]) => chip(`data-days="${d ?? ''}"`, l, filter.days === d));
-  return `${out.join('')}<span class="ph-sep"></span>${per.join('')}`;
+  const views = ([['points', 'Points'], ['candles', 'Bougies'], ['line', 'Ligne']] as const).map(([v, l]) => chip(`data-view="${v}"`, l, view === v));
+  const avgs = ([[0, 'Aucune'], [1, '1 j'], [2, '2 j'], [3, '3 j']] as const).map(([d, l]) => chip(`data-avg="${d}"`, l, avgDays === d));
+  return `<div class="ph-filters">${out.join('')}<span class="ph-sep"></span>${per.join('')}</div>
+    <div class="ph-filters"><span class="ph-lbl">Affichage</span>${views.join('')}<span class="ph-sep"></span><span class="ph-lbl">Moyenne glissante</span>${avgs.join('')}</div>`;
 }
 
 function legendHtml(): string {
-  const pts = plotted();
+  const rows = filterSales(sales ?? [], filter);
   const color = rarityColor(info?.rarity ?? null);
+  const showAvg = avgDays > 0 && rows.filter((r) => r.sold).length > 1 && filter.outcome !== 'unsold';
   return [
-    pts.some((p) => p.r.sold) ? `<span><i style="background:${color}"></i>vendue (prix final)</span>` : '',
-    pts.some((p) => !p.r.sold) ? '<span><i class="hollow"></i>sans acheteur ou annulée (mise de départ)</span>' : '',
-    filter.outcome !== 'unsold' ? '<span><span class="ln"></span>moyenne glissante (5 ventes)</span>' : '',
+    view === 'points' && rows.some((r) => r.sold) ? `<span><i style="background:${color}"></i>vente (prix final)</span>` : '',
+    view === 'points' && rows.some((r) => !r.sold) ? '<span><i class="hollow"></i>sans acheteur ou annulée (mise de départ)</span>' : '',
+    view === 'candles' ? '<span><i class="sq up"></i>hausse dans la journée</span><span><i class="sq down"></i>baisse dans la journée</span><span>mèche : plus haut / plus bas</span>' : '',
+    view === 'line' ? `<span><span class="ln" style="background:${color}"></span>ventes (moyenne par heure)</span>` : '',
+    showAvg ? `<span><span class="ln"></span>moyenne glissante (${avgDays} j)</span>` : '',
     info?.current != null ? '<span><span class="dash"></span>cette enchère</span>' : '',
-    pts.some((p) => p.r.shiny) ? '<span>✨ point plus gros : brillante</span>' : '',
+    view === 'points' && rows.some((r) => r.shiny) ? '<span>✨ point plus gros : brillante</span>' : '',
   ].join('');
 }
 
@@ -213,7 +279,7 @@ function bodyHtml(width: number): string {
   if (!sales) return '<div class="ph-empty">Chargement des ventes de la carte…</div>';
   if (!sales.length) return '<div class="ph-empty">Aucune enchère terminée pour cette carte.</div>';
   const chart = chartSvg(width);
-  return `<div class="ph-filters">${filtersHtml()}</div><div class="ph-tiles">${tilesHtml()}</div>
+  return `${filtersHtml()}<div class="ph-tiles">${tilesHtml()}</div>
     ${chart ? `<div class="ph-chart">${chart}</div><div class="ph-legend">${legendHtml()}</div>` : '<div class="ph-empty">Aucune enchère sur cette période.</div>'}
     ${tableHtml()}`;
 }
@@ -223,6 +289,20 @@ function bindBody(box: HTMLDetailsElement): void {
   body.querySelectorAll<HTMLButtonElement>('[data-outcome]').forEach((b) =>
     b.addEventListener('click', () => {
       filter = { ...filter, outcome: b.dataset.outcome as OutcomeFilter };
+      paintBody(box);
+    }),
+  );
+  body.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((b) =>
+    b.addEventListener('click', () => {
+      view = b.dataset.view as ChartView;
+      localStorageSet('wiky-ph-view', view);
+      paintBody(box);
+    }),
+  );
+  body.querySelectorAll<HTMLButtonElement>('[data-avg]').forEach((b) =>
+    b.addEventListener('click', () => {
+      avgDays = Number(b.dataset.avg);
+      localStorageSet('wiky-ph-avg', String(avgDays));
       paintBody(box);
     }),
   );
@@ -236,20 +316,17 @@ function bindBody(box: HTMLDetailsElement): void {
   const chart = body.querySelector<HTMLElement>('.ph-chart');
   const tip = chart?.querySelector<HTMLElement>('.ph-tip');
   if (!chart || !tip) return;
-  const pts = plotted();
   chart.addEventListener('mousemove', (e) => {
     const hit = (e.target as Element).closest<SVGCircleElement>('.hit');
     if (!hit) {
       tip.hidden = true;
       return;
     }
-    const r = pts[Number(hit.dataset.i)]?.r;
-    if (!r) return;
+    const text = tips[Number(hit.dataset.i)];
+    if (!text) return;
     const box2 = chart.getBoundingClientRect();
     const c = hit.getBoundingClientRect();
-    tip.innerHTML = r.sold
-      ? `<b>${w(r.price)}</b> · vendue${r.shiny ? ' ✨' : ''}<br>${dateFr(r.at)}${r.start != null ? ` · départ ${w(r.start)}` : ''}`
-      : `<b>${w(r.start)}</b> · ${OUTCOME_LABEL[r.outcome ?? 'unsold']} (mise de départ)<br>${dateFr(r.at)}`;
+    tip.innerHTML = text;
     tip.style.left = `${c.left + c.width / 2 - box2.left}px`;
     tip.style.top = `${c.top - box2.top}px`;
     tip.hidden = false;

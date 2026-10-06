@@ -13,12 +13,18 @@ Le menu **Marché** de la barre latérale ouvre directement les onglets du site,
 
 ## Page d'une enchère
 
-![Historique des prix](../screenshots/price-history.png)
+| Points | Bougies | Ligne |
+| --- | --- | --- |
+| ![Points](../screenshots/price-history.png) | ![Bougies](../screenshots/price-history-candles.png) | ![Ligne](../screenshots/price-history-line.png) |
 
 Sous l'historique des mises, la section **Historique des prix** (dépliable, état mémorisé) :
 
 - **chiffres clés** de la carte : ventes et enchères sans acheteur (dont annulées), moyenne et médiane, plus bas et plus haut, dernière vente, **tendance** (30 derniers jours contre les 30 précédents), **taux de vente** et gain moyen par rapport à la mise de départ, et l'écart de **cette enchère** à la moyenne ;
-- **graphique** de l'évolution du prix : un point plein par vente (prix final ; plus gros : brillante), un point vide par enchère **sans acheteur ou annulée** (à sa mise de départ), **moyenne glissante** (5 ventes) et la mise de cette enchère en pointillé ; au survol, le prix, le résultat, la date et la mise de départ ;
+- **graphique** de l'évolution du prix, au choix (mémorisé) :
+  - **Points** : un point plein par vente (prix final ; plus gros : brillante), un point vide par enchère **sans acheteur ou annulée** (à sa mise de départ) ;
+  - **Bougies** : une bougie par jour — ouverture, clôture, plus haut, plus bas ; verte si le prix monte dans la journée, rouge s'il baisse ;
+  - **Ligne** : les ventes reliées (moyenne des ventes d'une même heure) ;
+- **moyenne glissante** réglable : aucune, **1 j, 2 j ou 3 j** (moyenne des ventes des N derniers jours), toujours dessinée par-dessus ; la mise de cette enchère en pointillé ; au survol, le détail de chaque point, bougie ou vente ;
 - **filtres** : **Toutes / Vendues / Sans acheteur** et période (30 j, 90 j, tout) ;
 - la **liste** de toutes les enchères terminées de la carte.
 
