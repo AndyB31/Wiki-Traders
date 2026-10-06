@@ -19,7 +19,7 @@ const RARITY_FALLBACK: Record<Rarity, string> = { C: '#9ca3af', PC: '#22c55e', R
 const rarityColor = (r: Rarity | null) => (r ? `var(--color-rarity-${r.toLowerCase()}, ${RARITY_FALLBACK[r]})` : '#9ca3af');
 
 const CSS = `
-[data-wiky="price-history"] { margin-top: 16px; border-radius: 16px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-foreground); }
+[data-wiky="price-history"] { width: 80%; max-width: 980px; margin: 16px auto 0; box-sizing: border-box; border-radius: 16px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-foreground); }
 [data-wiky="price-history"] > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-weight: 700; font-size: 15px; }
 [data-wiky="price-history"] > summary::-webkit-details-marker { display: none; }
 [data-wiky="price-history"] > summary .ph-ico { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: rgba(249,115,22,.14); color: #fb923c; }
@@ -62,6 +62,7 @@ const CSS = `
 .ph-table table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .ph-table th, .ph-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--color-border); }
 .ph-table th { font-weight: 600; color: color-mix(in srgb, var(--color-foreground) 55%, transparent); position: sticky; top: 0; background: var(--color-surface); }
+@media (max-width: 900px) { [data-wiky="price-history"] { width: 100%; } }
 .ph-body details > summary { cursor: pointer; font-size: 12px; color: color-mix(in srgb, var(--color-foreground) 65%, transparent); }
 `;
 
