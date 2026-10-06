@@ -162,6 +162,19 @@ document.querySelectorAll('div.card[data-auction]').forEach((el) => attach(el, {
 
 const attr = (o) => JSON.stringify(o).replace(/"/g, '&quot;');
 
+// Marché (structure réelle relevée sur le site) : enchères de cartes déjà vendues, pour le prix moyen et l'écart.
+const DEAL_AUCTIONS = [
+  ['d1a1a1a1-0000-4000-8000-000000000001', 'k1', 'Tour Eiffel', 'Mise de départ', 24, '3m 18s', 'sr'],
+  ['d1a1a1a1-0000-4000-8000-000000000002', 'k4', 'Pyramide de Khéops', 'Mise actuelle', 400, '57m 14s', 'l'],
+  ['d1a1a1a1-0000-4000-8000-000000000003', 'k1', 'Tour Eiffel', 'Mise actuelle', 78, '1h 12m', 'sr'],
+  ['d1a1a1a1-0000-4000-8000-000000000004', 'k2', 'Léonard de Vinci', 'Mise de départ', 100, '2h 05m', 'ur'],
+];
+const dealCard = ([id, , title, label, price, left, glow]) => `<div id="marketplace-auction-${id}"><a class="card-frame block p-3 w-[172px] rounded-2xl" style="background:var(--color-surface);border:1px solid var(--color-border)" href="/marketplace/${id}">
+  <div class="flex flex-col items-center gap-2.5"><div class="overflow-hidden rounded-2xl"><div class="w-[150px] h-[200px] glow-${glow} relative" style="background:linear-gradient(160deg,#f59e0b,#b45309)"><h3 class="text-xs font-bold p-2" style="padding-top:120px;color:#111">${title}</h3></div></div>
+  <div class="w-full flex items-center justify-between"><div class="flex flex-col min-w-0"><span class="text-[10px] uppercase tracking-wide opacity-40">${label}</span><span class="inline-flex items-center gap-1 font-semibold">${price}</span></div>
+  <div class="flex flex-col items-end"><span class="text-[10px] uppercase tracking-wide opacity-40">Durée</span><span class="tabular-nums font-medium text-xs">${left}</span></div></div>
+  <p class="w-full text-[10px] opacity-40 truncate">Vendu par quelqu'un</p></div></a></div>`;
+
 // Barre latérale réelle du site (relevée sur wiki-masters.com, avec l'autre extension) : intégration Wiky-Traders.
 const SITE_NAV = readFileSync(join(root, 'tests/fixtures/site-nav.html'), 'utf8');
 const shell = (body) => `<!doctype html><html lang="fr" class="h-full"><head><meta charset="utf-8"><title>WikiMasters</title><script src="https://cdn.tailwindcss.com"></script>
@@ -306,6 +319,7 @@ await ctx.route(`${SB_URL}/**`, (route) => {
       const price = Math.round(base * (0.7 + ((i * 37) % 13) / 18));
       return { id: `h${i}`, final_price: sold ? price : null, base_amount: Math.round(base * 0.6), snapshot_rarity: rarity, is_shiny: i === 20, end_at: iso(-daysAgo * 86_400_000), settled_at: iso(-daysAgo * 86_400_000), status: sold ? 'settled_sold' : cancelled ? 'cancelled' : 'settled_unsold' };
     }) :
+    q.includes('select=id,card_id,snapshot_rarity,is_shiny&id=in.') ? DEAL_AUCTIONS.map(([id, card]) => ({ id, card_id: card, snapshot_rarity: null, is_shiny: false })) :
     q.includes('select=card_id,snapshot_rarity,is_shiny,current_bid') ? [{ card_id: 'k1', snapshot_rarity: 'SR', is_shiny: false, current_bid: 72, base_amount: 40 }] :
     q.includes('seller_id=eq.') && q.includes('status=in.') ? [
       { id: 'v1', card_id: 'k1', base_amount: 40, final_price: 66, status: 'settled_sold', end_at: iso(-3_600_000), settled_at: iso(-3_590_000), snapshot_rarity: 'SR', is_shiny: false },
@@ -331,6 +345,8 @@ await ctx.route(`${ORIGIN}/**`, (route) => {
   if (/^\/marketplace\/[0-9a-f-]{36}$/.test(url.pathname) && url.searchParams.has('detail')) return route.fulfill({ body: shell(`<div class="flex-1 p-4 md:p-6 space-y-6 max-w-3xl"><h1 class="text-2xl md:text-3xl font-bold">Enchère · Tour Eiffel</h1>
     <div class="card-frame p-4 rounded-2xl" style="background:var(--color-surface);border:1px solid var(--color-border)"><h3 class="font-semibold mb-2">Historique des mises</h3>
     <ul class="text-sm space-y-1 opacity-80"><li>72 W · il y a 3 min</li><li>60 W · il y a 20 min</li><li>40 W · mise de départ</li></ul></div></div>`), contentType: 'text/html' });
+  if (url.pathname === '/marketplace' && url.searchParams.has('deals')) return route.fulfill({ body: shell(`<div class="flex-1 p-4 md:p-6 space-y-6"><h1 class="text-2xl md:text-3xl font-bold">Marché</h1>
+    <div class="animate-fade-in-up"><div class="flex flex-wrap justify-center gap-4">${DEAL_AUCTIONS.map(dealCard).join('')}</div></div></div>`), contentType: 'text/html' });
   if (url.pathname === '/settings' || url.searchParams.has('wiky')) return route.fulfill({ body: shell(url.pathname === '/settings' ? settingsBody : '<div class="p-6"><h1 class="text-3xl font-bold">Collection</h1></div>'), contentType: 'text/html' });
   if (url.pathname.startsWith('/collection')) return route.fulfill({ body: collection(), contentType: 'text/html' });
   if (url.pathname.startsWith('/marketplace')) return route.fulfill({ body: marketplace(url.searchParams.get('tab') ?? 'browse'), contentType: 'text/html' });
@@ -859,6 +875,15 @@ for (const v of ['candles', 'line']) {
   await integ.screenshot({ path: join(shots, `price-history-${v}.png`) });
 }
 await integ.click('[data-wiky="price-history"] [data-view="points"]');
+
+// Marché : prix moyen de la carte et écart sur chaque enchère.
+await integ.goto(`${ORIGIN}/marketplace?deals=1`);
+await integ.waitForSelector('[data-wiky="deal"]', { timeout: 15000 });
+await integ.waitForFunction(() => document.querySelectorAll('[data-wiky="deal"]').length === 4, null, { timeout: 10000 });
+const deals = await integ.$$eval('[data-wiky="deal"]', (els) => els.map((e) => `${e.className}:${e.textContent.replace(/\s+/g, ' ').trim()}`));
+ok(deals[0].startsWith('good') && deals[1].startsWith('bad') && /Jamais vendue/.test(deals[3]), `marché : ${deals.join(' | ')}`);
+await integ.waitForTimeout(300);
+await integ.screenshot({ path: join(shots, 'market-deals.png') });
 
 // Familles : import automatique des familles de « Prix moyen collection », page native du site.
 await integ.evaluate((f) => localStorage.setItem('wm_families_v1', f), JSON.stringify(FAMILIES));

@@ -6,7 +6,7 @@ Le menu **Marché** de la barre latérale ouvre directement les onglets du site,
 
 | Onglet | Ce que Wiky-Traders ajoute |
 | --- | --- |
-| **Parcourir** | — |
+| **Parcourir** | Sur chaque enchère, sous son prix : la **moyenne de la carte** et l'**écart** du prix actuel — vert sous la moyenne (≥ 10 % moins cher : bonne affaire), rouge au-dessus, gris au prix ; « Jamais vendue » sans référence. Aussi dans les autres onglets du Marché. |
 | **Mes ventes** | Tes slots : les ventes du site et, à côté, une carte « Slot libre » par slot vide. Clic sur un slot libre : **Vendre** intégré (carte proposée, autre carte du slot, recherche, **carte au hasard** d'une étiquette, prix et durée modifiables). Avec l'option *Vendre depuis le classement*, mise en vente directe après confirmation ; sinon la carte s'ouvre avec prix et durée pré-remplis. |
 | **Mes enchères** | Tes mises avec filtres **En cours / Historique / Toutes**, statut, ta mise, prix actuel ou final, temps restant, prix de la carte et écart ; relues à l'ouverture de l'onglet |
 | **Historique** | Tes ventes terminées : statistiques en haut (vendues, invendues, taux de vente, total encaissé, gain moyen, écart moyen au prix de la carte, meilleure vente), filtres **Toutes / Vendues / Invendues**, recherche, tri ; pour chaque vente le prix de départ, le prix final, la moyenne de la carte et l'écart. « Liste du site » réaffiche la liste d'origine. |

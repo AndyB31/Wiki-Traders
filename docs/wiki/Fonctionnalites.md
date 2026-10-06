@@ -32,7 +32,7 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 
 | Fonctionnalité | Défaut | Ce qu'elle fait |
 | --- | --- | --- |
-| Prix moyen au marché (API) | oui | Médiane, nombre de ventes, min et max sur la page d'une enchère et dans la fiche d'une carte |
+| Prix moyen au marché (API) | oui | Sur chaque enchère du Marché : moyenne de la carte et écart (bonne affaire en vert) ; sur la page d'une enchère : historique des prix (graphique, statistiques) et autres enchères de la carte ; dans la fiche d'une carte : moyenne, ventes, min et max |
 | Suivi de mes mises (API) | oui | « Mises en direct » sous le bloc Wiky-Traders : statut, compte à rebours, bip quand tu es surenchéri à moins d'une minute de la fin ; relève toutes les 20 s quand une mise se termine bientôt |
 
 ## Paquets

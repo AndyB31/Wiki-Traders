@@ -468,3 +468,40 @@ export async function auctionInfo(auctionId: string): Promise<AuctionInfo | null
     hasBid: r.current_bid != null && r.current_bid > (r.base_amount ?? 0),
   };
 }
+
+// ---------------------------------------------------------------- enchères → cartes (par lots)
+
+export interface AuctionCard {
+  cardId: string;
+  rarity: Rarity | null;
+  shiny: boolean;
+}
+
+const auctionCards = new Map<string, AuctionCard | null>();
+
+/** Carte, rareté et brillance de chaque enchère (150 par requête, mis en cache). */
+export async function cardsForAuctions(ids: string[]): Promise<Map<string, AuctionCard>> {
+  const todo = [...new Set(ids)].filter((id) => !auctionCards.has(id));
+  if (todo.length) {
+    const { cfg, session } = await api();
+    for (let i = 0; i < todo.length; i += BATCH) {
+      const batch = todo.slice(i, i + BATCH);
+      const rows = await get<{ id: string; card_id: string; snapshot_rarity: string | null; is_shiny: boolean | null }[]>(
+        cfg,
+        session,
+        `auctions?select=id,card_id,snapshot_rarity,is_shiny&id=${inList(batch)}`,
+      );
+      for (const id of batch) auctionCards.set(id, null);
+      for (const r of rows) {
+        auctionCards.set(r.id, { cardId: r.card_id, rarity: RARITIES.has(r.snapshot_rarity as Rarity) ? (r.snapshot_rarity as Rarity) : null, shiny: !!r.is_shiny });
+        cardByAuction.set(r.id, r.card_id);
+      }
+    }
+  }
+  return new Map(ids.flatMap((id) => (auctionCards.get(id) ? [[id, auctionCards.get(id)!] as const] : [])));
+}
+
+/** Carte d'une enchère déjà connue (synchrone). */
+export function knownAuctionCard(auctionId: string): AuctionCard | null | undefined {
+  return auctionCards.get(auctionId);
+}

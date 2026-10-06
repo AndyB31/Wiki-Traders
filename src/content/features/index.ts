@@ -19,6 +19,7 @@ import './family-badges';
 import './collection-families';
 import './auction-others';
 import './price-history';
+import './market-deals';
 import './market-tabs';
 import './tag-tool';
 
