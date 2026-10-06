@@ -8,6 +8,7 @@
  *  - les demandes simultanées sont regroupées (une seule requête en vol par carte).
  */
 import { ext } from '../lib/browser';
+import { CARD_PRICES_KEY } from '../lib/defaults';
 import { median } from '../lib/pricing';
 import type { CatalogCard, Rarity } from '../lib/types';
 import { discoverConfig, get, getAll, inList, readSession } from './api';
@@ -196,7 +197,7 @@ export interface CardPrice {
 }
 
 // v3 : ventes lues en entier (pagination) ; les entrées des versions précédentes, parfois tronquées, sont ignorées.
-const PRICE_KEY = 'cardPrices3';
+const PRICE_KEY = CARD_PRICES_KEY;
 const PRICE_TTL = 6 * 3600_000;
 const prices = new Map<string, CardPrice>();
 let loaded: Promise<void> | null = null;
@@ -214,6 +215,16 @@ function loadPrices(): Promise<void> {
     }
   })();
   return loaded;
+}
+
+/** Enregistre tout de suite le cache des prix (la popup le lit pour l'étiquetage). */
+export async function flushPrices(): Promise<void> {
+  clearTimeout(persistTimer);
+  try {
+    await ext.storage.local.set({ [PRICE_KEY]: Object.fromEntries(prices) });
+  } catch {
+    // Stockage indisponible (tests).
+  }
 }
 
 function persistPrices(): void {

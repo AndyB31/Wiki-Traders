@@ -1,5 +1,6 @@
 import { ext } from '../lib/browser';
-import { planAutoTags, type TagChange } from '../lib/autotag';
+import { catalogPrice, planAutoTags, type TagChange } from '../lib/autotag';
+import { cardPrices, flushPrices, knownPrice } from './catalog';
 import type { DiagnosticResult, ScanMessage, ScannedCard, ToContent } from '../lib/messages';
 // Seules les cartes de la collection sont envoyées comme « possédées » : jamais celles du marché.
 import { load, onStoreChange, save } from '../lib/storage';
@@ -437,7 +438,7 @@ function priceSummary() {
 }
 
 /** Lectures via l'API (option « apiRead ») : mes mises, ventes récentes du marché. */
-async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 'myAuctions'): Promise<{ ok: boolean; error?: string; count?: number }> {
+async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 'myAuctions' | 'collectionPrices', force = false): Promise<{ ok: boolean; error?: string; count?: number }> {
   if (!store?.settings.apiRead && !store?.settings.apiWrite) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Automatisations).' };
   if (op === 'collection') {
     const cards = await fetchMyCollection();
@@ -451,6 +452,14 @@ async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 
     await save({ salesCache: result });
     log(`[api] ${result.items.length} vente(s) terminée(s)`);
     return { ok: true, count: result.items.length };
+  }
+  if (op === 'collectionPrices') {
+    // Prix moyens de toute ma collection (lots de 150 cartes), enregistrés pour l'étiquetage de la popup.
+    const ids = [...new Set(Object.values(store!.cards).map((c) => c.siteId).filter((id): id is string => !!id))];
+    const got = await cardPrices(ids, force);
+    await flushPrices();
+    log(`[api] prix de ${got.size} carte(s) de la collection`);
+    return { ok: true, count: got.size };
   }
   if (op === 'myAuctions') {
     const auctions = await fetchMyAuctions();
@@ -805,14 +814,19 @@ async function main(): Promise<void> {
           sendResponse({ ok: false, error: 'Ouvre ta collection pour lancer l\'étiquetage.' });
           return;
         }
-        const plan = message.plan ?? planAutoTags(store!, { removeOthers: store!.settings.autoTagRemoveOthers, clearUnpriced: store!.settings.autoTagClearUnpriced });
+        const plan = message.plan ?? planAutoTags(store!, {
+          removeOthers: store!.settings.autoTagRemoveOthers,
+          clearUnpriced: store!.settings.autoTagClearUnpriced,
+          // Prix moyen de toutes les ventes de la carte (comme le badge « Moy. »), déjà chargé par la popup.
+          extraPrice: (card) => (card.siteId ? catalogPrice(knownPrice(card.siteId), card.rarity) : null),
+        });
         void (store!.settings.apiWrite ? runAutoTagApi(plan) : runAutoTag(plan));
         sendResponse({ ok: true });
       });
       return true;
     }
     if (message.type === 'api') {
-      const job = message.op === 'cardAuctions' ? runCardAuctions(message.siteCardId) : runApi(message.op);
+      const job = message.op === 'cardAuctions' ? runCardAuctions(message.siteCardId) : runApi(message.op, !!message.force);
       void job.then(sendResponse, (e) => sendResponse({ ok: false, error: (e as Error).message }));
       return true;
     }

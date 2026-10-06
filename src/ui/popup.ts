@@ -2,10 +2,10 @@ import './common.css';
 import './popup.css';
 import { allocate, makeContext, type FreeSlot } from '../lib/allocation';
 import { rarityBase } from '../lib/pricing';
-import { diagnoseAutoTags, planAutoTags } from '../lib/autotag';
+import { catalogPriceOf, diagnoseAutoTags, planAutoTags, type CatalogPriceEntry } from '../lib/autotag';
 import { durationFor, durationLabel } from '../lib/duration';
 import { ext } from '../lib/browser';
-import { SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
+import { CARD_PRICES_KEY, SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
 import type { DiagnosticResult, ToBackground, ToContent } from '../lib/messages';
 import { featureFlags } from '../lib/features';
 import { loadAll, onStoreChange, save } from '../lib/storage';
@@ -820,6 +820,31 @@ async function openAuction(id: string): Promise<void> {
 }
 
 /** Étiquetage automatique : activation, aperçu du plan et lancement sur l'onglet de la collection. */
+/** Prix moyens par carte (cache du content script) : servent à l'étiquetage. */
+let catalogPrices: Record<string, CatalogPriceEntry> | null = null;
+let pricesState: 'idle' | 'loading' | 'done' | 'error' = 'idle';
+let pricesError = '';
+
+async function readCatalogPrices(): Promise<void> {
+  try {
+    catalogPrices = ((await ext.storage.local.get(CARD_PRICES_KEY))[CARD_PRICES_KEY] as Record<string, CatalogPriceEntry> | undefined) ?? null;
+  } catch {
+    catalogPrices = null;
+  }
+}
+
+/** Charge (ou recharge avec `force`) les prix moyens de toute la collection, via l'onglet du site. */
+async function loadCollectionPrices(force = false): Promise<void> {
+  if (pricesState === 'loading' || !store.settings.apiRead || !(await siteTab())) return;
+  pricesState = 'loading';
+  render();
+  const res = (await sendToTab({ type: 'api', op: 'collectionPrices', force })) as { ok: boolean; error?: string } | null;
+  pricesState = res?.ok ? 'done' : 'error';
+  pricesError = !res ? 'page non joignable : recharge l\'onglet' : res.error ?? '';
+  await readCatalogPrices();
+  render();
+}
+
 function autoTagBlock(onCollection: boolean) {
   if (!store.settings.autoTag) {
     const enable = async () => {
@@ -835,7 +860,29 @@ function autoTagBlock(onCollection: boolean) {
       h('div', { class: 'small muted' }, 'Range tes cartes dans l\'étiquette dont la plage de prix (plancher–plafond) contient leur prix propre (moyenne du site, ventes de la carte ou prix saisi).'),
     );
   }
-  const plan = planAutoTags(store, { removeOthers: store.settings.autoTagRemoveOthers, clearUnpriced: store.settings.autoTagClearUnpriced });
+  // Prix de toutes les cartes de la collection : chargés une fois à l'ouverture (puis bouton « Rafraîchir les prix »).
+  if (pricesState === 'idle') void loadCollectionPrices();
+  const extraPrice = catalogPriceOf(catalogPrices);
+  const plan = planAutoTags(store, { removeOthers: store.settings.autoTagRemoveOthers, clearUnpriced: store.settings.autoTagClearUnpriced, extraPrice });
+  const diag = diagnoseAutoTags(store, Date.now(), extraPrice);
+  const pricesLine = h(
+    'div',
+    { class: 'small muted row' },
+    h(
+      'span',
+      { class: 'grow' },
+      pricesState === 'loading'
+        ? 'Chargement des prix de ta collection…'
+        : pricesState === 'error'
+          ? `Prix non chargés (${pricesError}).`
+          : !store.settings.apiRead
+            ? 'Active la lecture via l\'API pour utiliser le prix moyen de chaque carte.'
+            : `${diag.pricedCards} carte(s) avec un prix · ${diag.unpricedCards} sans prix (jamais vendues)`,
+    ),
+    store.settings.apiRead
+      ? h('button', { class: 'small', disabled: pricesState === 'loading', title: 'Relit les ventes de toutes tes cartes', onclick: () => void loadCollectionPrices(true) }, '↻ Rafraîchir les prix')
+      : null,
+  );
   const status = h('div', { class: 'small muted' });
   const owned = collectionStatus('↻ Recharger mes cartes');
   const viaApi = store.settings.apiWrite;
@@ -846,21 +893,23 @@ function autoTagBlock(onCollection: boolean) {
       else await ext.tabs.create({ url });
       return closeUi();
     }
-    const res = (await sendToTab({ type: 'autoTag' })) as { ok: boolean; error?: string } | null;
+    // Le plan affiché (avec les prix moyens de chaque carte) est celui qui est appliqué.
+    const res = (await sendToTab({ type: 'autoTag', plan })) as { ok: boolean; error?: string } | null;
     status.textContent = res?.ok ? 'Étiquetage lancé : suis la progression sur la page.' : res?.error ?? 'Page non joignable : recharge l\'onglet.';
     if (res?.ok) closeUi();
   };
   const why = () => {
-    const d = diagnoseAutoTags(store);
+    const d = diag;
     if (!d.cards) return 'Aucune carte connue : ouvre ta collection.';
     if (!d.rulesWithRange) return 'Aucune règle n\'a de plage de prix : renseigne un plancher et/ou un plafond dans les réglages (ex. « Mettre au Enchère » : 20 à 1000).';
-    if (!d.pricedCards) return 'Aucune carte n\'a de prix propre : clique « Charger les prix » (autre extension) sur la collection, ou charge les ventes du marché (🧰 Outils).';
+    if (!d.pricedCards) return store.settings.apiRead ? 'Aucune carte n\'a encore de prix : patiente pendant le chargement, ou clique « Rafraîchir les prix ».' : 'Aucune carte n\'a de prix : active la lecture via l\'API (Réglages → Automatisations).';
     return `Les ${d.pricedCards} carte(s) au prix connu sont déjà dans la bonne étiquette.`;
   };
   return h(
     'div',
     { class: 'card autotag' },
     owned,
+    pricesLine,
     h(
       'div',
       { class: 'row' },
@@ -1193,6 +1242,11 @@ async function main(): Promise<void> {
   activeTab = (embedded ? await ext.tabs.getCurrent() : undefined) ?? (await ext.tabs.query({ active: true, currentWindow: true }))[0];
   await refresh();
   void refreshBidsOnOpen();
+  await readCatalogPrices();
+  render();
+  ext.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && CARD_PRICES_KEY in changes) void readCatalogPrices().then(render);
+  });
   onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'myFamilies', 'journal'], refresh);
   setInterval(render, 15_000);
   // Compte à rebours des mises (sans tout redessiner).

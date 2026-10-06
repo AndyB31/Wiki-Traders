@@ -64,6 +64,9 @@ export const DEFAULT_STORE: StoreShape = {
   familiesImportedAt: null,
 };
 
+/** Cache des prix moyens par carte (catalog.ts), lu aussi par la popup pour l'étiquetage. */
+export const CARD_PRICES_KEY = 'cardPrices3';
+
 /** Au-delà, la popup demande de rouvrir la page des enchères. */
 export const STALE_AFTER_MS = 30 * 60 * 1000;
 /** Les observations de prix plus vieilles sont purgées. */

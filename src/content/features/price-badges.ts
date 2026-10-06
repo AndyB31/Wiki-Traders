@@ -21,6 +21,10 @@ const CSS = `
 .wiky-avg-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 4px 0 0; font-size: 11px;
   color: color-mix(in srgb, var(--color-foreground) 55%, transparent); }
 .wiky-avg-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.wiky-avg-refresh { margin-left: auto; padding: 3px 10px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--color-border); background: var(--color-surface-light, var(--color-surface)); color: color-mix(in srgb, var(--color-foreground) 75%, transparent); }
+.wiky-avg-refresh:hover { color: var(--color-foreground); border-color: rgba(249,115,22,.4); }
+.wiky-avg-refresh:disabled { opacity: .6; cursor: default; }
 .wiky-avg-legend .wiky-avg { position: static; margin: 0; }
 `;
 
@@ -94,9 +98,22 @@ function renderLegend(ctx: FeatureContext): void {
   legend.setAttribute('data-wiky', 'avg-legend');
   legend.className = 'wiky-avg-legend';
   legend.innerHTML =
-    '<span><b class="wiky-avg">Moy. 12 W</b>médiane des ventes</span>' +
+    '<span><b class="wiky-avg">Moy. 12 W</b>moyenne des ventes (rareté de la carte)</span>' +
     '<span><b class="wiky-avg is-empty">Moy. —</b>jamais vendue</span>' +
     '<span><b class="wiky-avg is-loading">Prix…</b>chargement</span>';
+  const refresh = document.createElement('button');
+  refresh.type = 'button';
+  refresh.className = 'wiky-avg-refresh';
+  refresh.textContent = '↻ Rafraîchir les prix';
+  refresh.title = 'Relit les ventes de toutes tes cartes (sinon les prix sont gardés 6 h)';
+  refresh.addEventListener('click', async () => {
+    refresh.disabled = true;
+    refresh.textContent = 'Rafraîchissement…';
+    await refreshAllPrices();
+    refresh.disabled = false;
+    refresh.textContent = '↻ Rafraîchir les prix';
+  });
+  legend.append(refresh);
   row.after(legend);
 }
 
@@ -145,6 +162,23 @@ function load(job: () => Promise<void>, onError: () => void): void {
 function cleanup(): void {
   lastCtx = null;
   document.querySelectorAll('[data-wiky="avg"], [data-wiky="avg-legend"]').forEach((n) => n.remove());
+}
+
+/** Relit les prix de toute ma collection (et des cartes affichées), sans cache, puis redessine les badges. */
+export async function refreshAllPrices(): Promise<void> {
+  const ctx = lastCtx;
+  if (!ctx) return;
+  const ids = new Set(Object.values(ctx.cards).flatMap((c) => (c.siteId ? [c.siteId] : [])));
+  for (const card of nativeCards()) {
+    const id = siteIdOf(ctx, cardTitle(card));
+    if (id) ids.add(id);
+  }
+  try {
+    await cardPrices([...ids], true);
+  } catch {
+    // Les badges indiquent « Prix indispo. » ; nouvel essai plus tard.
+  }
+  if (lastCtx) paint(lastCtx);
 }
 
 registerFeature({

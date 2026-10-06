@@ -35,7 +35,7 @@ describe('planAutoTags', () => {
 describe('diagnoseAutoTags', () => {
   it('compte règles avec plage et cartes au prix connu', () => {
     const base = input({ cards: cardsById(card('a', { sitePrice: 30 }), card('b')) });
-    expect(diagnoseAutoTags(base, NOW)).toEqual({ cards: 2, rulesWithRange: 2, pricedCards: 1 });
+    expect(diagnoseAutoTags(base, NOW)).toEqual({ cards: 2, rulesWithRange: 2, pricedCards: 1, unpricedCards: 1 });
     base.rules = base.rules.map((r) => ({ ...r, floor: null, ceiling: null }));
     expect(diagnoseAutoTags(base, NOW).rulesWithRange).toBe(0);
   });
@@ -87,5 +87,20 @@ describe('étiquetage auto : prix propre à la carte uniquement', () => {
     const base = input({ cards: cardsById(card('une', { tags: [] })), priceObs: [{ cardId: 'une', price: 60, type: 'sold', at: NOW - 1000 }] });
     base.rules = [rule20100];
     expect(planAutoTags(base, { removeOthers: true }, NOW)[0]).toMatchObject({ cardId: 'une', target: '20-100', base: 60 });
+  });
+});
+
+describe('prix moyen de chaque carte (ventes du site)', () => {
+  it('une carte sans vente récente est classée grâce à la moyenne de toutes ses ventes (dans sa rareté)', async () => {
+    const { catalogPriceOf } = await import('../src/lib/autotag');
+    const cards = cardsById(card('vieille', { siteId: 's1', rarity: 'R' }), card('jamais', { siteId: 's2' }), card('sansid'));
+    const cache = { s1: { mean: 90, count: 5, byRarity: { R: { mean: 62, count: 4 } } }, s2: { mean: null, count: 0 } };
+    const base = input({ cards });
+    // Sans les prix moyens : aucune carte classée (pas de vente sur 7 jours, pas de prix du site).
+    expect(planAutoTags(base, { removeOthers: true })).toEqual([]);
+    const extraPrice = catalogPriceOf(cache);
+    const plan = planAutoTags(base, { removeOthers: true, extraPrice });
+    expect(plan.map((c) => [c.cardId, c.base, c.target])).toEqual([['vieille', 62, '50-100']]);
+    expect(diagnoseAutoTags(base, NOW, extraPrice)).toMatchObject({ pricedCards: 1, unpricedCards: 2 });
   });
 });

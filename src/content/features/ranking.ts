@@ -84,7 +84,11 @@ const CSS = `
 .wiky-rk-head .wiky-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(249,115,22,.14); color: #fb923c; }
 .wiky-rk-head h2 { margin: 0; font-size: 17px; font-weight: 700; font-family: var(--font-heading, inherit); }
 .wiky-rk-head small { display: block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #fb923c; }
-.wiky-rk-close { margin-left: auto; display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 10px; cursor: pointer;
+.wiky-rk-refresh { margin-left: auto; padding: 6px 12px; border-radius: 10px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--color-border); background: var(--color-surface-light); color: color-mix(in srgb, var(--color-foreground) 75%, transparent); }
+.wiky-rk-refresh:hover { color: var(--color-foreground); border-color: rgba(249,115,22,.4); }
+.wiky-rk-refresh:disabled { opacity: .6; cursor: default; }
+.wiky-rk-close { margin-left: 4px; display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 10px; cursor: pointer;
   background: none; color: color-mix(in srgb, var(--color-foreground) 60%, transparent); font-size: 20px; }
 .wiky-rk-close:hover { background: var(--color-surface-light); color: var(--color-foreground); }
 .wiky-rk-filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 18px 8px; }
@@ -170,6 +174,7 @@ export function openRanking(ctx: FeatureContext): void {
   overlay.innerHTML = `
     <div class="wiky-rk" role="dialog" aria-modal="true" aria-label="Plus chères">
       <div class="wiky-rk-head"><span class="wiky-ico">${ICON.replace('<svg ', '<svg width="18" height="18" ')}</span><div><small>Wiky-Traders</small><h2>Plus chères</h2></div>
+        <button type="button" class="wiky-rk-refresh" title="Relit les ventes de toutes tes cartes (sinon les prix sont gardés 6 h)">↻ Rafraîchir les prix</button>
         <button type="button" class="wiky-rk-close" aria-label="Fermer" title="Fermer">×</button></div>
       <div class="wiky-rk-filters">
         <input type="search" placeholder="Rechercher une carte…" aria-label="Rechercher">
@@ -347,6 +352,22 @@ export function openRanking(ctx: FeatureContext): void {
     if (e.target === overlay) closeRanking();
   });
   overlay.querySelector('.wiky-rk-close')!.addEventListener('click', closeRanking);
+  const refreshBtn = overlay.querySelector<HTMLButtonElement>('.wiky-rk-refresh')!;
+  refreshBtn.addEventListener('click', () => {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = 'Rafraîchissement…';
+    loading = true;
+    recompute();
+    const all = cards.flatMap((c) => (c.siteId ? [c.siteId] : []));
+    void cardPrices(all, true)
+      .catch(() => undefined)
+      .finally(() => {
+        loading = false;
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '↻ Rafraîchir les prix';
+        if (overlay.isConnected) recompute();
+      });
+  });
   let typing: ReturnType<typeof setTimeout> | undefined;
   q.addEventListener('input', () => {
     clearTimeout(typing);
