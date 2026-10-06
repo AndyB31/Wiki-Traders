@@ -2,7 +2,7 @@
 
 # Référence des réglages
 
-Réglages : **Paramètres → onglet Wiky-Traders** sur le site, ou page d'options de l'extension. Clique sur **Enregistrer** pour appliquer.
+Réglages : **Paramètres → onglet Wiky-Traders** sur le site, ou page d'options de l'extension. La page commence par un **Démarrage rapide** (ce qui est prêt, ce qui manque, réglable en un clic) ; chaque section s'ouvre sur une explication avec un exemple, les « ? » détaillent chaque champ. **Enregistrer** (ou Ctrl/⌘ + S) n'est actif que s'il y a des modifications ; les erreurs s'affichent à côté du champ. Les réglages rares sont dans **Avancé**, replié.
 
 ## Règles par étiquette
 

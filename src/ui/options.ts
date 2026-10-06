@@ -8,6 +8,7 @@ import { formatPrice, RARITIES } from '../lib/text';
 import type { Settings, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
+import { updatePanel } from './update-panel';
 import { embedded, initEmbed } from './embed';
 import { FEATURE_GROUPS, FEATURES, featureFlags, type FeatureDef, type FeatureGroup } from '../lib/features';
 import {
@@ -1097,6 +1098,7 @@ const TOC: [id: string, label: string][] = [
   ['affichage', 'Affichage sur le site'],
   ['fonctionnalites', 'Fonctionnalités'],
   ['automatisations', 'Automatisations'],
+  ['maj', 'Mises à jour'],
   ['avance', 'Avancé'],
 ];
 
@@ -1164,6 +1166,13 @@ function render(): void {
         displaySection(),
         featuresSection(),
         automationSection(),
+        h(
+          'section',
+          { class: 'card opt-section', id: 'maj' },
+          h('h2', null, 'Mises à jour'),
+          h('p', { class: 'intro muted' }, 'Compare ta version avec la dernière publiée sur GitHub et installe les nouveautés en un clic (programme d\'aide à installer une fois).'),
+          updatePanel(),
+        ),
         advancedSection(),
       ),
     ),

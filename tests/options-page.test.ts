@@ -27,7 +27,7 @@ describe('page Réglages', () => {
 
   it('affiche les sections dans l\'ordre, avec sommaire et interrupteurs', () => {
     const ids = [...document.querySelectorAll('.sections > [id]')].map((s) => s.id);
-    expect(ids).toEqual(['demarrage', 'ventes', 'prix', 'durees', 'notifications', 'affichage', 'fonctionnalites', 'automatisations', 'avance']);
+    expect(ids).toEqual(['demarrage', 'ventes', 'prix', 'durees', 'notifications', 'affichage', 'fonctionnalites', 'automatisations', 'maj', 'avance']);
     expect(document.querySelectorAll('.toc a')).toHaveLength(ids.length);
     expect(document.querySelectorAll('input[type=checkbox]:not([role=switch])')).toHaveLength(0);
     expect((document.getElementById('avance') as HTMLDetailsElement).open).toBe(false);

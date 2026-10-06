@@ -69,6 +69,24 @@ Rien de tout ça ? Voir [Dépannage](Depannage.md#rien-napparait-sur-le-site).
 
 ## 5. Mettre à jour
 
+### En un clic (recommandé)
+
+Installe une fois le **programme d'aide** (Node.js 20+), qui permet à l'extension de se mettre à jour elle-même :
+
+```bash
+cd Wiky-Traders
+npm run updater:install
+```
+
+(Installation depuis un zip : `node <dossier de l'extension>/updater/install.mjs`.) Recharge l'extension (↻). Ensuite :
+
+- quand `main` a des nouveautés, le récapitulatif de la barre latérale affiche **« ↑ Mise à jour disponible »** ;
+- Réglages → **Mises à jour** liste les nouveautés ; **Mettre à jour** récupère la dernière version (dépôt : `git pull` + construction ; zip : dernière version publiée sur GitHub), recharge l'extension et les onglets WikiMasters.
+
+La vérification se fait au démarrage, toutes les 6 h, et à la demande. Pour désinstaller le programme d'aide : `npm run updater:uninstall`.
+
+### À la main
+
 ```bash
 cd Wiky-Traders
 git pull

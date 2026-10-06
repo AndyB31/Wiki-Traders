@@ -88,7 +88,6 @@ input.switch:disabled { cursor: default; }
 .quota-summary.under { background: var(--accent-soft); border-color: var(--accent); }
 .quota-summary.over { border-color: var(--danger); color: var(--danger); }
 .table-wrap { overflow-x: auto; overflow-y: visible; }
-@media (min-width: 1000px) { .table-wrap:not(.scroll) { overflow: visible; } }
 .table-wrap.scroll { max-height: 420px; overflow: auto; }
 .rules td { vertical-align: top; padding-top: 8px; }
 .rules input[type='number'] { width: 56px; }
@@ -146,3 +145,14 @@ button.link.error { color: var(--danger); }
 .embed .sticky { border-radius: 12px 12px 0 0; }
 .embed .toc { top: 8px; }
 @media (max-width: 860px) { .embed .toc { top: 0; } }
+/* Tableau des étiquettes : jamais coupé (défilement horizontal si l'espace manque), sommaire plus étroit dans le site. */
+.table-wrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.rules { min-width: 760px; }
+.rules .example { white-space: normal; max-width: 150px; }
+.embed .layout { grid-template-columns: 150px minmax(0, 1fr); gap: 14px; }
+@media (max-width: 1100px) {
+  .embed .layout { grid-template-columns: minmax(0, 1fr); }
+  .embed .toc { top: 0; z-index: 5; background: var(--bg); padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .embed .toc ul { flex-direction: row; overflow-x: auto; gap: 4px; }
+  .embed .toc a { white-space: nowrap; border-left: 0; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; background: var(--card); }
+}
