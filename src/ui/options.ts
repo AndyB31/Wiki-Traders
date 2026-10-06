@@ -1,16 +1,30 @@
 import './common.css';
 import './options.css';
-import { quotaSum } from '../lib/allocation';
 import { ext } from '../lib/browser';
-import { DEFAULT_SETTINGS } from '../lib/defaults';
-import { DURATIONS, overlappingDurations } from '../lib/duration';
+import { DEFAULT_RULES, DEFAULT_SETTINGS, SITE_ORIGIN } from '../lib/defaults';
+import { DURATIONS } from '../lib/duration';
 import { clearAll, loadAll, save } from '../lib/storage';
 import { formatPrice, RARITIES } from '../lib/text';
 import type { Settings, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
-import { initEmbed } from './embed';
-import { FEATURE_GROUPS, FEATURES, featureFlags, type FeatureGroup } from '../lib/features';
+import { embedded, initEmbed } from './embed';
+import { FEATURE_GROUPS, FEATURES, featureFlags, type FeatureDef, type FeatureGroup } from '../lib/features';
+import {
+  DEFAULT_DURATION_TIERS,
+  isDirty,
+  nextTier,
+  pctExample,
+  quickStartChecks,
+  quotaSummary,
+  roundingExamples,
+  snapshot,
+  tiersPreviewParts,
+  validateOptions,
+  type OptionsSection,
+  type QuickCheck,
+  type ValidationError,
+} from './options-logic';
 
 // Onglet Wiky-Traders de la page Paramètres du site (iframe).
 initEmbed();
@@ -20,8 +34,44 @@ let store: StoreShape;
 let rules: TagRule[] = [];
 let settings: Settings;
 let manualPrices: Record<string, number> = {};
-let status: HTMLElement;
-let quotaInfo: HTMLElement;
+/** État enregistré (pour savoir s'il reste des modifications). */
+let baseline = '';
+let selectorsInvalid = false;
+let errors: ValidationError[] = [];
+/** Message ponctuel (enregistré, importé…) affiché tant qu'aucune modification ne suit. */
+let notice: { text: string; kind: 'ok' | 'error' } | null = null;
+let advancedOpen = false;
+let idSeq = 0;
+
+const RISK_TEXT = 'Les règles de WikiMasters (section 3) interdisent les outils qui interagissent à ta place : ton compte peut être banni sans préavis.';
+
+// Nœuds mis à jour sans tout redessiner (pas de re-rendu complet à chaque frappe).
+const ui = {
+  status: null as unknown as HTMLElement,
+  saveBtn: null as unknown as HTMLButtonElement,
+  revertBtn: null as unknown as HTMLButtonElement,
+  quick: null as unknown as HTMLElement,
+  quota: null as unknown as HTMLElement,
+  rules: null as unknown as HTMLElement,
+  durations: null as unknown as HTMLElement,
+  tiers: null as unknown as HTMLElement,
+  manual: null as unknown as HTMLElement,
+  rounding: null as unknown as HTMLElement,
+  fallback: null as unknown as HTMLSelectElement,
+  fallbackKey: '',
+  errorBoxes: {} as Record<OptionsSection, HTMLElement>,
+  /** Champs repérés par clé (« slots », « rule:<id>:tag »…) pour y afficher les erreurs. */
+  fields: new Map<string, HTMLElement>(),
+  pctExamples: new Map<TagRule, HTMLElement>(),
+  /** Mentions « nécessite la lecture via l'API », visibles seulement quand elle est coupée. */
+  apiNotes: [] as HTMLElement[],
+  /** Interrupteurs des automatisations (le démarrage rapide peut en activer une). */
+  risky: {} as Partial<Record<RiskyKey, HTMLInputElement>>,
+  /** Champs grisés selon un autre réglage. */
+  dependents: [] as { el: HTMLInputElement | HTMLSelectElement; enabled: () => boolean }[],
+};
+
+type RiskyKey = 'prefill' | 'autoTag' | 'apiRead' | 'apiWrite';
 
 function num(v: string, fallback: number | null = null): number | null {
   if (v.trim() === '') return fallback;
@@ -29,73 +79,249 @@ function num(v: string, fallback: number | null = null): number | null {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function validate(): string | null {
-  const sum = quotaSum(rules);
-  quotaInfo.textContent = `Somme des quotas : ${sum} / ${settings.slots} slots`;
-  quotaInfo.className = sum > settings.slots ? 'error' : 'muted';
-  if (sum > settings.slots) return `La somme des quotas (${sum}) dépasse le nombre de slots (${settings.slots}).`;
-  const tags = rules.map((r) => r.tag.trim().toLowerCase());
-  if (tags.some((t) => !t)) return 'Chaque règle doit avoir une étiquette.';
-  if (new Set(tags).size !== tags.length) return 'Deux règles ont la même étiquette.';
-  for (const [i, d] of settings.durationRules.entries()) {
-    if (d.from != null && d.to != null && d.from > d.to) return `Palier de durée ${i + 1} : « de » dépasse « à ».`;
-  }
-  const overlap = overlappingDurations(settings.durationRules);
-  if (overlap) return `Les paliers de durée ${overlap[0] + 1} et ${overlap[1] + 1} se chevauchent.`;
-  for (const r of rules) {
-    if (r.floor != null && r.ceiling != null && r.floor > r.ceiling) return `« ${r.tag} » : le plancher dépasse le plafond.`;
-    if (r.pct <= 0) return `« ${r.tag} » : le % doit être positif.`;
-  }
-  return null;
+function newId(): string {
+  return `r-${Date.now()}-${++idSeq}`;
 }
 
-function setStatus(text: string, kind: 'ok' | 'error' | 'muted' = 'muted'): void {
-  status.textContent = text;
-  status.className = kind;
+function reg<T extends HTMLElement>(key: string, el: T): T {
+  ui.fields.set(key, el);
+  return el;
 }
 
-function onEdit(): void {
-  const err = validate();
-  setStatus(err ?? 'Modifications non enregistrées', err ? 'error' : 'muted');
+// ---------------------------------------------------------------------------
+// Petits composants : aide « ? », interrupteur, champ
+// ---------------------------------------------------------------------------
+
+/** Petit « ? » : infobulle au survol, texte dépliable au clic (utile au clavier et sur mobile). */
+function hint(text: string) {
+  const pop = h('span', { class: 'hint-pop', hidden: true, role: 'note' }, text);
+  const btn = h(
+    'button',
+    {
+      type: 'button',
+      class: 'hint',
+      title: text,
+      'aria-label': `Aide : ${text}`,
+      'aria-expanded': 'false',
+      onclick: (e: Event) => {
+        e.preventDefault();
+        pop.hidden = !pop.hidden;
+        btn.setAttribute('aria-expanded', String(!pop.hidden));
+      },
+    },
+    '?',
+  );
+  return h('span', { class: 'hint-wrap' }, btn, pop);
 }
+
+/** Case à cocher présentée en interrupteur (reste une vraie case : clavier, lecteurs d'écran). */
+function switchInput(checked: boolean, onchange: (box: HTMLInputElement) => void, label?: string) {
+  return h('input', {
+    type: 'checkbox',
+    role: 'switch',
+    class: 'switch',
+    checked,
+    'aria-label': label,
+    onchange: (e: Event) => onchange(e.target as HTMLInputElement),
+  });
+}
+
+type Child = Node | string | null | false | undefined;
+
+function toggleField(label: string, checked: boolean, onchange: (box: HTMLInputElement) => void, help?: string, extra: Child[] = [], cls = '') {
+  return h(
+    'label',
+    { class: `toggle ${cls}`.trim() },
+    switchInput(checked, onchange),
+    h('span', { class: 'toggle-text' }, h('span', { class: 'toggle-label' }, label, ...extra), help ? h('span', { class: 'muted small' }, help) : null),
+  );
+}
+
+/** Interrupteur lié à un réglage booléen. */
+function settingToggle(key: { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings], label: string, help?: string, extra: Child[] = []) {
+  return toggleField(label, settings[key], (box) => ((settings[key] = box.checked), onEdit()), help, extra);
+}
+
+function field(label: string, input: HTMLElement, help?: string | HTMLElement, hintText?: string) {
+  return h(
+    'label',
+    { class: 'field' },
+    h('span', { class: 'field-label' }, label, hintText ? hint(hintText) : null),
+    input,
+    help ? (typeof help === 'string' ? h('span', { class: 'muted small' }, help) : help) : null,
+  );
+}
+
+function apiNote(text = 'nécessite la lecture via l\'API, désactivée') {
+  const el = h('span', { class: 'api-note small', hidden: settings.apiRead }, `⚠ ${text}`);
+  ui.apiNotes.push(el);
+  return el;
+}
+
+function dependent<T extends HTMLInputElement | HTMLSelectElement>(el: T, enabled: () => boolean): T {
+  ui.dependents.push({ el, enabled });
+  el.disabled = !enabled();
+  return el;
+}
+
+function section(id: string, title: string, intro: Child | Child[], ...body: (Child | Child[])[]) {
+  const errKey = ({ ventes: 'rules', prix: 'pricing', durees: 'durations' } as Record<string, OptionsSection>)[id];
+  return h(
+    'section',
+    { class: 'card opt-section', id },
+    h('h2', null, title),
+    intro ? h('p', { class: 'intro' }, ...[intro].flat()) : null,
+    errKey ? errorBox(errKey) : null,
+    ...body,
+  );
+}
+
+function errorBox(key: OptionsSection) {
+  const box = h('div', { class: 'section-errors', role: 'alert', hidden: true });
+  ui.errorBoxes[key] = box;
+  return box;
+}
+
+function scrollToSection(id: string): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el instanceof HTMLDetailsElement) el.open = true;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------------------------------------------------------------------------
+// Démarrage rapide
+// ---------------------------------------------------------------------------
+
+function quickFix(c: QuickCheck): Child {
+  if (c.ok) return null;
+  switch (c.id) {
+    case 'collection':
+      return h('a', { href: `${SITE_ORIGIN}/collection`, target: embedded ? '_top' : '_blank', rel: 'noopener' }, 'Ouvrir ma collection →');
+    case 'api':
+      return h('button', { type: 'button', class: 'small', onclick: () => void enableRisky('apiRead', 'Lecture via l\'API du site', true) }, 'Activer la lecture via l\'API');
+    case 'rules':
+      return rules.length
+        ? h('button', { type: 'button', class: 'small', onclick: () => scrollToSection('ventes') }, 'Voir les règles')
+        : h(
+            'button',
+            {
+              type: 'button',
+              class: 'small',
+              onclick: () => {
+                rules = DEFAULT_RULES.map((r) => ({ ...r, id: newId() }));
+                renderRules();
+                onEdit();
+                scrollToSection('ventes');
+              },
+            },
+            'Partir de l\'exemple (50-100 et 20-50)',
+          );
+    case 'quotas':
+      return h('button', { type: 'button', class: 'small', onclick: () => scrollToSection('ventes') }, 'Ajuster la répartition');
+  }
+}
+
+function refreshQuickStart(): void {
+  const checks = quickStartChecks({ cardCount: Object.keys(store.cards).length, rules, settings });
+  const done = checks.filter((c) => c.ok).length;
+  mount(
+    ui.quick,
+    h('p', { class: 'intro' }, done === checks.length ? 'Tout est prêt : Wiky-Traders peut te proposer des ventes.' : `${done} / ${checks.length} prêts. Les points restants se règlent en un clic.`),
+    h(
+      'ul',
+      { class: 'checks' },
+      checks.map((c) =>
+        h(
+          'li',
+          { class: c.ok ? 'ok-item' : 'todo-item' },
+          h('span', { class: 'check-icon', 'aria-hidden': 'true' }, c.ok ? '✓' : '!'),
+          h('span', { class: 'grow' }, h('strong', null, c.label), h('span', { class: 'muted small' }, ` — ${c.detail}`)),
+          quickFix(c),
+        ),
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mes ventes : répartition par étiquette
+// ---------------------------------------------------------------------------
 
 function ruleRow(rule: TagRule) {
   const bind = <K extends keyof TagRule>(key: K, parse: (v: string) => TagRule[K]) => (e: Event) => {
-    const t = e.target as HTMLInputElement;
-    rule[key] = parse(t.type === 'checkbox' ? String(t.checked) : t.value);
+    rule[key] = parse((e.target as HTMLInputElement).value);
     onEdit();
   };
+  const example = h('div', { class: 'muted small example' }, pctExample(rule.pct, settings.rounding));
+  ui.pctExamples.set(rule, example);
+  const name = () => rule.tag.trim() || 'sans nom';
   return h(
     'tr',
-    null,
-    h('td', null, h('input', { value: rule.tag, placeholder: '20-50', oninput: bind('tag', (v) => v) })),
-    h('td', null, h('input', { type: 'number', min: '0', value: rule.quota, oninput: bind('quota', (v) => num(v, 0)!) })),
-    h('td', null, h('input', { type: 'number', min: '1', max: '500', value: rule.pct, oninput: bind('pct', (v) => num(v, 0)!) }), ' %'),
-    h('td', null, h('input', { type: 'number', min: '0', value: rule.floor ?? '', oninput: bind('floor', (v) => num(v)) })),
-    h('td', null, h('input', { type: 'number', min: '0', value: rule.ceiling ?? '', oninput: bind('ceiling', (v) => num(v)) })),
-    h('td', null, h('input', { type: 'number', min: '0', value: rule.keepMin, oninput: bind('keepMin', (v) => num(v, 1)!) })),
+    { class: rule.active ? undefined : 'inactive' },
+    h(
+      'td',
+      null,
+      switchInput(
+        rule.active,
+        (box) => {
+          rule.active = box.checked;
+          box.closest('tr')?.classList.toggle('inactive', !box.checked);
+          onEdit();
+        },
+        `Règle ${name()} active`,
+      ),
+    ),
+    h('td', null, reg(`rule:${rule.id}:tag`, h('input', { class: 'tag-input', value: rule.tag, placeholder: '20-50', 'aria-label': 'Étiquette', oninput: bind('tag', (v) => v) }))),
+    h('td', null, reg(`rule:${rule.id}:quota`, h('input', { type: 'number', min: '0', value: rule.quota, 'aria-label': 'Slots réservés', oninput: bind('quota', (v) => num(v, 0)!) }))),
+    h(
+      'td',
+      null,
+      h(
+        'span',
+        { class: 'row nowrap' },
+        reg(`rule:${rule.id}:pct`, h('input', { type: 'number', min: '1', max: '500', value: rule.pct, 'aria-label': '% du prix moyen', oninput: bind('pct', (v) => num(v, 0)!) })),
+        h('span', { class: 'small' }, '% du prix moyen'),
+      ),
+      example,
+    ),
+    h(
+      'td',
+      null,
+      h(
+        'span',
+        { class: 'row nowrap' },
+        'de',
+        reg(`rule:${rule.id}:floor`, h('input', { type: 'number', min: '0', value: rule.floor ?? '', placeholder: '—', 'aria-label': 'Plancher', oninput: bind('floor', (v) => num(v)) })),
+        'à',
+        reg(`rule:${rule.id}:ceiling`, h('input', { type: 'number', min: '0', value: rule.ceiling ?? '', placeholder: '∞', 'aria-label': 'Plafond', oninput: bind('ceiling', (v) => num(v)) })),
+        'W',
+      ),
+    ),
+    h('td', null, h('input', { type: 'number', min: '0', value: rule.keepMin, 'aria-label': 'Exemplaires gardés', oninput: bind('keepMin', (v) => num(v, 1)!) })),
     h(
       'td',
       null,
       h(
         'select',
-        { onchange: bind('match', (v) => v as TagRule['match']) },
+        { 'aria-label': 'Appartenance', onchange: bind('match', (v) => v as TagRule['match']) },
         h('option', { value: 'tag', selected: rule.match === 'tag' }, 'étiquette du site'),
-        h('option', { value: 'price', selected: rule.match === 'price' }, 'plage de prix moyen'),
+        h('option', { value: 'price', selected: rule.match === 'price' }, 'prix dans la plage'),
       ),
     ),
-    h('td', null, h('input', { type: 'checkbox', checked: rule.active, onchange: bind('active', (v) => v === 'true') })),
     h(
       'td',
       null,
       h(
         'button',
         {
+          type: 'button',
           class: 'danger',
-          title: 'Supprimer',
+          title: 'Supprimer cette règle',
+          'aria-label': `Supprimer la règle ${name()}`,
           onclick: () => {
             rules = rules.filter((r) => r !== rule);
-            render();
+            renderRules();
             onEdit();
           },
         },
@@ -114,280 +340,452 @@ function detectedTagsBlock() {
   return h(
     'div',
     { class: 'row detected' },
-    h('span', { class: 'muted small' }, 'Étiquettes de ta collection :'),
+    h('span', { class: 'muted small' }, 'Étiquettes de ta collection sans règle :'),
     missing.map(([tag, n]) =>
       h(
         'button',
         {
+          type: 'button',
           class: 'small',
           title: 'Ajouter une règle pour cette étiquette (garder 0 : l\'étiquette désigne les cartes à vendre)',
           onclick: () => {
-            rules.push({ id: `r-${Date.now()}`, tag, quota: 1, pct: 100, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' });
-            render();
+            rules.push({ id: newId(), tag, quota: 1, pct: 100, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' });
+            renderRules();
             onEdit();
           },
         },
-        `+ ${tag} (${n})`,
+        `+ ${tag} (${n} carte${n > 1 ? 's' : ''})`,
       ),
     ),
   );
 }
 
-function field(label: string, input: HTMLElement, help?: string) {
-  return h('label', { class: 'field' }, h('span', null, label), input, help ? h('span', { class: 'muted small' }, help) : null);
-}
+const th = (label: string, help?: string) => h('th', null, h('span', { class: 'row nowrap th-label' }, label, help ? hint(help) : null));
 
-function settingsForm() {
-  const s = settings;
-  const set = <K extends keyof Settings>(key: K, parse: (v: string) => Settings[K]) => (e: Event) => {
-    const t = e.target as HTMLInputElement;
-    s[key] = parse(t.type === 'checkbox' ? String(t.checked) : t.value);
-    onEdit();
-  };
-  return h(
-    'div',
-    { class: 'grid' },
-    field('Nombre de slots', h('input', { type: 'number', min: '1', max: '50', value: s.slots, oninput: set('slots', (v) => num(v, 5)!) })),
-    field('Fenêtre du prix moyen (jours)', h('input', { type: 'number', min: '1', max: '90', value: s.windowDays, oninput: set('windowDays', (v) => num(v, 7)!) })),
-    field(
-      'Statistique',
-      h(
-        'select',
-        { onchange: set('stat', (v) => v as Settings['stat']) },
-        h('option', { value: 'mean', selected: s.stat === 'mean' }, 'moyenne'),
-        h('option', { value: 'median', selected: s.stat === 'median' }, 'médiane (résiste aux ventes aberrantes)'),
-      ),
-    ),
-    field(
-      'Arrondi',
-      h('input', { type: 'number', min: '0', value: s.rounding, oninput: set('rounding', (v) => num(v, 0)!) }),
-      '0 = automatique (unité sous 20, 5 sous 100, 10 sous 1 000) ; ex. 10 → 63 devient 60',
-    ),
-    field(
-      'À doublons égaux, proposer',
-      h(
-        'select',
-        {
-          onchange: (e: Event) => {
-            s.sortPrice = (e.target as HTMLSelectElement).value as Settings['sortPrice'];
-            if (s.sortPrice === 'random') s.randomSeed = Date.now() % 2_147_483_647;
-            onEdit();
-          },
-        },
-        h('option', { value: 'desc', selected: s.sortPrice === 'desc' }, 'le prix le plus haut'),
-        h('option', { value: 'asc', selected: s.sortPrice === 'asc' }, 'le prix le plus bas (écouler)'),
-        h('option', { value: 'random', selected: s.sortPrice === 'random' }, 'aléatoire'),
-      ),
-    ),
-    field(
-      'Étiquette de secours',
-      h(
-        'select',
-        { onchange: set('fallbackTag', (v) => v || null) },
-        h('option', { value: '' }, '— aucune —'),
-        rules.map((r) => h('option', { value: r.tag, selected: r.tag === s.fallbackTag }, r.tag)),
-      ),
-      'utilisée quand une étiquette n\'a plus de carte vendable',
-    ),
-    field('Proposer une carte déjà en vente', h('input', { type: 'checkbox', checked: s.allowDuplicateListing, onchange: set('allowDuplicateListing', (v) => v === 'true') })),
-    field('Compter les enchères en cours dans le prix moyen', h('input', { type: 'checkbox', checked: s.includeListings, onchange: set('includeListings', (v) => v === 'true') }), 'par défaut, seules les ventes terminées comptent'),
-    field('Notifications', h('input', { type: 'checkbox', checked: s.notifications, onchange: set('notifications', (v) => v === 'true') })),
-    field('Intégration au site', h('input', { type: 'checkbox', checked: s.siteIntegration, onchange: set('siteIntegration', (v) => v === 'true') }), 'résumé et menu Wiky-Traders dans la barre latérale, onglet dans Paramètres'),
-    field('Barre latérale compacte', h('input', { type: 'checkbox', checked: s.compactNav, onchange: set('compactNav', (v) => v === 'true') }), 'menus regroupés (Social, Progression) pour faire de la place'),
-    field('Étiquettes visibles sur les cartes', h('input', { type: 'checkbox', checked: s.showTagOverlay, onchange: set('showTagOverlay', (v) => v === 'true') }), 'sur chaque carte de la collection, aux couleurs du site'),
-    field(
-      'Style des étiquettes sur les cartes',
-      h(
-        'select',
-        { onchange: set('tagOverlayStyle', (v) => v as Settings['tagOverlayStyle']) },
-        h('option', { value: 'label', selected: s.tagOverlayStyle === 'label' }, 'libellés détaillés'),
-        h('option', { value: 'dot', selected: s.tagOverlayStyle === 'dot' }, 'pastilles de couleur seulement'),
-      ),
-      'pastilles : nom de l\'étiquette au survol',
-    ),
-    field(
-      'Heures silencieuses',
-      h(
-        'span',
-        { class: 'row' },
-        h('input', { type: 'time', value: s.quietStart ?? '', oninput: set('quietStart', (v) => v || null) }),
-        '→',
-        h('input', { type: 'time', value: s.quietEnd ?? '', oninput: set('quietEnd', (v) => v || null) }),
-      ),
-    ),
-    field('Page « mes enchères »', h('input', { value: s.myAuctionsPath ?? '', placeholder: 'auto (onglet « Mes ventes » de /marketplace)', oninput: set('myAuctionsPath', (v) => v.trim() || null) }), 'chemin, ex. /marketplace?tab=mine'),
-    field('Page ouverte par « Ouvrir »', h('input', { value: s.sellPath, oninput: set('sellPath', (v) => v.trim() || DEFAULT_SETTINGS.sellPath) })),
-  );
-}
-
-/** Bascule avec confirmation pour les automatisations interdites par les règles du site. */
-function riskyToggle(key: 'prefill' | 'autoTag' | 'apiRead' | 'apiWrite', label: string, help: string) {
-  return field(
-    label,
-    h('input', {
-      type: 'checkbox',
-      checked: settings[key],
-      onchange: (e: Event) => {
-        const box = e.target as HTMLInputElement;
-        if (box.checked && !confirm(`${label}\n\nLes règles de WikiMasters (section 3) interdisent les outils qui interagissent à ta place : ton compte peut être banni sans préavis.\n\nActiver quand même ?`)) {
-          box.checked = false;
-          return;
-        }
-        settings[key] = box.checked;
-        onEdit();
-      },
-    }),
-    help,
-  );
-}
-
-/** Fonctionnalités reprises de « Prix moyen collection », par groupe ; les automatisations demandent confirmation. */
-function featuresBlock() {
-  const flags = featureFlags(settings.features);
-  return (Object.keys(FEATURE_GROUPS) as FeatureGroup[]).map((group) =>
-    h(
-      'div',
-      { class: 'feature-group' },
-      h('h3', null, FEATURE_GROUPS[group]),
-      h(
-        'div',
-        { class: 'grid' },
-        FEATURES.filter((f) => f.group === group).map((f) =>
-          field(
-            f.label,
-            h('input', {
-              type: 'checkbox',
-              checked: flags[f.key],
-              onchange: (e: Event) => {
-                const box = e.target as HTMLInputElement;
-                if (box.checked && f.risky && !confirm(`${f.label}\n\n${f.help}\n\nLes règles de WikiMasters (section 3) interdisent les outils qui interagissent à ta place : ton compte peut être banni sans préavis.\n\nActiver quand même ?`)) {
-                  box.checked = false;
-                  return;
-                }
-                settings.features = { ...settings.features, [f.key]: box.checked };
-                onEdit();
-              },
-            }),
-            `${f.help}${f.api && !settings.apiRead ? ' (nécessite la lecture via l\'API)' : ''}`,
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-function automationBlock() {
-  return h(
-    'div',
-    null,
-    h(
-      'p',
-      { class: 'warn small' },
-      '⚠️ Ces options simulent des clics sur le site. Les règles de WikiMasters (section 3) et ses conditions (section 6) les interdisent : risque de bannissement définitif avec perte des cartes. Désactivées par défaut, à tes risques.',
-    ),
-    h(
-      'div',
-      { class: 'grid' },
-      riskyToggle('prefill', 'V4 – Ouvrir la vente et pré-remplir le prix', '« Ouvrir » ouvre la carte, sa fenêtre de vente et remplit le prix. Le clic « Mettre en vente » reste toujours à toi.'),
-      riskyToggle('apiRead', 'Lecture via l\'API du site', 'Onglet « Mises » (enchères où tu as misé, prix des cartes) et chargement des ventes du marché. Lectures seules, avec ta session.'),
-      riskyToggle('apiWrite', 'Étiquetage par l\'API (plus fiable)', 'L\'étiquetage automatique écrit directement les étiquettes, comme le fait le site (table user_card_tags), au lieu de cliquer dans la fiche de chaque carte. Écritures limitées aux étiquettes ; favoris revérifiés avant chaque écriture.'),
-      field(
-        'Fenêtre de vente : résumé du marché',
-        h('input', { type: 'checkbox', checked: settings.sellMarketSummary, onchange: (e: Event) => ((settings.sellMarketSummary = (e.target as HTMLInputElement).checked), onEdit()) }),
-        'sous « Marché · … » : nombre d\'offres en cours, min, médiane, max (nécessite la lecture via l\'API)',
-      ),
-      field(
-        'Fenêtre de vente : liste des enchères de la carte',
-        h('input', { type: 'checkbox', checked: settings.sellMarketList, onchange: (e: Event) => ((settings.sellMarketList = (e.target as HTMLInputElement).checked), onEdit()) }),
-        'sous la fenêtre : enchères en cours de cette carte, prix et durée restante (nécessite la lecture via l\'API)',
-      ),
-      riskyToggle('autoTag', 'Étiquetage automatique sur le site', 'Range chaque carte dans l\'étiquette dont la plage plancher–plafond contient son prix moyen. Lancé depuis la popup, sur la collection, avec bouton Arrêter.'),
-      field(
-        'Retirer les autres étiquettes gérées',
-        h('input', {
-          type: 'checkbox',
-          checked: settings.autoTagRemoveOthers,
-          onchange: (e: Event) => ((settings.autoTagRemoveOthers = (e.target as HTMLInputElement).checked), onEdit()),
-        }),
-        'ex. une carte passée à 60 perd « 20-50 » et reçoit « 50-100 »',
-      ),
-    ),
-  );
-}
-
-/** Paliers de durée : prix de départ entre « de » et « à » → durée de l'enchère. */
-function durationBlock() {
-  const rows = settings.durationRules;
-  const set = (i: number, key: 'from' | 'to' | 'minutes', v: number | null) => {
-    rows[i] = { ...rows[i], [key]: v };
-    onEdit();
-  };
-  return h(
-    'div',
-    null,
-    h('p', { class: 'muted small' }, 'Durée de l\'enchère selon la mise de départ conseillée. Le premier palier qui correspond l\'emporte ; sans palier, la durée par défaut du site (1 h) est gardée. Affichée avec chaque proposition, et choisie automatiquement avec la V4.'),
-    rows.length
+function renderRules(): void {
+  ui.pctExamples.clear();
+  mount(
+    ui.rules,
+    rules.length
       ? h(
-          'table',
-          { class: 'durations' },
-          h('tr', null, ['Mise de', 'à', 'Durée', ''].map((t) => h('th', null, t))),
-          rows.map((r, i) =>
+          'div',
+          { class: 'table-wrap' },
+          h(
+            'table',
+            { class: 'rules' },
             h(
-              'tr',
+              'thead',
               null,
-              h('td', null, h('input', { type: 'number', min: '0', value: r.from ?? '', placeholder: '0', oninput: (e: Event) => set(i, 'from', num((e.target as HTMLInputElement).value)) })),
-              h('td', null, h('input', { type: 'number', min: '0', value: r.to ?? '', placeholder: '∞', oninput: (e: Event) => set(i, 'to', num((e.target as HTMLInputElement).value)) })),
               h(
-                'td',
+                'tr',
                 null,
-                h(
-                  'select',
-                  { onchange: (e: Event) => set(i, 'minutes', Number((e.target as HTMLSelectElement).value)) },
-                  DURATIONS.map((d) => h('option', { value: d.minutes, selected: d.minutes === r.minutes }, d.label)),
-                ),
+                th('Active', 'Désactivée, l\'étiquette ne réserve plus aucun slot (la règle est gardée).'),
+                th('Étiquette', 'Nom exact de l\'étiquette sur WikiMasters, ex. « 20-50 ».'),
+                th('Slots', 'Nombre de tes slots d\'enchères réservés à cette étiquette.'),
+                th('Mise de départ', 'Pourcentage du prix moyen de la carte utilisé comme mise de départ conseillée.'),
+                th('Plage de prix', 'Plage de prix de l\'étiquette (plancher–plafond). Sert à l\'étiquetage automatique et à l\'appartenance « prix moyen dans la plage » ; ne change pas le prix conseillé.'),
+                th('Garder', 'Exemplaires jamais vendus : avec 1, ton dernier exemplaire reste toujours dans ta collection.'),
+                th('Appartenance', 'Comment savoir qu\'une carte fait partie de l\'étiquette : elle porte l\'étiquette sur le site, ou son prix moyen tombe dans la plage de prix.'),
+                h('th', null, h('span', { class: 'sr-only' }, 'Supprimer')),
               ),
-              h('td', null, h('button', { class: 'danger', title: 'Supprimer', onclick: () => (rows.splice(i, 1), render(), onEdit()) }, '✕')),
             ),
+            h('tbody', null, rules.map(ruleRow)),
           ),
         )
-      : null,
+      : h('p', { class: 'muted' }, 'Aucune règle : ajoute une étiquette pour que Wiky-Traders te propose des ventes.'),
     h(
       'div',
       { class: 'row', style: 'margin-top:8px' },
       h(
         'button',
         {
+          type: 'button',
           onclick: () => {
-            const last = rows[rows.length - 1];
-            const from = last?.to != null ? last.to + 1 : last ? null : 0;
-            rows.push({ from, to: null, minutes: 60 });
-            render();
+            const rule: TagRule = { id: newId(), tag: '', quota: 1, pct: 70, floor: null, ceiling: null, keepMin: 1, active: true, match: 'tag' };
+            rules.push(rule);
+            renderRules();
+            onEdit();
+            (ui.fields.get(`rule:${rule.id}:tag`) as HTMLInputElement | undefined)?.focus();
+          },
+        },
+        '+ Ajouter une étiquette',
+      ),
+    ),
+    detectedTagsBlock(),
+  );
+}
+
+function refreshQuota(): void {
+  const q = quotaSummary(rules, settings.slots);
+  ui.quota.className = `quota-summary ${q.status}`;
+  mount(ui.quota, h('strong', null, q.text), h('span', null, ` — ${q.status === 'ok' ? '✓ ' : '⚠ '}${q.message}`));
+}
+
+function rulesSection() {
+  ui.rules = h('div');
+  ui.quota = h('div', { class: 'quota-summary', 'aria-live': 'polite' });
+  renderRules();
+  return section(
+    'ventes',
+    'Mes ventes : répartition par étiquette',
+    [
+      'Chaque étiquette du site réserve des slots. Ex. : 1 slot pour tes cartes « 50-100 » et 4 slots pour « 20-50 » ; Wiky-Traders propose une carte de cette étiquette pour chaque slot libre, avec une mise de départ égale à un % de son prix moyen.',
+    ],
+    ui.quota,
+    ui.rules,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Prix conseillé
+// ---------------------------------------------------------------------------
+
+function refreshFallback(): void {
+  const tags = rules.map((r) => r.tag.trim()).filter(Boolean);
+  const current = settings.fallbackTag;
+  const key = JSON.stringify([tags, current]);
+  if (key === ui.fallbackKey) return;
+  ui.fallbackKey = key;
+  const missing = current && !tags.includes(current);
+  ui.fallback.replaceChildren(
+    h('option', { value: '' }, '— aucune —'),
+    ...tags.map((t) => h('option', { value: t, selected: t === current }, t)),
+    missing ? h('option', { value: current, selected: true }, `${current} (aucune règle)`) : '',
+  );
+}
+
+function pricingSection() {
+  const s = settings;
+  const set = <K extends keyof Settings>(key: K, parse: (v: string) => Settings[K]) => (e: Event) => {
+    s[key] = parse((e.target as HTMLInputElement).value);
+    onEdit();
+  };
+  ui.rounding = h('span', { class: 'muted small' });
+  ui.fallback = h('select', { onchange: set('fallbackTag', (v) => v || null) });
+  ui.fallbackKey = '';
+  refreshFallback();
+  return section(
+    'prix',
+    'Prix conseillé',
+    'Comment Wiky-Traders calcule le prix moyen d\'une carte et choisit quoi proposer. Les valeurs par défaut conviennent à la plupart des joueurs.',
+    h(
+      'div',
+      { class: 'grid' },
+      field(
+        'Nombre de slots',
+        reg('slots', h('input', { type: 'number', min: '1', max: '50', value: s.slots, oninput: set('slots', (v) => num(v, 5)!) })),
+        'Nombre d\'enchères que tu peux avoir en même temps sur le site.',
+      ),
+      field(
+        'Statistique',
+        h(
+          'select',
+          { onchange: set('stat', (v) => v as Settings['stat']) },
+          h('option', { value: 'median', selected: s.stat === 'median' }, 'médiane (conseillé)'),
+          h('option', { value: 'mean', selected: s.stat === 'mean' }, 'moyenne'),
+        ),
+        'Médiane = le prix du milieu des ventes : une vente exceptionnelle ne la fausse pas. Moyenne = total ÷ nombre de ventes.',
+      ),
+      field(
+        'Période observée (jours)',
+        h('input', { type: 'number', min: '1', max: '90', value: s.windowDays, oninput: set('windowDays', (v) => num(v, 7)!) }),
+        'Seules les ventes de ces derniers jours comptent (7 = la dernière semaine).',
+      ),
+      field(
+        'Arrondi (W)',
+        h('input', { type: 'number', min: '0', value: s.rounding, oninput: set('rounding', (v) => num(v, 0)!) }),
+        h('span', { class: 'small' }, h('span', { class: 'muted' }, '0 = automatique. '), ui.rounding),
+        'Pas d\'arrondi de la mise conseillée. Automatique : à l\'unité sous 20 W, à 5 sous 100, à 10 sous 1 000.',
+      ),
+      field(
+        'Entre deux cartes aussi doublonnées, proposer',
+        h(
+          'select',
+          {
+            onchange: (e: Event) => {
+              s.sortPrice = (e.target as HTMLSelectElement).value as Settings['sortPrice'];
+              if (s.sortPrice === 'random') s.randomSeed = Date.now() % 2_147_483_647;
+              onEdit();
+            },
+          },
+          h('option', { value: 'desc', selected: s.sortPrice === 'desc' }, 'la plus chère d\'abord'),
+          h('option', { value: 'asc', selected: s.sortPrice === 'asc' }, 'la moins chère d\'abord (écouler)'),
+          h('option', { value: 'random', selected: s.sortPrice === 'random' }, 'au hasard'),
+        ),
+        'Les cartes en plus d\'exemplaires passent en premier ; ce choix départage les égalités.',
+      ),
+      field('Étiquette de secours', ui.fallback, 'Quand une étiquette n\'a plus aucune carte à vendre, son slot reçoit une carte de cette étiquette-ci.'),
+    ),
+    h(
+      'div',
+      { class: 'toggles' },
+      settingToggle('includeListings', 'Compter les enchères en cours dans le prix moyen', 'Par défaut, seules les ventes terminées comptent : une enchère en cours peut encore monter.'),
+      settingToggle('allowDuplicateListing', 'Proposer une carte déjà en vente', 'Autorise à mettre en vente un autre exemplaire d\'une carte déjà aux enchères.'),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Durée des enchères
+// ---------------------------------------------------------------------------
+
+function renderDurations(): void {
+  const rows = settings.durationRules;
+  const set = (i: number, key: 'from' | 'to' | 'minutes', v: number | null) => {
+    rows[i] = { ...rows[i], [key]: v };
+    onEdit();
+  };
+  mount(
+    ui.durations,
+    rows.length
+      ? h(
+          'ol',
+          { class: 'tiers' },
+          rows.map((r, i) =>
+            h(
+              'li',
+              { class: 'row tier' },
+              h('span', { class: 'muted small tier-num' }, `Palier ${i + 1}`),
+              'Mise de',
+              reg(`dur:${i}:from`, h('input', { type: 'number', min: '0', value: r.from ?? '', placeholder: '0', 'aria-label': `Palier ${i + 1} : de`, oninput: (e: Event) => set(i, 'from', num((e.target as HTMLInputElement).value)) })),
+              'à',
+              reg(`dur:${i}:to`, h('input', { type: 'number', min: '0', value: r.to ?? '', placeholder: '∞', 'aria-label': `Palier ${i + 1} : à`, oninput: (e: Event) => set(i, 'to', num((e.target as HTMLInputElement).value)) })),
+              'W →',
+              h(
+                'select',
+                { 'aria-label': `Palier ${i + 1} : durée`, onchange: (e: Event) => set(i, 'minutes', Number((e.target as HTMLSelectElement).value)) },
+                DURATIONS.map((d) => h('option', { value: d.minutes, selected: d.minutes === r.minutes }, d.label)),
+              ),
+              h(
+                'button',
+                { type: 'button', class: 'danger', title: 'Supprimer ce palier', 'aria-label': `Supprimer le palier ${i + 1}`, onclick: () => (rows.splice(i, 1), renderDurations(), onEdit()) },
+                '✕',
+              ),
+            ),
+          ),
+        )
+      : null,
+    h(
+      'div',
+      { class: 'row wrap', style: 'margin-top:8px' },
+      h(
+        'button',
+        {
+          type: 'button',
+          onclick: () => {
+            rows.push(nextTier(rows));
+            renderDurations();
             onEdit();
           },
         },
         '+ Ajouter un palier',
       ),
-      rows.length
-        ? null
-        : h(
-            'button',
-            {
-              title: 'Exemple : petites mises en 10 min, moyennes en 1 h, grosses en 3 h',
-              onclick: () => {
-                settings.durationRules = [
-                  { from: 0, to: 20, minutes: 10 },
-                  { from: 21, to: 100, minutes: 60 },
-                  { from: 101, to: null, minutes: 180 },
-                ];
-                render();
-                onEdit();
-              },
-            },
-            'Exemple (≤ 20 : 10 min, 21–100 : 1 h, > 100 : 3 h)',
-          ),
+      h(
+        'button',
+        {
+          type: 'button',
+          title: '≤ 20 W : 10 min · 21–100 W : 1 h · plus de 100 W : 3 h',
+          onclick: () => {
+            if (rows.length && !confirm('Remplacer tes paliers par la proposition par défaut ?\n\n0–20 W → 10 min · 21–100 W → 1 h · 101 W et + → 3 h')) return;
+            settings.durationRules = DEFAULT_DURATION_TIERS.map((t) => ({ ...t }));
+            renderDurations();
+            onEdit();
+          },
+        },
+        'Proposition par défaut',
+      ),
     ),
   );
 }
+
+function refreshTiers(): void {
+  mount(ui.tiers, tiersPreviewParts(settings.durationRules).map((p) => h('span', { class: 'chip' }, p)));
+}
+
+function durationsSection() {
+  ui.durations = h('div');
+  ui.tiers = h('div', { class: 'tiers-preview', 'aria-live': 'polite' });
+  renderDurations();
+  return section(
+    'durees',
+    'Durée des enchères',
+    'Choisis la durée de chaque enchère selon sa mise de départ. Ex. : une carte à 15 W part 10 min, une carte à 150 W part 3 h. Le premier palier qui correspond l\'emporte ; la durée s\'affiche avec chaque proposition (et se choisit seule avec le pré-remplissage).',
+    h('div', { class: 'muted small' }, 'Aperçu :'),
+    ui.tiers,
+    ui.durations,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Notifications, affichage
+// ---------------------------------------------------------------------------
+
+function notificationsSection() {
+  const s = settings;
+  const time = (key: 'quietStart' | 'quietEnd', label: string) =>
+    dependent(h('input', { type: 'time', value: s[key] ?? '', 'aria-label': label, oninput: (e: Event) => ((s[key] = (e.target as HTMLInputElement).value || null), onEdit()) }), () => settings.notifications);
+  return section(
+    'notifications',
+    'Notifications',
+    'Wiky-Traders te prévient quand une enchère se termine ou qu\'un slot se libère.',
+    h('div', { class: 'toggles' }, settingToggle('notifications', 'Notifications', 'Alertes du navigateur pour tes ventes.')),
+    field(
+      'Heures silencieuses',
+      h('span', { class: 'row' }, 'de', time('quietStart', 'Début des heures silencieuses'), 'à', time('quietEnd', 'Fin des heures silencieuses')),
+      'Aucune notification pendant cette plage (ex. la nuit). Laisse vide pour toujours être prévenu.',
+    ),
+  );
+}
+
+function displaySection() {
+  const s = settings;
+  return section(
+    'affichage',
+    'Affichage sur le site',
+    'Ce que Wiky-Traders ajoute directement dans les pages de WikiMasters.',
+    h(
+      'div',
+      { class: 'toggles' },
+      settingToggle('siteIntegration', 'Intégration au site', 'Résumé et menu Wiky-Traders dans la barre latérale, onglet dans Paramètres.'),
+      settingToggle('compactNav', 'Barre latérale compacte', 'Menus regroupés (Social, Progression) pour faire de la place.'),
+      settingToggle('showTagOverlay', 'Étiquettes visibles sur les cartes', 'Sur chaque carte de la collection, aux couleurs du site.'),
+    ),
+    field(
+      'Style des étiquettes sur les cartes',
+      dependent(
+        h(
+          'select',
+          { onchange: (e: Event) => ((s.tagOverlayStyle = (e.target as HTMLSelectElement).value as Settings['tagOverlayStyle']), onEdit()) },
+          h('option', { value: 'label', selected: s.tagOverlayStyle === 'label' }, 'libellés détaillés'),
+          h('option', { value: 'dot', selected: s.tagOverlayStyle === 'dot' }, 'pastilles de couleur seulement'),
+        ),
+        () => settings.showTagOverlay,
+      ),
+      'Pastilles : le nom de l\'étiquette s\'affiche au survol.',
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Fonctionnalités
+// ---------------------------------------------------------------------------
+
+function featureCard(f: FeatureDef) {
+  const flags = featureFlags(settings.features);
+  return toggleField(
+    f.label,
+    flags[f.key],
+    (box) => {
+      if (box.checked && f.risky && !confirm(`${f.label}\n\n${f.help}\n\n${RISK_TEXT}\n\nActiver quand même ?`)) {
+        box.checked = false;
+        return;
+      }
+      settings.features = { ...settings.features, [f.key]: box.checked };
+      onEdit();
+    },
+    undefined,
+    [f.api ? h('span', { class: 'badge api', title: 'Utilise la lecture via l\'API' }, 'API') : null, f.risky ? h('span', { class: 'badge risk', title: 'Agit sur le site à ta place' }, '⚠ risque') : null],
+    'feature',
+  );
+}
+
+function featureGroup(group: FeatureGroup, title = FEATURE_GROUPS[group]) {
+  return h(
+    'div',
+    { class: 'feature-group' },
+    h('h3', null, title),
+    h(
+      'div',
+      { class: 'feature-grid' },
+      FEATURES.filter((f) => f.group === group).map((f) => {
+        const card = featureCard(f);
+        card.querySelector('.toggle-text')!.append(h('span', { class: 'muted small' }, f.help), f.api ? apiNote() : '');
+        return card;
+      }),
+    ),
+  );
+}
+
+function featuresSection() {
+  const groups = (Object.keys(FEATURE_GROUPS) as FeatureGroup[]).filter((g) => g !== 'automation');
+  return section(
+    'fonctionnalites',
+    'Fonctionnalités',
+    'Ajouts au site, à activer ou couper selon tes goûts. Le badge API indique ce qui a besoin de la lecture via l\'API (section Automatisations).',
+    groups.map((g) => featureGroup(g)),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Automatisations
+// ---------------------------------------------------------------------------
+
+/** Active une automatisation après confirmation ; `saveNow` : enregistre aussitôt (démarrage rapide). */
+async function enableRisky(key: RiskyKey, label: string, saveNow = false): Promise<void> {
+  if (!confirm(`${label}\n\n${RISK_TEXT}\n\nActiver quand même ?`)) return;
+  settings[key] = true;
+  const box = ui.risky[key];
+  if (box) box.checked = true;
+  onEdit();
+  if (saveNow) await saveAll();
+}
+
+function riskyToggle(key: RiskyKey, label: string, help: string, extra: Child[] = []) {
+  const el = toggleField(
+    label,
+    settings[key],
+    (box) => {
+      if (box.checked && !confirm(`${label}\n\n${RISK_TEXT}\n\nActiver quand même ?`)) {
+        box.checked = false;
+        return;
+      }
+      settings[key] = box.checked;
+      onEdit();
+    },
+    help,
+    [h('span', { class: 'badge risk' }, '⚠ risque'), ...extra],
+  );
+  ui.risky[key] = el.querySelector('input')!;
+  return el;
+}
+
+function automationSection() {
+  const withNote = (el: HTMLElement) => (el.querySelector('.toggle-text')!.append(apiNote()), el);
+  return h(
+    'section',
+    { class: 'card opt-section danger-zone', id: 'automatisations' },
+    h('h2', null, 'Automatisations (risque de bannissement)'),
+    h(
+      'p',
+      { class: 'risk-banner' },
+      h('strong', null, '⚠ À tes risques. '),
+      'Ces options lisent le site avec ta session ou cliquent à ta place. Les règles de WikiMasters (section 3) et ses conditions (section 6) l\'interdisent : ton compte peut être banni définitivement, avec perte des cartes. Tout est désactivé par défaut et chaque activation demande une confirmation.',
+    ),
+    h('h3', null, 'Lecture du site'),
+    h(
+      'div',
+      { class: 'toggles' },
+      riskyToggle('apiRead', 'Lecture via l\'API du site', 'Prix des cartes, onglet « Mises » (enchères où tu as misé) et ventes du marché. Lectures seules, avec ta session.'),
+      withNote(settingToggle('sellMarketSummary', 'Fenêtre de vente : résumé du marché', 'Sous « Marché · … » : nombre d\'offres en cours, min, médiane, max.')),
+      withNote(settingToggle('sellMarketList', 'Fenêtre de vente : enchères de la carte', 'Sous la fenêtre : enchères en cours de cette carte, prix et durée restante.')),
+    ),
+    h('h3', null, 'Actions à ta place'),
+    h(
+      'div',
+      { class: 'toggles' },
+      riskyToggle('prefill', 'Ouvrir la vente et pré-remplir le prix', '« Ouvrir » ouvre la carte, sa fenêtre de vente et remplit le prix. Le clic « Mettre en vente » reste toujours à toi.'),
+      riskyToggle('autoTag', 'Étiquetage automatique', 'Range chaque carte dans l\'étiquette dont la plage de prix contient son prix moyen. Lancé depuis la popup, avec bouton Arrêter.'),
+      riskyToggle('apiWrite', 'Étiquetage par l\'API (plus fiable)', 'Écrit directement les étiquettes, comme le site, au lieu de cliquer dans la fiche de chaque carte. Écritures limitées aux étiquettes ; favoris revérifiés avant chaque écriture.'),
+      settingToggle('autoTagRemoveOthers', 'Retirer les autres étiquettes gérées', 'Ex. une carte passée à 60 W perd « 20-50 » et reçoit « 50-100 ».'),
+      settingToggle('autoTagClearUnpriced', 'Retirer les étiquettes des cartes sans prix connu', 'Défait les classements faits sans prix propre (par ex. à partir de la médiane de la rareté).'),
+    ),
+    featureGroup('automation', 'Fonctionnalités automatisées'),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Avancé
+// ---------------------------------------------------------------------------
 
 function blacklistBlock() {
   return h(
@@ -396,32 +794,37 @@ function blacklistBlock() {
     h('textarea', {
       rows: 4,
       placeholder: 'Une carte par ligne (nom ou identifiant)',
+      'aria-label': 'Liste noire',
       value: settings.blacklist.join('\n'),
       oninput: (e: Event) => {
         settings.blacklist = (e.target as HTMLTextAreaElement).value.split('\n').map((l) => l.trim()).filter(Boolean);
         onEdit();
       },
     }),
-    h('div', { class: 'muted small' }, 'Les cartes épinglées en favori ne sont jamais proposées non plus.'),
+    h('div', { class: 'muted small' }, 'Ces cartes ne sont jamais proposées à la vente. Les cartes épinglées en favori non plus.'),
   );
 }
 
-function manualPricesBlock() {
+function renderManual(): void {
   const entries = Object.entries(manualPrices);
-  if (!entries.length) return h('p', { class: 'muted' }, 'Aucun prix saisi. La popup te demande un prix quand une carte n\'a aucune donnée.');
-  return h(
-    'table',
-    null,
-    h('tr', null, h('th', null, 'Carte'), h('th', null, 'Prix moyen saisi'), h('th', null, '')),
-    entries.map(([id, price]) =>
-      h(
-        'tr',
-        null,
-        h('td', null, store.cards[id]?.name ?? id),
-        h('td', null, h('input', { type: 'number', value: price, oninput: (e: Event) => ((manualPrices[id] = num((e.target as HTMLInputElement).value, price)!), onEdit()) })),
-        h('td', null, h('button', { class: 'danger', onclick: () => (delete manualPrices[id], render(), onEdit()) }, '✕')),
-      ),
-    ),
+  mount(
+    ui.manual,
+    entries.length
+      ? h(
+          'table',
+          null,
+          h('tr', null, h('th', null, 'Carte'), h('th', null, 'Prix moyen saisi'), h('th', null, h('span', { class: 'sr-only' }, 'Supprimer'))),
+          entries.map(([id, price]) =>
+            h(
+              'tr',
+              null,
+              h('td', null, store.cards[id]?.name ?? id),
+              h('td', null, h('input', { type: 'number', value: price, 'aria-label': 'Prix moyen saisi', oninput: (e: Event) => ((manualPrices[id] = num((e.target as HTMLInputElement).value, price)!), onEdit()) }), ' W'),
+              h('td', null, h('button', { type: 'button', class: 'danger', 'aria-label': 'Supprimer ce prix', onclick: () => (delete manualPrices[id], renderManual(), onEdit()) }, '✕')),
+            ),
+          ),
+        )
+      : h('p', { class: 'muted' }, 'Aucun prix saisi. La popup te demande un prix quand une carte n\'a aucune donnée.'),
   );
 }
 
@@ -432,19 +835,23 @@ function cardsBlock() {
     null,
     h('summary', null, `${cards.length} carte(s) connue(s) · dernier relevé de la collection : ${fmtDate(store.meta.lastCollectionScan)}`),
     h(
-      'table',
-      { class: 'small' },
-      h('tr', null, ['Carte', 'Rareté', 'Qté', 'Étiquettes', 'Prix site', 'Favori'].map((t) => h('th', null, t))),
-      cards.map((c) =>
-        h(
-          'tr',
-          null,
-          h('td', null, c.name),
-          h('td', null, c.rarity ? RARITIES[c.rarity].label : '—'),
-          h('td', null, c.quantity),
-          h('td', null, c.tags.join(', ') || '—'),
-          h('td', null, formatPrice(c.sitePrice)),
-          h('td', null, c.favorite ? '★' : ''),
+      'div',
+      { class: 'table-wrap scroll' },
+      h(
+        'table',
+        { class: 'small' },
+        h('tr', null, ['Carte', 'Rareté', 'Qté', 'Étiquettes', 'Prix site', 'Favori'].map((t) => h('th', null, t))),
+        cards.map((c) =>
+          h(
+            'tr',
+            null,
+            h('td', null, c.name),
+            h('td', null, c.rarity ? RARITIES[c.rarity].label : '—'),
+            h('td', null, c.quantity),
+            h('td', null, c.tags.join(', ') || '—'),
+            h('td', null, formatPrice(c.sitePrice)),
+            h('td', null, c.favorite ? '★' : ''),
+          ),
         ),
       ),
     ),
@@ -452,40 +859,201 @@ function cardsBlock() {
 }
 
 function selectorsBlock() {
-  const area = h('textarea', {
-    rows: 8,
-    class: 'mono',
-    value: Object.keys(settings.selectorOverrides).length ? JSON.stringify(settings.selectorOverrides, null, 2) : '',
-    placeholder: '{\n  "cardTile": "[data-card]"\n}',
-    oninput: (e: Event) => {
-      const v = (e.target as HTMLTextAreaElement).value.trim();
-      try {
-        settings.selectorOverrides = v ? JSON.parse(v) : {};
-        area.classList.remove('invalid');
+  const area = reg(
+    'selectors',
+    h('textarea', {
+      rows: 8,
+      class: 'mono',
+      'aria-label': 'Sélecteurs personnalisés (JSON)',
+      value: Object.keys(settings.selectorOverrides).length ? JSON.stringify(settings.selectorOverrides, null, 2) : '',
+      placeholder: '{\n  "cardTile": "[data-card]"\n}',
+      oninput: (e: Event) => {
+        const v = (e.target as HTMLTextAreaElement).value.trim();
+        try {
+          settings.selectorOverrides = v ? JSON.parse(v) : {};
+          selectorsInvalid = false;
+        } catch {
+          selectorsInvalid = true;
+        }
         onEdit();
-      } catch {
-        area.classList.add('invalid');
-        setStatus('JSON des sélecteurs invalide', 'error');
-      }
-    },
-  });
+      },
+    }),
+  );
   return h(
     'details',
     null,
     h('summary', null, 'Sélecteurs avancés (si le site change)'),
-    h('p', { class: 'muted small' }, 'Surcharge les sélecteurs CSS / motifs utilisés pour lire le site. Valeurs par défaut :'),
+    h('p', { class: 'muted small' }, 'Remplace les sélecteurs CSS / motifs utilisés pour lire le site. Valeurs par défaut :'),
     h('pre', { class: 'mono small defaults' }, JSON.stringify(DEFAULT_SELECTORS, null, 2)),
     area,
   );
 }
 
+function advancedSection() {
+  const s = settings;
+  ui.manual = h('div');
+  renderManual();
+  const fileInput = h('input', {
+    type: 'file',
+    accept: 'application/json',
+    style: 'display:none',
+    onchange: (e: Event) => {
+      const f = (e.target as HTMLInputElement).files?.[0];
+      if (f) void importSettings(f);
+    },
+  });
+  return h(
+    'details',
+    { class: 'card opt-section advanced', id: 'avance', open: advancedOpen, ontoggle: (e: Event) => (advancedOpen = (e.target as HTMLDetailsElement).open) },
+    h('summary', null, h('h2', null, 'Avancé'), h('span', { class: 'muted small' }, 'pages du site, liste noire, prix saisis, données, sauvegarde')),
+    errorBox('advanced'),
+    h('h3', null, 'Pages du site'),
+    h(
+      'div',
+      { class: 'grid' },
+      field('Page « mes enchères »', h('input', { value: s.myAuctionsPath ?? '', placeholder: 'auto (onglet « Mes ventes » de /marketplace)', oninput: (e: Event) => ((s.myAuctionsPath = (e.target as HTMLInputElement).value.trim() || null), onEdit()) }), 'Chemin, ex. /marketplace?tab=mine. Vide = automatique.'),
+      field('Page ouverte par « Ouvrir »', h('input', { value: s.sellPath, oninput: (e: Event) => ((s.sellPath = (e.target as HTMLInputElement).value.trim() || DEFAULT_SETTINGS.sellPath), onEdit()) }), `Par défaut ${DEFAULT_SETTINGS.sellPath}.`),
+    ),
+    h('h3', null, 'Liste noire'),
+    blacklistBlock(),
+    h('h3', null, 'Prix saisis à la main'),
+    ui.manual,
+    h('h3', null, 'Données'),
+    cardsBlock(),
+    selectorsBlock(),
+    h('h3', null, 'Sauvegarde'),
+    h('p', { class: 'muted small' }, 'Exporte tes réglages (règles, paliers, prix saisis) dans un fichier JSON, pour les garder ou les copier sur un autre navigateur.'),
+    h(
+      'div',
+      { class: 'row wrap' },
+      h('button', { type: 'button', onclick: exportSettings }, 'Exporter (JSON)'),
+      h('button', { type: 'button', onclick: () => fileInput.click() }, 'Importer…'),
+      fileInput,
+      h('span', { class: 'grow' }),
+      h('button', { type: 'button', class: 'danger', onclick: wipe }, 'Effacer toutes les données'),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Validation, état « modifié », barre d'enregistrement
+// ---------------------------------------------------------------------------
+
+function showErrors(): void {
+  for (const [key, el] of ui.fields) {
+    if (!el.isConnected) {
+      ui.fields.delete(key);
+      continue;
+    }
+    el.classList.remove('invalid');
+    el.removeAttribute('aria-invalid');
+  }
+  for (const e of errors) {
+    for (const k of e.keys) {
+      const el = ui.fields.get(k);
+      if (!el) continue;
+      el.classList.add('invalid');
+      el.setAttribute('aria-invalid', 'true');
+      el.title = e.message;
+    }
+  }
+  for (const [key, box] of Object.entries(ui.errorBoxes) as [OptionsSection, HTMLElement][]) {
+    const msgs = errors.filter((e) => e.section === key);
+    box.hidden = !msgs.length;
+    mount(box, msgs.length ? h('ul', null, msgs.map((m) => h('li', null, m.message))) : null);
+  }
+}
+
+function focusFirstError(): void {
+  const first = errors[0];
+  if (!first) return;
+  const el = first.keys.map((k) => ui.fields.get(k)).find((x) => x?.isConnected);
+  const details = el?.closest('details');
+  if (details) details.open = true;
+  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  (el as HTMLInputElement | undefined)?.focus({ preventScroll: true });
+}
+
+function updateBar(): void {
+  const dirty = isDirty(baseline, { rules, settings, manualPrices });
+  ui.saveBtn.disabled = !dirty;
+  ui.revertBtn.disabled = !dirty;
+  document.documentElement.classList.toggle('dirty', dirty);
+  if (errors.length) {
+    const n = errors.length;
+    mount(
+      ui.status,
+      h(
+        'button',
+        { type: 'button', class: 'link error', title: 'Aller au champ', onclick: focusFirstError },
+        `⚠ ${n} erreur${n > 1 ? 's' : ''} à corriger : ${errors[0].message}`,
+      ),
+    );
+    ui.status.className = 'status error';
+  } else if (notice && (!dirty || notice.kind === 'error')) {
+    mount(ui.status, notice.text);
+    ui.status.className = `status ${notice.kind}`;
+  } else if (dirty) {
+    mount(ui.status, h('span', { class: 'dot', 'aria-hidden': 'true' }), 'Modifications non enregistrées');
+    ui.status.className = 'status dirty';
+  } else {
+    mount(ui.status, 'Tout est enregistré.');
+    ui.status.className = 'status muted';
+  }
+}
+
+/** Mise à jour après une saisie : uniquement les résumés et aperçus concernés. */
+function refreshLive(): void {
+  refreshQuota();
+  refreshQuickStart();
+  refreshTiers();
+  refreshFallback();
+  ui.rounding.textContent = `ex. ${roundingExamples(settings.rounding)}`;
+  for (const [rule, el] of ui.pctExamples) el.textContent = pctExample(rule.pct, settings.rounding);
+  for (const n of ui.apiNotes) n.hidden = settings.apiRead;
+  for (const d of ui.dependents) d.el.disabled = !d.enabled();
+  errors = validateOptions(rules, settings, { selectorsInvalid });
+  showErrors();
+}
+
+function onEdit(): void {
+  notice = null;
+  refreshLive();
+  updateBar();
+}
+
 async function saveAll(): Promise<void> {
-  const err = validate();
-  if (err) return setStatus(err, 'error');
-  rules = rules.map((r) => ({ ...r, tag: r.tag.trim() }));
+  errors = validateOptions(rules, settings, { selectorsInvalid });
+  showErrors();
+  if (errors.length) {
+    updateBar();
+    focusFirstError();
+    return;
+  }
+  // Étiquettes nettoyées sur place : le tableau garde ses liens (et le focus) sans être redessiné.
+  for (const r of rules) {
+    const tag = r.tag.trim();
+    if (tag === r.tag) continue;
+    r.tag = tag;
+    const input = ui.fields.get(`rule:${r.id}:tag`) as HTMLInputElement | undefined;
+    if (input) input.value = tag;
+  }
   await save({ rules, settings, manualPrices });
   await ext.runtime.sendMessage({ type: 'refreshBadge' }).catch(() => {});
-  setStatus(`Enregistré à ${new Date().toLocaleTimeString('fr-FR')}`, 'ok');
+  baseline = snapshot({ rules, settings, manualPrices });
+  notice = { text: `✓ Enregistré à ${new Date().toLocaleTimeString('fr-FR')}`, kind: 'ok' };
+  refreshLive();
+  updateBar();
+}
+
+function revert(): void {
+  const b = JSON.parse(baseline) as { rules: TagRule[]; settings: Settings; manualPrices: Record<string, number> };
+  rules = b.rules;
+  settings = b.settings;
+  manualPrices = b.manualPrices;
+  selectorsInvalid = false;
+  notice = { text: 'Modifications annulées.', kind: 'ok' };
+  render();
 }
 
 function exportSettings(): void {
@@ -499,10 +1067,12 @@ async function importSettings(file: File): Promise<void> {
     rules = data.rules;
     settings = { ...DEFAULT_SETTINGS, ...data.settings };
     manualPrices = data.manualPrices ?? {};
+    selectorsInvalid = false;
     render();
     await saveAll();
   } catch {
-    setStatus('Fichier de réglages invalide.', 'error');
+    notice = { text: 'Fichier de réglages invalide.', kind: 'error' };
+    updateBar();
   }
 }
 
@@ -510,74 +1080,98 @@ async function wipe(): Promise<void> {
   if (!confirm('Effacer toutes les données de Wiky-Traders (règles, cartes, historique, journal) ?')) return;
   await clearAll();
   await load();
-  setStatus('Toutes les données ont été effacées.', 'ok');
+  notice = { text: 'Toutes les données ont été effacées.', kind: 'ok' };
+  updateBar();
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+const TOC: [id: string, label: string][] = [
+  ['demarrage', 'Démarrage rapide'],
+  ['ventes', 'Mes ventes'],
+  ['prix', 'Prix conseillé'],
+  ['durees', 'Durée des enchères'],
+  ['notifications', 'Notifications'],
+  ['affichage', 'Affichage sur le site'],
+  ['fonctionnalites', 'Fonctionnalités'],
+  ['automatisations', 'Automatisations'],
+  ['avance', 'Avancé'],
+];
+
+function tocNav() {
+  return h(
+    'nav',
+    { class: 'toc', 'aria-label': 'Sections des réglages' },
+    h(
+      'ul',
+      null,
+      TOC.map(([id, label]) =>
+        h(
+          'li',
+          null,
+          h(
+            'a',
+            {
+              href: `#${id}`,
+              class: id === 'automatisations' ? 'risk' : undefined,
+              onclick: (e: Event) => {
+                e.preventDefault();
+                scrollToSection(id);
+              },
+            },
+            label,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 function render(): void {
-  status = h('span', { class: 'muted' });
-  quotaInfo = h('span', { class: 'muted' });
-  const fileInput = h('input', {
-    type: 'file',
-    accept: 'application/json',
-    style: 'display:none',
-    onchange: (e: Event) => {
-      const f = (e.target as HTMLInputElement).files?.[0];
-      if (f) void importSettings(f);
-    },
-  });
+  const scroll = scrollY;
+  ui.fields.clear();
+  ui.apiNotes = [];
+  ui.dependents = [];
+  ui.risky = {};
+  ui.errorBoxes = {} as Record<OptionsSection, HTMLElement>;
+  ui.status = h('span', { class: 'status muted', role: 'status', 'aria-live': 'polite' });
+  ui.saveBtn = h('button', { type: 'button', class: 'primary', title: `Enregistrer (${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'}S)`, onclick: () => void saveAll() }, 'Enregistrer');
+  ui.revertBtn = h('button', { type: 'button', title: 'Revenir aux réglages enregistrés', onclick: revert }, 'Annuler les modifications');
+  ui.quick = h('div');
   mount(
     app,
-    h('header', { class: 'row' }, h('img', { src: 'icons/icon-48.png', width: 32, height: 32, alt: '' }), h('h1', { class: 'grow' }, 'Wiky-Traders – Réglages'), h('a', { href: 'journal.html' }, 'Journal →')),
     h(
-      'section',
-      { class: 'card' },
-      h('h2', null, 'Règles par étiquette'),
-      h('p', { class: 'muted small' }, 'Chaque étiquette occupe en permanence son quota de slots ; le prix conseillé est le prix de référence × le %. Le plancher et le plafond définissent la plage de prix de l\'étiquette : ils servent uniquement à l\'étiquetage automatique (et aux règles « plage de prix »), pas au prix conseillé. « Garder » = exemplaires jamais proposés à la vente.'),
-      h(
-        'table',
-        { class: 'rules' },
-        h('tr', null, ['Étiquette', 'Quota', '% du prix moyen', 'Plancher', 'Plafond', 'Garder', 'Appartenance', 'Active', ''].map((t) => h('th', null, t))),
-        rules.map(ruleRow),
-      ),
-      h(
-        'div',
-        { class: 'row', style: 'margin-top:8px' },
-        h(
-          'button',
-          {
-            onclick: () => {
-              rules.push({ id: `r-${Date.now()}`, tag: '', quota: 1, pct: 70, floor: null, ceiling: null, keepMin: 1, active: true, match: 'tag' });
-              render();
-              onEdit();
-            },
-          },
-          '+ Ajouter une étiquette',
-        ),
-        h('span', { class: 'grow' }),
-        quotaInfo,
-      ),
-      detectedTagsBlock(),
+      'header',
+      { class: 'row' },
+      h('img', { src: 'icons/icon-48.png', width: 32, height: 32, alt: '' }),
+      h('h1', { class: 'grow' }, 'Wiky-Traders – Réglages'),
+      h('a', { href: 'journal.html' }, 'Journal →'),
     ),
-    h('section', { class: 'card' }, h('h2', null, 'Prix et notifications'), settingsForm()),
-    h('section', { class: 'card' }, h('h2', null, 'Durée des enchères'), durationBlock()),
-    h('section', { class: 'card' }, h('h2', null, 'Liste noire'), blacklistBlock()),
-    h('section', { class: 'card' }, h('h2', null, 'Fonctionnalités'), featuresBlock()),
-    h('section', { class: 'card' }, h('h2', null, 'Automatisations'), automationBlock()),
-    h('section', { class: 'card' }, h('h2', null, 'Prix saisis à la main'), manualPricesBlock()),
-    h('section', { class: 'card' }, h('h2', null, 'Données'), cardsBlock(), selectorsBlock()),
     h(
-      'footer',
-      { class: 'row sticky' },
-      h('button', { class: 'primary', onclick: saveAll }, 'Enregistrer'),
-      status,
-      h('span', { class: 'grow' }),
-      h('button', { onclick: exportSettings }, 'Exporter (JSON)'),
-      h('button', { onclick: () => fileInput.click() }, 'Importer'),
-      fileInput,
-      h('button', { class: 'danger', onclick: wipe }, 'Effacer toutes les données'),
+      'div',
+      { class: 'layout' },
+      tocNav(),
+      h(
+        'main',
+        { class: 'sections' },
+        h('section', { class: 'card opt-section quick', id: 'demarrage' }, h('h2', null, 'Démarrage rapide'), ui.quick),
+        rulesSection(),
+        pricingSection(),
+        durationsSection(),
+        notificationsSection(),
+        displaySection(),
+        featuresSection(),
+        automationSection(),
+        advancedSection(),
+      ),
     ),
+    h('footer', { class: 'row sticky savebar' }, ui.saveBtn, ui.revertBtn, ui.status),
   );
-  validate();
+  refreshLive();
+  updateBar();
+  scrollTo(0, scroll);
 }
 
 async function load(): Promise<void> {
@@ -585,7 +1179,20 @@ async function load(): Promise<void> {
   rules = structuredClone(store.rules);
   settings = structuredClone(store.settings);
   manualPrices = { ...store.manualPrices };
+  selectorsInvalid = false;
+  baseline = snapshot({ rules, settings, manualPrices });
   render();
 }
+
+// Ctrl/Cmd+S enregistre ; avertissement en quittant la page avec des modifications.
+addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (!ui.saveBtn?.disabled) void saveAll();
+  }
+});
+addEventListener('beforeunload', (e) => {
+  if (!embedded && settings && isDirty(baseline, { rules, settings, manualPrices })) e.preventDefault();
+});
 
 void load();
