@@ -84,11 +84,14 @@ L'extension n'est pas publiée sur les boutiques : on la construit depuis les so
 ```bash
 git clone https://github.com/AndyB31/Wiky-Traders.git
 cd Wiky-Traders
-npm install
-npm run build
+make install
 ```
 
-Le dossier **`dist/`** contient l'extension prête à charger. (`npm run zip` produit en plus `wiky-traders.zip`.)
+`make install` vérifie Node.js, installe les dépendances, construit l'extension, **demande où l'installer** (par défaut `~/Wiky-Traders`), propose la mise à jour en un clic et affiche comment la charger dans ton navigateur. Sans question : `make install DEST=~/Wiky-Traders`. `make help` liste les autres commandes (`make update`, `make zip`…).
+
+Sans `make` : `npm install && npm run build`, puis charge le dossier **`dist/`**. (`npm run zip` produit en plus `wiky-traders.zip`.)
+
+> Le navigateur reconnaît une extension non empaquetée à son **dossier** : garde toujours le même (un nouveau dossier = nouvelle extension, sans tes réglages ; Réglages → Avancé → Exporter / Importer pour les reprendre).
 
 ### 3. Charger l'extension dans le navigateur
 

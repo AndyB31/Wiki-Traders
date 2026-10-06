@@ -16,9 +16,21 @@ Sur macOS, Node.js s'installe avec `brew install node` ; sous Windows, avec l'in
 
 ## 2. Construire l'extension
 
+Le plus simple :
+
 ```bash
 git clone https://github.com/AndyB31/Wiky-Traders.git
 cd Wiky-Traders
+make install
+```
+
+`make install` vérifie Node.js, installe les dépendances, construit, **demande le dossier d'installation** (par défaut `~/Wiky-Traders`), propose la mise à jour en un clic, puis affiche les étapes pour charger l'extension (Chrome, Arc, Edge, Brave, Firefox). Sans question : `make install DEST=~/Wiky-Traders`. Autres commandes : `make help`.
+
+> Le navigateur reconnaît une extension non empaquetée à son **dossier**. Tu l'utilises déjà depuis un dossier ? Donne le même pour garder tes réglages et tes familles. Un nouveau dossier = nouvelle extension (Réglages → Avancé → Exporter, puis Importer, pour reprendre tes réglages).
+
+Ou à la main :
+
+```bash
 npm install        # dépendances (une seule fois, puis après chaque mise à jour)
 npm run build      # crée le dossier dist/
 ```
@@ -71,11 +83,11 @@ Rien de tout ça ? Voir [Dépannage](Depannage.md#rien-napparait-sur-le-site).
 
 ### En un clic (recommandé)
 
-Installe une fois le **programme d'aide** (Node.js 20+), qui permet à l'extension de se mettre à jour elle-même :
+Installe une fois le **programme d'aide** (Node.js 20+), qui permet à l'extension de se mettre à jour elle-même — `make install` le propose, sinon :
 
 ```bash
 cd Wiky-Traders
-npm run updater:install
+make updater        # ou : npm run updater:install
 ```
 
 (Installation depuis un zip : `node <dossier de l'extension>/updater/install.mjs`.) Recharge l'extension (↻). Ensuite :

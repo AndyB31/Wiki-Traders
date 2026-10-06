@@ -12,7 +12,7 @@
  * La configuration (mode, dossiers) est écrite par install.mjs dans ~/.wiky-traders/config.json.
  */
 import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -60,7 +60,7 @@ function config() {
 }
 
 function installedBuild(cfg) {
-  const file = cfg.mode === 'git' ? join(cfg.dir, 'dist', 'build.json') : join(cfg.dir, 'build.json');
+  const file = cfg.extDir ? join(cfg.extDir, 'build.json') : cfg.mode === 'git' ? join(cfg.dir, 'dist', 'build.json') : join(cfg.dir, 'build.json');
   try {
     return JSON.parse(readFileSync(file, 'utf8'));
   } catch {
@@ -83,6 +83,9 @@ async function updateGit(cfg) {
     if (changed) await run(npmCmd, ['install', '--no-audit', '--no-fund'], dir);
   }
   await run(npmCmd, ['run', 'build'], dir);
+  // Extension installée hors du dépôt (make install) : on y recopie la nouvelle construction.
+  const dist = join(dir, 'dist');
+  if (cfg.extDir && cfg.extDir !== dist) cpSync(dist, cfg.extDir, { recursive: true, force: true });
   return { from: before, to: after };
 }
 

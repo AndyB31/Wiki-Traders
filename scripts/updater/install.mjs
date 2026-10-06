@@ -5,6 +5,7 @@
  *   Depuis le dépôt :            npm run updater:install
  *   Depuis un zip décompressé :  node <dossier de l'extension>/updater/install.mjs
  *   Identifiant précis :         … --id <identifiant affiché dans les réglages de l'extension>
+ *   Extension copiée ailleurs :  … --target <dossier>   (make install : la mise à jour y recopie la construction)
  *
  * Écrit ~/.wiky-traders/ (lanceur, configuration, manifeste) et enregistre le programme auprès des navigateurs
  * Chromium (Chrome, Arc, Brave, Edge, Chromium) : fichier dans leur dossier NativeMessagingHosts (macOS, Linux)
@@ -24,6 +25,11 @@ const os = platform();
 const args = process.argv.slice(2);
 const uninstall = args.includes('--uninstall');
 const ids = args.flatMap((a, i) => (a === '--id' && args[i + 1] ? [args[i + 1]] : []));
+/** Dossier où l'extension est installée, s'il n'est pas dist/ du dépôt (make install). */
+const target = (() => {
+  const i = args.indexOf('--target');
+  return i >= 0 && args[i + 1] ? resolve(args[i + 1].replace(/^~(?=$|\/)/, homedir())) : null;
+})();
 
 /** Identifiant d'une extension non empaquetée : SHA-256 de son chemin absolu, 32 premiers chiffres hexa en a–p. */
 export function unpackedId(path) {
@@ -53,6 +59,8 @@ if (basename(dirname(here)) === 'scripts' && existsSync(join(here, '..', '..', '
   extDir = dir;
   hostScript = join(here, 'host.mjs');
 }
+
+if (target && mode === 'git') extDir = target;
 
 const base = join(home, '.wiky-traders');
 const manifestDirs =
