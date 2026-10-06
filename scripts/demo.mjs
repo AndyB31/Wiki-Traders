@@ -170,7 +170,7 @@ const shell = (body) => `<!doctype html><html lang="fr" class="h-full"><head><me
 body{background:var(--color-background);color:var(--color-foreground);font-family:Inter,sans-serif;margin:0}
 .wm-family-nav{border:1px solid rgba(168,85,247,.24)!important;background:rgba(124,58,237,.07)!important;color:rgb(196,181,253)!important;text-decoration:none!important}
 .wm-family-nav-icon{display:inline-flex;align-items:center;justify-content:center;color:rgb(192,132,252)}</style></head>
-<body class="h-full"><div class="flex h-screen flex-col md:flex-row">${SITE_NAV}<main class="min-h-0 flex-1 overflow-y-auto">${body}</main></div></body></html>`;
+<body class="h-full"><script src="/_next/static/chunks/app.js"></script><div class="flex h-screen flex-col md:flex-row">${SITE_NAV}<main class="min-h-0 flex-1 overflow-y-auto">${body}</main></div></body></html>`;
 const settingsBody = `<div class="flex-1 p-4 md:p-6 space-y-6"><h1 class="text-2xl md:text-3xl font-bold">Paramètres</h1>
 <div role="tablist" class="flex gap-2"><button role="tab" aria-selected="true" class="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--color-surface-light)]">Compte</button><button role="tab" aria-selected="false" class="px-4 py-2 rounded-xl text-sm font-medium opacity-60">Affichage</button></div>
 <p class="opacity-50">Réglages du site…</p></div>`;
@@ -297,6 +297,15 @@ await ctx.route(`${SB_URL}/**`, (route) => {
     q.includes('status=eq.settled_sold') && q.includes('end_at=gte.') ? Object.entries(SOLD).flatMap(([r, prices]) =>
       prices.map((p, i) => ({ id: `m-${r}-${i}`, card_id: `mc-${r}-${i}`, final_price: p + 1, snapshot_rarity: r, is_shiny: false, end_at: iso(-3_600_000 * (i + 1)), status: 'settled_sold', card: { wikipedia_title: `Marché ${r} ${i}` } })),
     ) :
+    q.includes('status=in.(settled_sold,settled_unsold)') && q.includes('card_id=eq.') ? Array.from({ length: 34 }, (_, i) => {
+      const daysAgo = 88 - i * 2.6;
+      const rarity = i % 7 === 3 ? 'UR' : 'SR';
+      const base = rarity === 'UR' ? 120 : 30 + i * 1.4;
+      const sold = i % 9 !== 4;
+      const price = Math.round(base * (0.8 + ((i * 37) % 10) / 20));
+      return { id: `h${i}`, final_price: sold ? price : null, base_amount: Math.round(base * 0.6), snapshot_rarity: rarity, is_shiny: i === 20, end_at: iso(-daysAgo * 86_400_000), settled_at: iso(-daysAgo * 86_400_000), status: sold ? 'settled_sold' : 'settled_unsold' };
+    }) :
+    q.includes('select=card_id,snapshot_rarity,is_shiny,current_bid') ? [{ card_id: 'k1', snapshot_rarity: 'SR', is_shiny: false, current_bid: 72, base_amount: 40 }] :
     q.includes('seller_id=eq.') && q.includes('status=in.') ? [
       { id: 'v1', card_id: 'k1', base_amount: 40, final_price: 66, status: 'settled_sold', end_at: iso(-3_600_000), settled_at: iso(-3_590_000), snapshot_rarity: 'SR', is_shiny: false },
       { id: 'v2', card_id: 'k3', base_amount: 10, final_price: 12, status: 'settled_sold', end_at: iso(-7_200_000), settled_at: iso(-7_190_000), snapshot_rarity: 'PC', is_shiny: false },
@@ -318,6 +327,9 @@ await ctx.route(`${ORIGIN}/**`, (route) => {
   const url = new URL(route.request().url());
   if (/\.(png|jpe?g)$/.test(url.pathname)) return route.fulfill({ body: png, contentType: 'image/png' });
   if (url.pathname === '/_next/static/chunks/app.js') return route.fulfill({ body: `window.__sb={url:"${SB_URL}",key:"${SB_ANON}"};`, contentType: 'application/javascript' });
+  if (/^\/marketplace\/[0-9a-f-]{36}$/.test(url.pathname) && url.searchParams.has('detail')) return route.fulfill({ body: shell(`<div class="flex-1 p-4 md:p-6 space-y-6 max-w-3xl"><h1 class="text-2xl md:text-3xl font-bold">Enchère · Tour Eiffel</h1>
+    <div class="card-frame p-4 rounded-2xl" style="background:var(--color-surface);border:1px solid var(--color-border)"><h3 class="font-semibold mb-2">Historique des mises</h3>
+    <ul class="text-sm space-y-1 opacity-80"><li>72 W · il y a 3 min</li><li>60 W · il y a 20 min</li><li>40 W · mise de départ</li></ul></div></div>`), contentType: 'text/html' });
   if (url.pathname === '/settings' || url.searchParams.has('wiky')) return route.fulfill({ body: shell(url.pathname === '/settings' ? settingsBody : '<div class="p-6"><h1 class="text-3xl font-bold">Collection</h1></div>'), contentType: 'text/html' });
   if (url.pathname.startsWith('/collection')) return route.fulfill({ body: collection(), contentType: 'text/html' });
   if (url.pathname.startsWith('/marketplace')) return route.fulfill({ body: marketplace(url.searchParams.get('tab') ?? 'browse'), contentType: 'text/html' });
@@ -830,6 +842,16 @@ await integ.click('[data-wiky="mt-slot"]');
 await integ.waitForTimeout(600);
 await integ.screenshot({ path: join(shots, 'market-sales-slot.png') });
 await integ.keyboard.press('Escape');
+
+// Page d'une enchère : historique des prix de la carte, sous l'historique des mises.
+await integ.goto(`${ORIGIN}/marketplace/0f0e0d0c-0b0a-4909-8807-060504030201?detail=1`);
+await integ.waitForSelector('[data-wiky="price-history"] circle.dot', { timeout: 15000 });
+const phText = await integ.$eval('[data-wiky="price-history"] summary', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+ok(/ventes en SR/.test(phText), `historique des prix : ${phText}`);
+await integ.waitForTimeout(500);
+await integ.evaluate(() => document.querySelector('[data-wiky="price-history"]').scrollIntoView({ block: 'start' }));
+await integ.waitForTimeout(300);
+await integ.screenshot({ path: join(shots, 'price-history.png') });
 
 // Familles : import automatique des familles de « Prix moyen collection », page native du site.
 await integ.evaluate((f) => localStorage.setItem('wm_families_v1', f), JSON.stringify(FAMILIES));

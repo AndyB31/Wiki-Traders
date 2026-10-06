@@ -13,7 +13,16 @@ Le menu **Marché** de la barre latérale ouvre directement les onglets du site,
 
 ## Page d'une enchère
 
-En bas à gauche, **Même carte** liste les autres enchères en cours de la carte (prix, mise de départ ou en cours, temps restant, ✨), de la moins chère à la plus chère ; clic pour l'ouvrir. Relue toutes les 20 s, masquable (×).
+![Historique des prix](../screenshots/price-history.png)
+
+Sous l'historique des mises, la section **Historique des prix** (dépliable, état mémorisé) :
+
+- **chiffres clés** de la carte : ventes et invendues, moyenne et médiane, plus bas et plus haut, dernière vente, **tendance** (30 derniers jours contre les 30 précédents), **taux de vente** et gain moyen par rapport à la mise de départ, et l'écart de **cette enchère** à la moyenne ;
+- **graphique** de l'évolution du prix : un point par vente, coloré selon la rareté (plus gros : brillante), **moyenne glissante** (5 ventes) et la mise de cette enchère en pointillé ; au survol, le prix, la rareté, la date et la mise de départ ;
+- **filtres** : rareté (par défaut celle de l'enchère, comme la moyenne du site) et période (30 j, 90 j, tout) ;
+- la **liste** de toutes les enchères terminées de la carte.
+
+**Même carte** liste les autres enchères en cours de la carte (prix, mise de départ ou en cours, temps restant, ✨), de la moins chère à la plus chère ; clic pour l'ouvrir. Elle se place dans l'espace libre (à droite, sinon à gauche), ou sous l'historique des prix s'il n'y a pas la place. Relue toutes les 20 s, masquable (×).
 
 ## Mes ventes en cours
 

@@ -392,3 +392,77 @@ export function resetCatalog(): void {
   inflight.clear();
   loaded = null;
 }
+
+// ---------------------------------------------------------------- historique des ventes d'une carte
+
+export interface CardSale {
+  id: string;
+  price: number | null;
+  start: number | null;
+  rarity: Rarity | null;
+  shiny: boolean;
+  at: number;
+  sold: boolean;
+}
+
+const historyCache = new Map<string, { at: number; value: Promise<CardSale[]> }>();
+const HISTORY_TTL = 5 * 60_000;
+
+/** Toutes les enchères terminées d'une carte (vendues et invendues), de la plus ancienne à la plus récente. */
+export function cardSalesHistory(siteId: string, force = false): Promise<CardSale[]> {
+  const hit = historyCache.get(siteId);
+  if (!force && hit && Date.now() - hit.at < HISTORY_TTL) return hit.value;
+  const value = (async () => {
+    const { cfg, session } = await api();
+    const rows = await getAll<{ id: string; final_price: number | null; base_amount: number | null; snapshot_rarity: string | null; is_shiny: boolean | null; end_at: string | null; settled_at: string | null; status: string }>(
+      cfg,
+      session,
+      `auctions?select=id,final_price,base_amount,snapshot_rarity,is_shiny,end_at,settled_at,status&card_id=eq.${encodeURIComponent(siteId)}&status=in.(settled_sold,settled_unsold)&order=end_at.asc`,
+    );
+    return rows.flatMap((r) => {
+      const at = Date.parse(r.settled_at ?? r.end_at ?? '');
+      if (!Number.isFinite(at)) return [];
+      return [{
+        id: r.id,
+        price: r.status === 'settled_sold' ? r.final_price : null,
+        start: r.base_amount,
+        rarity: RARITIES.has(r.snapshot_rarity as Rarity) ? (r.snapshot_rarity as Rarity) : null,
+        shiny: !!r.is_shiny,
+        at,
+        sold: r.status === 'settled_sold' && r.final_price != null,
+      }];
+    });
+  })();
+  historyCache.set(siteId, { at: Date.now(), value });
+  value.catch(() => historyCache.delete(siteId));
+  return value;
+}
+
+export interface AuctionInfo {
+  cardId: string;
+  rarity: Rarity | null;
+  shiny: boolean;
+  current: number | null;
+  start: number | null;
+  hasBid: boolean;
+}
+
+/** Carte, rareté et mise actuelle d'une enchère. */
+export async function auctionInfo(auctionId: string): Promise<AuctionInfo | null> {
+  const { cfg, session } = await api();
+  const rows = await get<{ card_id: string; snapshot_rarity: string | null; is_shiny: boolean | null; current_bid: number | null; base_amount: number | null }[]>(
+    cfg,
+    session,
+    `auctions?select=card_id,snapshot_rarity,is_shiny,current_bid,base_amount&id=eq.${encodeURIComponent(auctionId)}&limit=1`,
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    cardId: r.card_id,
+    rarity: RARITIES.has(r.snapshot_rarity as Rarity) ? (r.snapshot_rarity as Rarity) : null,
+    shiny: !!r.is_shiny,
+    current: r.current_bid ?? r.base_amount,
+    start: r.base_amount,
+    hasBid: r.current_bid != null && r.current_bid > (r.base_amount ?? 0),
+  };
+}
