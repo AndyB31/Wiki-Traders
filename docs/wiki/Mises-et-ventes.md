@@ -24,7 +24,7 @@ Sous l'historique des mises, la section **Historique des prix** (dépliable, ét
   - **Points** : un point plein par vente (prix final ; plus gros : brillante), un point vide par enchère **sans acheteur ou annulée** (à sa mise de départ) ;
   - **Bougies** : une bougie par jour — ouverture, clôture, plus haut, plus bas ; verte si le prix monte dans la journée, rouge s'il baisse ;
   - **Ligne** : les ventes reliées (moyenne des ventes d'une même heure) ;
-- **moyenne glissante** réglable : aucune, **1 j, 2 j ou 3 j** (moyenne des ventes des N derniers jours), toujours dessinée par-dessus ; la mise de cette enchère en pointillé ; au survol, le détail de chaque point, bougie ou vente ;
+- **moyenne glissante** réglable : aucune, **2 j, 5 j, 7 j, 2 semaines ou 1 mois** (moyenne des ventes de la période ; 7 j par défaut), en orange, toujours dessinée par-dessus ; les ventes sont en bleu, plus fines ; la mise de cette enchère en pointillé ; au survol, le détail de chaque point, bougie ou vente ;
 - **filtres** : **Toutes / Vendues / Sans acheteur** et période (30 j, 90 j, tout) ;
 - la **liste** de toutes les enchères terminées de la carte.
 

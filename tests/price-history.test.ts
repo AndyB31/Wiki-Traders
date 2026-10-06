@@ -100,8 +100,9 @@ describe('page d\'une enchère : section « Historique des prix »', () => {
     document.querySelector<HTMLButtonElement>('[data-view="line"]')!.click();
     expect(document.querySelector('[data-wiky="price-history"] .sales-line')).not.toBeNull();
     expect(localStorage.getItem('wiky-ph-view')).toBe('line');
-    document.querySelector<HTMLButtonElement>('[data-avg="1"]')!.click();
-    expect(localStorage.getItem('wiky-ph-avg')).toBe('1');
+    expect([...document.querySelectorAll('[data-avg]')].map((b) => b.textContent)).toEqual(['Aucune', '2 j', '5 j', '7 j', '2 sem', '1 mois']);
+    document.querySelector<HTMLButtonElement>('[data-avg="14"]')!.click();
+    expect(localStorage.getItem('wiky-ph-avg')).toBe('14');
     const svg = document.querySelector('[data-wiky="price-history"] .ph-chart svg')!;
     expect(svg.lastElementChild!.previousElementSibling!.getAttribute('class')).toBe('avg');
     // Replier : mémorisé.

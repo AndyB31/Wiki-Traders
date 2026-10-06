@@ -6,16 +6,14 @@
  * Données : toutes les enchères terminées de la carte (une requête paginée), mises en cache 5 min.
  */
 import { formatDuration } from '../../lib/text';
-import type { Rarity } from '../../lib/types';
 import { auctionInfo, cardSalesHistory, type AuctionInfo, type CardSale } from '../catalog';
 import { candles, filterSales, historyStats, niceTicks, rollingMeanByTime, saleLine, type HistoryFilter, type OutcomeFilter } from './price-history-logic';
 import { registerFeature } from './runtime';
 
 const AUCTION_RE = /^\/marketplace\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
 const OPEN_KEY = 'wiky-price-history-open';
-/** Couleur de rareté du site (variables CSS du site), avec une valeur de secours distincte par rareté. */
-const RARITY_FALLBACK: Record<Rarity, string> = { C: '#9ca3af', PC: '#22c55e', R: '#3b82f6', SR: '#a855f7', UR: '#ef4444', L: '#f59e0b' };
-const rarityColor = (r: Rarity | null) => (r ? `var(--color-rarity-${r.toLowerCase()}, ${RARITY_FALLBACK[r]})` : '#9ca3af');
+/** Ventes (points, ligne) : bleu ciel, bien distinct de l'orange de la moyenne glissante, quelle que soit la rareté. */
+const SALES_COLOR = '#38bdf8';
 
 const CSS = `
 [data-wiky="price-history"] { width: 80%; max-width: 980px; margin: 16px auto 0; box-sizing: border-box; border-radius: 16px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-foreground); }
@@ -44,16 +42,16 @@ const CSS = `
 .ph-chart .axis text { fill: color-mix(in srgb, var(--color-foreground) 50%, transparent); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .ph-chart .avg { fill: none; stroke: #f97316; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .ph-chart .avg-halo { fill: none; stroke: var(--color-surface); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; opacity: .9; }
-.ph-chart .dot.soft { opacity: .55; }
-.ph-chart .sales-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ph-chart .dot.soft { opacity: .7; }
+.ph-chart .sales-line { fill: none; stroke-width: 1.25; stroke-linejoin: round; stroke-linecap: round; opacity: .85; }
 .ph-chart .candle line { stroke-width: 1.5; }
 .ph-chart .candle.up line, .ph-chart .candle.up rect { stroke: #22c55e; fill: #22c55e; }
 .ph-chart .candle.down line, .ph-chart .candle.down rect { stroke: #ef4444; fill: #ef4444; }
 .ph-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: color-mix(in srgb, var(--color-foreground) 50%, transparent); margin-right: 2px; }
 .ph-chart .cur { stroke: var(--color-foreground); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: .55; }
 .ph-chart .cur-label { fill: var(--color-foreground); font-size: 10.5px; opacity: .75; }
-.ph-chart .dot { stroke: var(--color-surface); stroke-width: 2; }
-.ph-chart .dot.unsold { fill: var(--color-surface); stroke: color-mix(in srgb, var(--color-foreground) 55%, transparent); stroke-width: 1.5; }
+.ph-chart .dot { stroke: var(--color-surface); stroke-width: 1; }
+.ph-chart .dot.unsold { fill: var(--color-surface); stroke: color-mix(in srgb, var(--color-foreground) 50%, transparent); stroke-width: 1.2; }
 .ph-chart .hit { fill: transparent; cursor: default; }
 .ph-tip { position: absolute; pointer-events: none; transform: translate(-50%, calc(-100% - 10px)); padding: 6px 9px; border-radius: 8px; font-size: 11.5px; white-space: nowrap;
   background: var(--color-background, #0c0d0c); border: 1px solid var(--color-border); box-shadow: 0 6px 20px rgba(0,0,0,.4); }
@@ -83,7 +81,11 @@ let resizeObs: ResizeObserver | null = null;
 /** Affichage du graphique et moyenne glissante (jours, 0 = aucune), mémorisés. */
 type ChartView = 'points' | 'candles' | 'line';
 let view: ChartView = (localStorageGet('wiky-ph-view') as ChartView | null) ?? 'points';
-let avgDays = Number(localStorageGet('wiky-ph-avg') ?? 2);
+/** Fenêtres de la moyenne glissante (jours) et leur libellé. */
+const AVG_WINDOWS: [days: number, label: string][] = [[0, 'Aucune'], [2, '2 j'], [5, '5 j'], [7, '7 j'], [14, '2 sem'], [30, '1 mois']];
+const savedAvg = Number(localStorageGet('wiky-ph-avg'));
+let avgDays = AVG_WINDOWS.some(([d]) => d === savedAvg) && localStorageGet('wiky-ph-avg') != null ? savedAvg : 7;
+const avgLabel = (d: number) => AVG_WINDOWS.find(([x]) => x === d)?.[1] ?? `${d} j`;
 /** Texte des info-bulles, dans l'ordre des zones de survol du graphique. */
 let tips: string[] = [];
 
@@ -182,7 +184,7 @@ function chartSvg(width: number): string {
   const plotW = width - pad.l - pad.r;
   const x = (t: number) => pad.l + ((t - t0) / span) * plotW;
   const y = (v: number) => pad.t + (1 - v / top) * (H - pad.t - pad.b);
-  const color = rarityColor(info?.rarity ?? sold.find((r) => r.rarity)?.rarity ?? null);
+  const color = SALES_COLOR;
   const showAvg = avgDays > 0 && sold.length > 1 && filter.outcome !== 'unsold';
   const grid = ticks.map((v) => `<line x1="${pad.l}" x2="${width - pad.r}" y1="${y(v)}" y2="${y(v)}"/>`).join('');
   const ylabels = ticks.map((v) => `<text x="${pad.l - 6}" y="${y(v) + 3.5}" text-anchor="end">${v.toLocaleString('fr-FR')}</text>`).join('');
@@ -201,8 +203,8 @@ function chartSvg(width: number): string {
       .map(({ r, v }) => {
         hit(x(r.at), y(v), tipOf(r));
         return r.sold
-          ? `<circle class="dot${showAvg ? ' soft' : ''}" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${r.shiny ? 5 : 4}" fill="${color}"/>`
-          : `<circle class="dot unsold" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4"/>`;
+          ? `<circle class="dot${showAvg ? ' soft' : ''}" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${r.shiny ? 3.5 : 2.5}" fill="${color}"/>`
+          : `<circle class="dot unsold" cx="${x(r.at).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.5"/>`;
       })
       .join('');
   } else if (view === 'candles') {
@@ -243,21 +245,21 @@ function filtersHtml(): string {
   );
   const per = ([[30, '30 j'], [90, '90 j'], [null, 'Tout']] as const).map(([d, l]) => chip(`data-days="${d ?? ''}"`, l, filter.days === d));
   const views = ([['points', 'Points'], ['candles', 'Bougies'], ['line', 'Ligne']] as const).map(([v, l]) => chip(`data-view="${v}"`, l, view === v));
-  const avgs = ([[0, 'Aucune'], [1, '1 j'], [2, '2 j'], [3, '3 j']] as const).map(([d, l]) => chip(`data-avg="${d}"`, l, avgDays === d));
+  const avgs = AVG_WINDOWS.map(([d, l]) => chip(`data-avg="${d}"`, l, avgDays === d));
   return `<div class="ph-filters">${out.join('')}<span class="ph-sep"></span>${per.join('')}</div>
     <div class="ph-filters"><span class="ph-lbl">Affichage</span>${views.join('')}<span class="ph-sep"></span><span class="ph-lbl">Moyenne glissante</span>${avgs.join('')}</div>`;
 }
 
 function legendHtml(): string {
   const rows = filterSales(sales ?? [], filter);
-  const color = rarityColor(info?.rarity ?? null);
+  const color = SALES_COLOR;
   const showAvg = avgDays > 0 && rows.filter((r) => r.sold).length > 1 && filter.outcome !== 'unsold';
   return [
     view === 'points' && rows.some((r) => r.sold) ? `<span><i style="background:${color}"></i>vente (prix final)</span>` : '',
     view === 'points' && rows.some((r) => !r.sold) ? '<span><i class="hollow"></i>sans acheteur ou annulée (mise de départ)</span>' : '',
     view === 'candles' ? '<span><i class="sq up"></i>hausse dans la journée</span><span><i class="sq down"></i>baisse dans la journée</span><span>mèche : plus haut / plus bas</span>' : '',
     view === 'line' ? `<span><span class="ln" style="background:${color}"></span>ventes (moyenne par heure)</span>` : '',
-    showAvg ? `<span><span class="ln"></span>moyenne glissante (${avgDays} j)</span>` : '',
+    showAvg ? `<span><span class="ln"></span>moyenne glissante (${avgLabel(avgDays)})</span>` : '',
     info?.current != null ? '<span><span class="dash"></span>cette enchère</span>' : '',
     view === 'points' && rows.some((r) => r.shiny) ? '<span>✨ point plus gros : brillante</span>' : '',
   ].join('');
