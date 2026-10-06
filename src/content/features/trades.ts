@@ -8,6 +8,7 @@
 import type { Rarity } from '../../lib/types';
 import { cardPrices, displayPrice, knownPrice, type CardPrice } from '../catalog';
 import { onSiteResponse } from '../net';
+import { discoverConfig, readSession } from '../api';
 import { type FeatureContext, registerFeature } from './runtime';
 import { ensureFeatureStyle, node, rarityChip, RARITY_COLORS, wiki } from './ui';
 
@@ -87,6 +88,41 @@ export function tradeSides(trade: Trade, prices: Map<string, CardPrice>): [Trade
   return [side(trade.initiator), side(trade.recipient)];
 }
 
+export interface TradeVerdict {
+  /** Phrase d'écart : l'échange avantage celui qui REÇOIT le plus (chaque colonne = ce qu'une personne donne). */
+  text: string;
+  /** Mon bilan (reçu − donné), null si je ne suis pas dans l'échange ou inconnu. */
+  mine: { net: number; give: number; get: number } | null;
+}
+
+/** Qui l'échange avantage, et mon bilan si je fais partie de l'échange. */
+export function tradeVerdict(sides: [TradeSide, TradeSide], meId: string | null): TradeVerdict {
+  const [a, b] = sides;
+  // a donne a.total et reçoit b.total : l'écart est en faveur de celui qui reçoit le plus.
+  const diff = b.total - a.total;
+  const text = diff === 0 ? 'Échange équilibré' : `Écart : ${wiki(Math.abs(diff))} en faveur de ${diff > 0 ? a.user.name : b.user.name} (qui reçoit le plus)`;
+  const me = meId ? sides.find((s) => s.user.id === meId) : undefined;
+  const other = me ? sides.find((s) => s !== me)! : undefined;
+  return { text, mine: me && other ? { net: other.total - me.total, give: me.total, get: other.total } : null };
+}
+
+/** Mon identifiant (session du site), pour le bilan « pour toi ». */
+let meId: string | null = null;
+let meAsked = false;
+function askMe(): void {
+  if (meAsked) return;
+  meAsked = true;
+  void discoverConfig()
+    .then((cfg) => {
+      meId = readSession(cfg).userId;
+      for (const n of document.querySelectorAll('[data-wiky="trade-values"]')) n.remove();
+      renderValues();
+    })
+    .catch(() => {
+      meId = null;
+    });
+}
+
 // ---------------------------------------------------------------- état
 
 const trades = new Map<string, Trade>();
@@ -148,6 +184,8 @@ const CSS = `
 [data-wiky="trade-values"] .wiky-tv-row span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 [data-wiky="trade-values"] .wiky-tv-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
 [data-wiky="trade-values"] .wiky-tv-diff { grid-column: 1 / -1; text-align: center; font-weight: 700; color: color-mix(in srgb, var(--color-foreground, #e7e5e4) 70%, transparent); }
+[data-wiky="trade-values"] .wiky-tv-diff.good { color: #4ade80; }
+[data-wiky="trade-values"] .wiky-tv-diff.bad { color: #f87171; }
 [data-wiky="trade-preview"] { display: inline-flex; flex-direction: column; width: 76px; flex: 0 0 76px; overflow: hidden; vertical-align: top; border-radius: 9px;
   border: 1px solid color-mix(in srgb, var(--wiky-rar, #94a3b8) 70%, transparent); background: var(--color-surface, #1c1917); }
 [data-wiky="trade-preview"] .wiky-tp-art { position: relative; height: 64px; display: grid; place-items: center; font-weight: 800; font-size: 18px;
@@ -166,7 +204,7 @@ function valuesPanel(trade: Trade, showCards: boolean): HTMLElement {
   for (const s of sides) {
     const col = node('div', 'part', 'wiky-tv-side');
     const head = node('div', 'part', 'wiky-tv-head');
-    head.append(node('span', 'part', '', s.user.name), node('b', 'part', '', s.missing && s.missing === s.cards.length && !s.user.wikibidous ? '—' : wiki(s.total)));
+    head.append(node('span', 'part', '', `${s.user.id === meId ? 'Tu donnes' : `${s.user.name} donne`}`), node('b', 'part', '', s.missing && s.missing === s.cards.length && !s.user.wikibidous ? '—' : wiki(s.total)));
     col.append(head);
     if (showCards) {
       for (const c of s.cards) {
@@ -185,8 +223,18 @@ function valuesPanel(trade: Trade, showCards: boolean): HTMLElement {
     if (s.missing) col.append(node('div', 'part', 'wiky-f-muted', `${s.missing} carte${s.missing > 1 ? 's' : ''} sans prix moyen`));
     panel.append(col);
   }
-  const diff = sides[1].total - sides[0].total;
-  panel.append(node('div', 'part', 'wiky-tv-diff', diff === 0 ? 'Échange équilibré' : `Écart : ${wiki(Math.abs(diff))} en faveur de ${diff > 0 ? sides[1].user.name : sides[0].user.name}`));
+  const v = tradeVerdict(sides, meId);
+  if (v.mine) {
+    const { net, give, get } = v.mine;
+    panel.append(
+      node(
+        'div',
+        'part',
+        `wiky-tv-diff ${net > 0 ? 'good' : net < 0 ? 'bad' : ''}`,
+        net === 0 ? `Pour toi : équilibré (tu donnes ${wiki(give)}, tu reçois ${wiki(get)})` : `Pour toi : ${net > 0 ? '+' : '−'}${wiki(Math.abs(net))} (tu donnes ${wiki(give)}, tu reçois ${wiki(get)})`,
+      ),
+    );
+  } else panel.append(node('div', 'part', 'wiky-tv-diff', v.text));
   return panel;
 }
 
@@ -316,6 +364,7 @@ function render(c: FeatureContext): void {
   // Valeurs : prix moyens lus via l'API (option « lecture via l'API »).
   const values = c.flags.tradeValues && c.apiRead;
   if (values) {
+    askMe();
     void loadPrices();
     renderValues();
   } else for (const n of document.querySelectorAll('[data-wiky="trade-values"]')) n.remove();

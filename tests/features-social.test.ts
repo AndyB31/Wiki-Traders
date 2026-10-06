@@ -235,3 +235,31 @@ describe('son des notifications', () => {
     expect(readNotificationCount()).toBeNull();
   });
 });
+
+describe('échange : à qui profite-t-il ?', () => {
+  it('je donne une carte à 600 contre une carte à 100 : −500 pour moi, en faveur de l\'autre', async () => {
+    const { tradeSides, tradeVerdict } = await import('../src/content/features/trades');
+    const trade = {
+      id: 't1',
+      status: 'pending',
+      initiator: { id: 'moi', name: 'Moi', wikibidous: 0 },
+      recipient: { id: 'pote', name: 'Pote', wikibidous: 0 },
+      items: [
+        { offeredBy: 'moi', card: { siteId: 'chere', title: 'Chère', rarity: 'UR' as const, imageUrl: null } },
+        { offeredBy: 'pote', card: { siteId: 'pascher', title: 'Pas chère', rarity: 'R' as const, imageUrl: null } },
+      ],
+    };
+    const prices = new Map([
+      ['chere', { median: 600, mean: 600, count: 3, at: 0 }],
+      ['pascher', { median: 100, mean: 100, count: 3, at: 0 }],
+    ]);
+    const sides = tradeSides(trade as never, prices);
+    const v = tradeVerdict(sides, 'moi');
+    expect(v.mine).toEqual({ net: -500, give: 600, get: 100 });
+    expect(v.text).toContain('en faveur de Pote');
+    // Vu par l'autre joueur : +500.
+    expect(tradeVerdict(sides, 'pote').mine!.net).toBe(500);
+    // Sans savoir qui je suis : seule la phrase, toujours en faveur de celui qui reçoit le plus.
+    expect(tradeVerdict(sides, null)).toMatchObject({ mine: null });
+  });
+});
