@@ -85,7 +85,11 @@ async function updateGit(cfg) {
   await run(npmCmd, ['run', 'build'], dir);
   // Extension installée hors du dépôt (make install) : on y recopie la nouvelle construction.
   const dist = join(dir, 'dist');
-  if (cfg.extDir && cfg.extDir !== dist) cpSync(dist, cfg.extDir, { recursive: true, force: true });
+  if (cfg.extDir && cfg.extDir !== dist) {
+    // build.json en dernier : l'extension se recharge quand il change, tous les autres fichiers doivent être en place.
+    cpSync(dist, cfg.extDir, { recursive: true, force: true, filter: (src) => !src.endsWith('build.json') });
+    cpSync(join(dist, 'build.json'), join(cfg.extDir, 'build.json'));
+  }
   return { from: before, to: after };
 }
 

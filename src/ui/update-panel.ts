@@ -62,6 +62,7 @@ export function updatePanel(): HTMLElement {
         { class: 'row' },
         h('button', { disabled: !!busy, onclick: check }, 'Vérifier les mises à jour'),
         h('button', { class: 'primary', disabled: !canUpdate, title: helper?.ok ? '' : 'Programme d\'aide non installé', onclick: update }, 'Mettre à jour'),
+        h('button', { title: 'Recharge l\'extension depuis son dossier (après make update ou git pull), puis les onglets WikiMasters', onclick: () => void ext.runtime.sendMessage({ type: 'reloadExtension' }) }, 'Recharger l\'extension'),
         h('span', { class: 'grow' }),
         h('a', { href: `${REPO_URL}/commits/main`, target: '_blank', rel: 'noopener' }, 'Historique sur GitHub'),
       ),

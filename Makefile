@@ -50,7 +50,7 @@ install: build ## Construit, copie l'extension dans le dossier choisi et expliqu
 	  if [ -d "$$dest" ] && [ -n "$$(ls -A "$$dest" 2>/dev/null)" ] && [ ! -f "$$dest/manifest.json" ]; then \
 	    echo "✗ $$dest existe et ne contient pas une extension Wiki-Traders : choisis un dossier vide ou nouveau."; exit 1; \
 	  fi; \
-	  mkdir -p "$$dest" && cp -R dist/. "$$dest/"; \
+	  mkdir -p "$$dest" && rsync -a --exclude build.json dist/ "$$dest/" && cp dist/build.json "$$dest/"; \
 	fi; \
 	echo "$$dest" > $(TARGET_FILE); \
 	echo ""; echo "✔ Extension installée dans : $$dest"; \
@@ -81,7 +81,7 @@ install: build ## Construit, copie l'extension dans le dossier choisi et expliqu
 update: ## Récupère main, reconstruit et met à jour le dossier installé
 	@git pull --ff-only --autostash origin main
 	@$(MAKE) --no-print-directory build
-	@if [ -f $(TARGET_FILE) ] && [ "$$(cat $(TARGET_FILE))" != "$$PWD/dist" ]; then cp -R dist/. "$$(cat $(TARGET_FILE))/"; echo "✔ $$(cat $(TARGET_FILE)) mis à jour"; fi
+	@if [ -f $(TARGET_FILE) ] && [ "$$(cat $(TARGET_FILE))" != "$$PWD/dist" ]; then rsync -a --exclude build.json dist/ "$$(cat $(TARGET_FILE))/" && cp dist/build.json "$$(cat $(TARGET_FILE))/"; echo "✔ $$(cat $(TARGET_FILE)) mis à jour"; fi
 	@echo "→ Clique ↻ sur l'extension (page des extensions) puis recharge les onglets WikiMasters."
 
 updater: ## Installe le programme d'aide (mise à jour en un clic)

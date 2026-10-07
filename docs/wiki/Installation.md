@@ -97,6 +97,8 @@ make updater        # ou : npm run updater:install
 
 La vérification se fait au démarrage, toutes les 6 h, et à la demande. Pour désinstaller le programme d'aide : `npm run updater:uninstall`.
 
+**Pas besoin de passer par la page des extensions** : après « Mettre à jour », l'extension se recharge d'elle-même ainsi que les onglets WikiMasters. Après une mise à jour à la main (`make update`, `git pull` + construction), elle détecte la nouvelle version dans son dossier en moins d'une minute et se recharge toute seule ; le bouton **Recharger l'extension** (Réglages → Mises à jour) le fait tout de suite.
+
 ### À la main
 
 ```bash
@@ -106,10 +108,7 @@ npm install
 npm run build
 ```
 
-Ensuite :
-
-1. page des extensions → **↻** sous Wiki-Traders ;
-2. **recharge chaque onglet WikiMasters ouvert** : une extension rechargée ne remplace pas le script déjà chargé dans une page.
+L'extension détecte la nouvelle version en moins d'une minute et se recharge toute seule, avec les onglets WikiMasters (ou bouton **Recharger l'extension** dans Réglages → Mises à jour).
 
 Tes réglages, ta collection connue et ton journal sont conservés.
 

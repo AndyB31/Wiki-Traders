@@ -7,7 +7,7 @@ import { reliableBase } from '../lib/pricing';
 import { load, loadAll, onStoreChange, save } from '../lib/storage';
 import { inQuietHours } from '../lib/time';
 import type { Card, JournalEntry, MyAuction, PriceObs, StoreShape } from '../lib/types';
-import { checkForUpdate, UPDATE_KEY, UPDATER_HOST, type UpdateInfo } from '../lib/update';
+import { BUILD, checkForUpdate, UPDATE_KEY, UPDATER_HOST, type BuildInfo, type UpdateInfo } from '../lib/update';
 
 const ALARM_PREFIX = 'auction:';
 const NOTIF_ID = 'wiky-slot';
@@ -235,9 +235,32 @@ async function updater(cmd: 'ping' | 'update'): Promise<Record<string, unknown>>
 async function applyUpdate(): Promise<Record<string, unknown>> {
   const res = await updater('update');
   if (!res.ok) return res;
+  return (await reloadExtension(), res);
+}
+
+/** Recharge l'extension depuis son dossier ; les onglets WikiMasters sont rechargés au redémarrage. */
+async function reloadExtension(): Promise<{ ok: true }> {
   await ext.storage.local.set({ [RELOAD_FLAG]: Date.now() });
   setTimeout(() => ext.runtime.reload(), 300);
-  return res;
+  return { ok: true };
+}
+
+const BUILD_ALARM = 'build-watch';
+
+/**
+ * Nouvelle version construite dans le dossier de l'extension (make update, git pull + build…) : le fichier build.json
+ * du dossier (lu tel qu'il est sur le disque) ne correspond plus à la version qui tourne → rechargement automatique,
+ * sans passer par la page des extensions.
+ */
+async function watchBuild(): Promise<void> {
+  if (!BUILD.builtAt) return;
+  try {
+    const res = await fetch(ext.runtime.getURL('build.json'), { cache: 'no-store' });
+    const onDisk = (await res.json()) as BuildInfo;
+    if (onDisk.builtAt && onDisk.builtAt !== BUILD.builtAt) await reloadExtension();
+  } catch {
+    // build.json absent (construction en cours) : on réessaie à la prochaine vérification.
+  }
 }
 
 /** Après une mise à jour : recharge les onglets WikiMasters (leur script était celui de l'ancienne version). */
@@ -250,6 +273,11 @@ async function afterUpdateReload(): Promise<void> {
   void runUpdateCheck();
 }
 void afterUpdateReload();
+// Surveillance du dossier de l'extension (toutes les minutes, le minimum des alarmes) et dès le démarrage.
+void ext.alarms.get(BUILD_ALARM).then((a) => {
+  if (!a) void ext.alarms.create(BUILD_ALARM, { delayInMinutes: 1, periodInMinutes: 1 });
+});
+void watchBuild();
 
 ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
   const msg = raw as ToBackground;
@@ -257,8 +285,8 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
     sendResponse({ tabId: sender.tab?.id ?? null });
     return false;
   }
-  if (msg.type === 'checkUpdate' || msg.type === 'updaterStatus' || msg.type === 'applyUpdate') {
-    const job = msg.type === 'checkUpdate' ? runUpdateCheck() : msg.type === 'updaterStatus' ? updater('ping') : applyUpdate();
+  if (msg.type === 'checkUpdate' || msg.type === 'updaterStatus' || msg.type === 'applyUpdate' || msg.type === 'reloadExtension') {
+    const job = msg.type === 'checkUpdate' ? runUpdateCheck() : msg.type === 'updaterStatus' ? updater('ping') : msg.type === 'reloadExtension' ? reloadExtension() : applyUpdate();
     void job.then(sendResponse, (e) => sendResponse({ ok: false, error: String(e) }));
     return true;
   }
@@ -294,6 +322,10 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
 ext.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === UPDATE_ALARM) {
     void runUpdateCheck();
+    return;
+  }
+  if (alarm.name === BUILD_ALARM) {
+    void watchBuild();
     return;
   }
   if (alarm.name.startsWith(ALARM_PREFIX)) void serial(() => onAuctionEnd(alarm.name.slice(ALARM_PREFIX.length)));

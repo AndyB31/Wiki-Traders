@@ -128,7 +128,7 @@ Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
 **En un clic** : installe une fois le programme d'aide (`make install` le propose, sinon `make updater`). Quand `main` a des nouveautés, le récapitulatif affiche **« ↑ Mise à jour disponible »** ; Réglages → **Mises à jour** → **Mettre à jour** récupère la dernière version, reconstruit, recharge l'extension et les onglets WikiMasters.
 
-**À la main** : `make update` (ou `git pull && npm install && npm run build`), puis **↻** sous Wiki-Traders dans la page des extensions et **recharge les onglets WikiMasters** (une extension rechargée ne remplace pas le script d'une page déjà ouverte). Tes réglages et données sont conservés.
+**À la main** : `make update` (ou `git pull && npm install && npm run build`). L'extension détecte la nouvelle version dans son dossier en moins d'une minute et **se recharge toute seule**, avec les onglets WikiMasters (ou tout de suite : Réglages → Mises à jour → **Recharger l'extension**). Tes réglages et données sont conservés.
 
 **Sans le dépôt** : le dernier zip construit est publié à chaque mise à jour de `main` dans la release [« Dernière version »](https://github.com/AndyB31/Wiki-Traders/releases/tag/latest) : décompresse-le dans le **même dossier** qu'avant, puis ↻.
 
