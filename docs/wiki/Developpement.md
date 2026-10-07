@@ -43,4 +43,4 @@ Avec `npm run dev`, recharge l'extension (↻) puis l'onglet du site après chaq
 
 ## Contribuer
 
-Issues et pull requests bienvenues sur [GitHub](https://github.com/AndyB31/Wiky-Traders). Joins un **diagnostic** pour tout problème de lecture du site.
+Issues et pull requests bienvenues sur [GitHub](https://github.com/AndyB31/Wiki-Traders). Joins un **diagnostic** pour tout problème de lecture du site.

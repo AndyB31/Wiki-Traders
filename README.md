@@ -81,8 +81,8 @@ L'extension n'est pas publiée sur les boutiques : on la construit depuis les so
 ### 2. Récupérer et construire l'extension
 
 ```bash
-git clone https://github.com/AndyB31/Wiky-Traders.git
-cd Wiky-Traders
+git clone https://github.com/AndyB31/Wiki-Traders.git
+cd Wiki-Traders
 make install
 ```
 
@@ -104,7 +104,7 @@ Sans `make` : `npm install && npm run build`, puis charge le dossier **`dist/`**
 
 1. Ouvre `arc://extensions` (ou `chrome://extensions`).
 2. Active le **Mode développeur**, puis **Load unpacked** → dossier `dist/`.
-3. Vérifie que la carte « Wiki-Traders » indique bien *Loaded from: …/Wiky-Traders/dist*.
+3. Vérifie que la carte « Wiki-Traders » indique bien *Loaded from: …/Wiki-Traders/dist*.
 
 **Firefox (128+)**
 
@@ -130,7 +130,7 @@ Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
 **À la main** : `make update` (ou `git pull && npm install && npm run build`), puis **↻** sous Wiki-Traders dans la page des extensions et **recharge les onglets WikiMasters** (une extension rechargée ne remplace pas le script d'une page déjà ouverte). Tes réglages et données sont conservés.
 
-**Sans le dépôt** : le dernier zip construit est publié à chaque mise à jour de `main` dans la release [« Dernière version »](https://github.com/AndyB31/Wiky-Traders/releases/tag/latest) : décompresse-le dans le **même dossier** qu'avant, puis ↻.
+**Sans le dépôt** : le dernier zip construit est publié à chaque mise à jour de `main` dans la release [« Dernière version »](https://github.com/AndyB31/Wiki-Traders/releases/tag/latest) : décompresse-le dans le **même dossier** qu'avant, puis ↻.
 
 ### 6. Désinstaller
 

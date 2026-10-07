@@ -16,7 +16,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'no
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-const REPO = 'AndyB31/Wiky-Traders';
+const REPO = 'AndyB31/Wiki-Traders';
 const ZIP_URL = `https://github.com/${REPO}/releases/download/latest/wiki-traders.zip`;
 const CONFIG = process.env.WIKY_UPDATER_CONFIG || join(homedir(), '.wiky-traders', 'config.json');
 

@@ -19,8 +19,8 @@ Sur macOS, Node.js s'installe avec `brew install node` ; sous Windows, avec l'in
 Le plus simple :
 
 ```bash
-git clone https://github.com/AndyB31/Wiky-Traders.git
-cd Wiky-Traders
+git clone https://github.com/AndyB31/Wiki-Traders.git
+cd Wiki-Traders
 make install
 ```
 
@@ -86,7 +86,7 @@ Rien de tout ça ? Voir [Dépannage](Depannage.md#rien-napparait-sur-le-site).
 Installe une fois le **programme d'aide** (Node.js 20+), qui permet à l'extension de se mettre à jour elle-même — `make install` le propose, sinon :
 
 ```bash
-cd Wiky-Traders
+cd Wiki-Traders
 make updater        # ou : npm run updater:install
 ```
 
@@ -100,7 +100,7 @@ La vérification se fait au démarrage, toutes les 6 h, et à la demande. Pour d
 ### À la main
 
 ```bash
-cd Wiky-Traders
+cd Wiki-Traders
 git pull
 npm install
 npm run build

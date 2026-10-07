@@ -57,7 +57,7 @@ Le détail du calcul est affiché à côté de chaque prix. Voir [Prix conseill�
 WikiMasters change ses classes CSS à chaque mise à jour. L'extension préfère afficher « page non reconnue » plutôt que des données fausses.
 
 1. Sur la page en question : **Outils → Diagnostic**. Un fichier JSON est téléchargé : le plan de la page (balises, classes, textes courts, **jamais** le contenu des champs), un échantillon des données lues et les dernières étapes des automatisations.
-2. Ajuste Réglages → Données → **Sélecteurs avancés**, ou [ouvre une issue](https://github.com/AndyB31/Wiky-Traders/issues) avec le fichier.
+2. Ajuste Réglages → Données → **Sélecteurs avancés**, ou [ouvre une issue](https://github.com/AndyB31/Wiki-Traders/issues) avec le fichier.
 
 ## FAQ
 

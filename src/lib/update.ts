@@ -17,7 +17,7 @@ declare const __WIKY_BUILD__: BuildInfo | undefined;
 
 export const BUILD: BuildInfo = typeof __WIKY_BUILD__ !== 'undefined' ? __WIKY_BUILD__ : { sha: null, dirty: false, date: null, builtAt: null };
 
-export const REPO = 'AndyB31/Wiky-Traders';
+export const REPO = 'AndyB31/Wiki-Traders';
 export const REPO_URL = `https://github.com/${REPO}`;
 export const UPDATER_HOST = 'com.wikytraders.updater';
 /** Clé de stockage du dernier résultat de vérification. */
