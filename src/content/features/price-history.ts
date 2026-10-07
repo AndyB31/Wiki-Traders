@@ -70,7 +70,12 @@ const CSS = `
 .ph-table th, .ph-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--color-border); }
 .ph-table th { font-weight: 600; color: color-mix(in srgb, var(--color-foreground) 55%, transparent); position: sticky; top: 0; background: var(--color-surface); }
 @media (max-width: 900px) { .wiky-ph { width: 100%; } }
-.wiky-ph.ph-sell { width: 100%; max-width: 32rem; margin: 0; flex-shrink: 0; }
+.wiky-ph.ph-sell { width: 100%; margin: 0; box-sizing: border-box; }
+.wiky-ph.ph-compact .ph-tiles { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; }
+.wiky-ph.ph-compact .ph-tile { padding: 5px 8px; border-radius: 10px; }
+.wiky-ph.ph-compact .ph-tile b { font-size: 13.5px; }
+.wiky-ph.ph-compact .ph-tile small { font-size: 9.5px; }
+.ph-tile[title] { cursor: help; }
 .ph-body details > summary { cursor: pointer; font-size: 12px; color: color-mix(in srgb, var(--color-foreground) 65%, transparent); }
 `;
 
@@ -118,12 +123,13 @@ export class PriceHistoryPanel {
   private resizeObs: ResizeObserver | null = null;
 
   /** `wiky`: valeur de `data-wiky` ; `openKey` : clé où l'état replié / déplié est mémorisé. */
-  constructor(wiky: string, openKey: string, extraClass = '') {
+  /** `compact` : tuiles plus petites, leurs précisions en info-bulle (fenêtre de vente). */
+  constructor(wiky: string, openKey: string, extraClass = '', private readonly compact = false) {
     ensureStyle();
     const box = document.createElement('details');
     this.el = box;
     box.setAttribute('data-wiky', wiky);
-    box.className = `wiky-ph ${extraClass}`.trim();
+    box.className = `wiky-ph ${extraClass}${compact ? ' ph-compact' : ''}`.trim();
     box.open = localStorageGet(openKey) !== '0';
     box.innerHTML = `<summary><span class="ph-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span><span>Historique des prix <span class="ph-sub"></span></span><svg class="ph-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></summary><div class="ph-body"></div>`;
     box.addEventListener('toggle', () => {
@@ -177,16 +183,20 @@ export class PriceHistoryPanel {
 
   private tilesHtml(): string {
     const s = historyStats(this.rows());
-    const trend = s.trend30 == null ? '<b>—</b><span>pas assez de ventes</span>' : `<b class="${s.trend30 >= 0 ? 'ph-up' : 'ph-down'}">${s.trend30 > 0 ? '+' : ''}${s.trend30} %</b><span>30 j vs 30 j avant</span>`;
+    const trend = s.trend30 == null ? '<b>—</b>' : `<b class="${s.trend30 >= 0 ? 'ph-up' : 'ph-down'}">${s.trend30 > 0 ? '+' : ''}${s.trend30} %</b>`;
     const cur = this.info?.current;
     const vsMean = cur != null && s.mean ? Math.round(((cur - s.mean) / s.mean) * 100) : null;
-    const tile = (label: string, value: string, sub = '') => `<div class="ph-tile"><small>${label}</small>${value}${sub ? `<span>${sub}</span>` : ''}</div>`;
+    // Précision sous la valeur, ou en info-bulle en mode compact.
+    const tile = (label: string, value: string, sub = '') =>
+      this.compact
+        ? `<div class="ph-tile"${sub ? ` title="${esc(sub)}"` : ''}><small>${label}</small>${value}</div>`
+        : `<div class="ph-tile"><small>${label}</small>${value}${sub ? `<span>${sub}</span>` : ''}</div>`;
     return [
       tile('Ventes', `<b>${s.sold}</b>`, `${s.unsold} sans acheteur${s.cancelled ? ` (dont ${s.cancelled} annulée${s.cancelled > 1 ? 's' : ''})` : ''}`),
       tile('Moyenne', `<b>${w(s.mean)}</b>`, `médiane ${w(s.median)}`),
       tile('Plus bas · haut', `<b>${w(s.min)}</b>`, `jusqu'à ${w(s.max)}`),
       tile('Dernière vente', `<b>${w(s.last?.price)}</b>`, s.last ? `il y a ${formatDuration(Date.now() - s.last.at)}` : ''),
-      `<div class="ph-tile"><small>Tendance</small>${trend}</div>`,
+      tile('Tendance', trend, s.trend30 == null ? 'pas assez de ventes' : '30 j vs 30 j avant'),
       tile(
         'Taux de vente',
         `<b>${s.sellRate == null ? '—' : `${s.sellRate} %`}</b>`,

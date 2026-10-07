@@ -48,11 +48,11 @@ export interface SellRate {
 const rates = new Map<string, SellRate | null>();
 
 export function priceSummary(p: CardPrice | undefined, rate?: SellRate | null): { value: string; meta: string } {
-  const rateText = rate ? ` · taux de vente <b>${rate.pct} %</b> (${rate.sold}/${rate.total})` : '';
+  const rateText = rate ? ` · <span title="Taux de vente : enchères conclues sur toutes les enchères terminées de la carte">tdv</span> <b>${rate.pct} %</b> (${rate.sold}/${rate.total})` : '';
   if (!p) return { value: '…', meta: 'Chargement des ventes…' };
   if (!p.count) return { value: '—', meta: `Aucune vente conclue${rateText}` };
   const range = p.min != null && p.max != null ? ` · min <b>${formatW(p.min)}</b> · max <b>${formatW(p.max)}</b>` : '';
-  const median = p.median != null ? ` · médiane <b>${formatW(p.median)}</b>` : '';
+  const median = p.median != null ? ` · med <b>${formatW(p.median)}</b>` : '';
   return { value: `${formatW(p.mean)} W`, meta: `<b>${p.count}</b> vente${p.count > 1 ? 's' : ''}${median}${range}${rateText}` };
 }
 

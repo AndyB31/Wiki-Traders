@@ -28,6 +28,8 @@ export interface PricingContext {
   obsByCard: Map<string, PriceObs[]>;
   manualPrices: Record<string, number>;
   now: number;
+  /** Vrai prix moyen de la carte (ventes lues via l'API du site), s'il est connu. */
+  catalogPrice?: (card: Card) => number | null;
   /** Cache des prix de référence par rareté (rempli à la demande). */
   rarityCache?: Map<string, BasePrice | null>;
 }
@@ -97,6 +99,9 @@ function stat(values: number[], settings: Settings): number | null {
 export function reliableBase(card: Card, ctx: PricingContext): BasePrice {
   // Un prix moyen de 0 (ou négatif) affiché par le site n'a pas de sens : on l'ignore.
   if (card.sitePrice != null && card.sitePrice > 0) return { value: card.sitePrice, source: 'site', samples: 0 };
+  // Vrai prix moyen de la carte lu via l'API (prioritaire sur nos relevés et sur toute médiane de rareté).
+  const api = ctx.catalogPrice?.(card);
+  if (api != null && api > 0) return { value: api, source: 'site', samples: 0 };
   const samples = windowSamples(card.id, ctx);
   if (samples.length >= MIN_SALES) return { value: stat(samples, ctx.settings), source: 'history', samples: samples.length };
   return { value: null, source: 'none', samples: samples.length };
@@ -131,6 +136,8 @@ export function rarityBase(rarity: Card['rarity'], shiny: boolean, ctx: PricingC
  */
 export function ownPrice(card: Card, ctx: PricingContext): number | null {
   if (card.sitePrice != null && card.sitePrice > 0) return card.sitePrice;
+  const api = ctx.catalogPrice?.(card);
+  if (api != null && api > 0) return api;
   const samples = windowSamples(card.id, ctx);
   if (samples.length) return stat(samples, ctx.settings);
   return ctx.manualPrices[card.id] ?? null;

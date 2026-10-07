@@ -65,7 +65,10 @@ export interface AllocationResult {
 export type AllocationInput = Pick<
   StoreShape,
   'rules' | 'settings' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots'
->;
+> & {
+  /** Vrai prix moyen d'une carte (cache des prix lus via l'API), prioritaire sur la médiane de la rareté. */
+  catalogPrice?: (card: Card) => number | null;
+};
 
 export function isActive(a: MyAuction, now: number): boolean {
   return a.endsAt == null || a.endsAt > now;
@@ -77,6 +80,7 @@ export function makeContext(input: AllocationInput, now: number): PricingContext
     cards: input.cards,
     obsByCard: indexObs(input.priceObs),
     manualPrices: input.manualPrices,
+    catalogPrice: input.catalogPrice,
     now,
   };
 }

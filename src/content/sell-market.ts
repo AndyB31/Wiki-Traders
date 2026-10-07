@@ -2,7 +2,8 @@
  * Fenêtre « Mettre aux enchères » du site : on y ajoute, comme si c'était le site,
  *  - sous « Marché · <rareté> » : un résumé compact des offres en cours de cette carte (nombre, min, médiane, max) ;
  *  - sous la fenêtre : la liste des enchères en cours de cette carte (prix, durée restante) ;
- *  - dessous : l'« Historique des prix » de la carte, le même que sur la page d'une enchère.
+ *  - à droite (dessous sur un écran étroit) : l'« Historique des prix » de la carte, comme sur la page d'une enchère,
+ *    en version compacte.
  * Données lues via l'API (option « apiRead »), mises en cache une minute. Chaque partie est désactivable.
  */
 import { formatDuration, formatPrice, normalize, RARITIES } from '../lib/text';
@@ -136,12 +137,34 @@ function listNode(card: Card, auctions: CardAuction[] | null, error?: string): H
 let current = '';
 let history: PriceHistoryPanel | null = null;
 
+/** Attribut posé sur la fenêtre du site : historique des prix à droite (en dessous sur un écran étroit). */
+const LAYOUT_ATTR = 'data-wiky-sell-layout';
+const LAYOUT_CSS = `
+[${LAYOUT_ATTR}] { display: grid !important; grid-template-columns: minmax(0, 32rem) minmax(0, 38rem); justify-content: center; align-content: safe center;
+  align-items: start; gap: 12px; overflow-y: auto; }
+[${LAYOUT_ATTR}] > [data-wiky="market-list"] { grid-column: 1; grid-row: 2; }
+[${LAYOUT_ATTR}] > [data-wiky="sell-history"] { grid-column: 2; grid-row: 1 / span 2; max-height: calc(100dvh - 2rem); overflow-y: auto; }
+@media (max-width: 1100px) {
+  [${LAYOUT_ATTR}] { grid-template-columns: minmax(0, 32rem); }
+  [${LAYOUT_ATTR}] > [data-wiky="sell-history"] { grid-column: 1; grid-row: 3; max-height: none; overflow: visible; }
+}`;
+
+function ensureLayoutStyle(): void {
+  if (document.getElementById('wiky-sell-layout-style')) return;
+  const s = document.createElement('style');
+  s.id = 'wiky-sell-layout-style';
+  s.setAttribute('data-wiky', 'style');
+  s.textContent = LAYOUT_CSS;
+  (document.head ?? document.documentElement).append(s);
+}
+
 const WIKY_NODES = '[data-wiky="market-summary"], [data-wiky="market-list"], [data-wiky="sell-history"]';
 
 function clearNodes(): void {
   history?.destroy();
   history = null;
   for (const n of qsa(document, WIKY_NODES)) n.remove();
+  for (const n of qsa(document, `[${LAYOUT_ATTR}]`)) n.removeAttribute(LAYOUT_ATTR);
 }
 
 /** À appeler à chaque relecture de la page : ajoute / met à jour / retire les compléments de la fenêtre de vente. */
@@ -172,16 +195,16 @@ export function enhanceSellDialog(state: SellMarketState): void {
   current = key;
   clearNodes();
   const ov = overlay as HTMLElement;
-  // La fenêtre du site est centrée en ligne : on empile nos blocs dessous (défilement si ça dépasse l'écran).
+  // La fenêtre du site est centrée en ligne : on empile la liste dessous.
   const stack = () => {
     if (getComputedStyle(ov).flexDirection !== 'column') Object.assign(ov.style, { flexDirection: 'column', gap: '12px' });
   };
   if (wantHistory) {
-    const panel = (history = new PriceHistoryPanel('sell-history', 'wiky-sell-price-history-open', 'ph-sell'));
+    const panel = (history = new PriceHistoryPanel('sell-history', 'wiky-sell-price-history-open', 'ph-sell', true));
     // La fenêtre du site se ferme au clic à l'extérieur : notre section ne doit pas déclencher cette fermeture.
     for (const type of ['click', 'mousedown', 'pointerdown']) panel.el.addEventListener(type, (e) => e.stopPropagation());
-    stack();
-    Object.assign(ov.style, { overflowY: 'auto', justifyContent: 'safe center' });
+    ensureLayoutStyle();
+    ov.setAttribute(LAYOUT_ATTR, '');
     (overlay.querySelector(':scope > [data-wiky="market-list"]') ?? frame).after(panel.el);
     panel.update();
   }

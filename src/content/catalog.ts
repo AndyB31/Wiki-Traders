@@ -7,10 +7,11 @@
  *    gardés en mémoire et dans le stockage de l'extension (6 h) ;
  *  - les demandes simultanées sont regroupées (une seule requête en vol par carte).
  */
+import { catalogPrice } from '../lib/autotag';
 import { ext } from '../lib/browser';
 import { CARD_PRICES_KEY } from '../lib/defaults';
 import { median } from '../lib/pricing';
-import type { CatalogCard, Rarity } from '../lib/types';
+import type { Card, CatalogCard, Rarity } from '../lib/types';
 import { discoverConfig, get, getAll, inList, readSession } from './api';
 
 const RARITIES = new Set<Rarity>(['C', 'PC', 'R', 'SR', 'UR', 'L']);
@@ -241,6 +242,12 @@ function persistPrices(): void {
 /** Prix déjà connus (synchrone, pour un affichage immédiat). */
 export function knownPrice(siteId: string): CardPrice | undefined {
   return prices.get(siteId);
+}
+
+/** Vrai prix moyen d'une carte de ma collection d'après le cache (pour le prix conseillé) ; lit le cache stocké au besoin. */
+export function knownCardPrice(card: Card): number | null {
+  void loadPrices();
+  return card.siteId ? catalogPrice(knownPrice(card.siteId), card.rarity) : null;
 }
 
 async function fetchPrices(ids: string[]): Promise<void> {

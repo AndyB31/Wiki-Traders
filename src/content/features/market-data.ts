@@ -3,6 +3,7 @@
  * règles, mes ventes en cours, prix observés, mises et ventes terminées. Rechargées quand elles changent.
  */
 import type { AllocationInput } from '../../lib/allocation';
+import { knownCardPrice } from '../catalog';
 import { load, onStoreChange, type StoreKey } from '../../lib/storage';
 import type { MyBidsResult, MySalesResult, StoreShape } from '../../lib/types';
 import type { FeatureContext } from './runtime';
@@ -54,6 +55,7 @@ export function allocationInput(ctx: FeatureContext, d: MarketData): AllocationI
     manualPrices: d.manualPrices,
     slotOverrides: d.slotOverrides,
     ignoredSlots: d.ignoredSlots,
+    catalogPrice: knownCardPrice,
   };
 }
 

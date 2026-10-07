@@ -1,10 +1,10 @@
 import { ext } from '../lib/browser';
 import { catalogPrice, planAutoTags, type TagChange } from '../lib/autotag';
-import { cardPrices, flushPrices, knownPrice } from './catalog';
+import { cardPrices, flushPrices, knownCardPrice, knownPrice } from './catalog';
 import type { DiagnosticResult, ScanMessage, ScannedCard, ToContent } from '../lib/messages';
 // Seules les cartes de la collection sont envoyées comme « possédées » : jamais celles du marché.
 import { load, onStoreChange, save } from '../lib/storage';
-import type { MyAuction, PageKind, PageStatus, PriceObs, StoreShape } from '../lib/types';
+import type { Card, MyAuction, PageKind, PageStatus, PriceObs, StoreShape } from '../lib/types';
 import type { BridgeItem } from './bridge';
 import { ActionError, findByText, pause, realClick, waitFor } from './actions';
 import { fetchCardAuctions, fetchMarketSales, fetchMyAuctions, fetchMyBids, fetchMyCollection, fetchMySales, refreshBidStates } from './api';
@@ -31,7 +31,10 @@ import { activeTabLabel, detectPage, rootOf, slotsFromTabs } from './parsers/pag
 import { auctionFromItem, cardFromItem, refElement, requestBridge, tagColors, tagDictionary } from './parsers/react';
 import { re, resolveSelectors, type SelectorConfig } from './parsers/selectors';
 
-type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta' | 'bidsCache' | 'myFamilies' | 'familiesImportedAt'>;
+type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta' | 'bidsCache' | 'myFamilies' | 'familiesImportedAt'> & {
+  /** Vrai prix moyen des cartes (cache des prix lus via l'API) : prioritaire sur la médiane de la rareté. */
+  catalogPrice: (card: Card) => number | null;
+};
 
 let store: Store | null = null;
 let lastPayload = '';
@@ -54,7 +57,8 @@ function log(step: string): void {
 }
 
 async function refreshStore(): Promise<void> {
-  store = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta', 'bidsCache', 'myFamilies', 'familiesImportedAt');
+  const loaded = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta', 'bidsCache', 'myFamilies', 'familiesImportedAt');
+  store = { ...loaded, catalogPrice: knownCardPrice };
 }
 
 function toObs(a: ParsedAuction, now: number): PriceObs | null {

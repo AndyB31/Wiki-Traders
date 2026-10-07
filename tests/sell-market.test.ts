@@ -110,7 +110,7 @@ describe('fenêtre de vente : marché de la carte', () => {
     expect(document.querySelector('[data-wiky^="market"]')).toBeNull();
   });
 
-  it('historique des prix de la carte sous la liste, avec le taux de vente, sans fermer la fenêtre au clic', async () => {
+  it('historique des prix de la carte à côté de la fenêtre, avec le taux de vente, sans fermer la fenêtre au clic', async () => {
     const modal = mountSellModal();
     const ended = (price: number | null, status: string, daysAgo: number) => ({
       id: `h${daysAgo}`, final_price: price, base_amount: 10, snapshot_rarity: 'SR', is_shiny: false,
@@ -125,11 +125,14 @@ describe('fenêtre de vente : marché de la carte', () => {
     expect(box.previousElementSibling!.getAttribute('data-wiky')).toBe('market-list');
     const text = box.textContent!.replace(/\s+/g, ' ');
     expect(text).toContain('1 vente · moyenne 40 W · 25 % vendues');
-    expect(text).toContain('1 sur 4 enchères');
+    // Version compacte, à droite de la fenêtre : précisions des tuiles en info-bulle.
+    expect(box.querySelector('.ph-tiles [title^="1 sur 4 enchères"]')).not.toBeNull();
+    expect(document.getElementById('overlay')!.hasAttribute('data-wiky-sell-layout')).toBe(true);
     box.querySelector<HTMLButtonElement>('[data-outcome="sold"]')!.click();
     expect(modal.closed()).toBe(0);
 
     enhanceSellDialog({ settings: settings({ sellMarketHistory: false }), cards: zico, cfg: DEFAULT_SELECTORS });
     expect(document.querySelector('[data-wiky="sell-history"]')).toBeNull();
+    expect(document.getElementById('overlay')!.hasAttribute('data-wiky-sell-layout')).toBe(false);
   });
 });

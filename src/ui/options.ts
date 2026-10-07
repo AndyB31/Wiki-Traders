@@ -769,7 +769,7 @@ function automationSection() {
       riskyToggle('apiRead', 'Lecture via l\'API du site', 'Prix des cartes, onglet « Mises » (enchères où tu as misé) et ventes du marché. Lectures seules, avec ta session.'),
       withNote(settingToggle('sellMarketSummary', 'Fenêtre de vente : résumé du marché', 'Sous « Marché · … » : nombre d\'offres en cours, min, médiane, max.')),
       withNote(settingToggle('sellMarketList', 'Fenêtre de vente : enchères de la carte', 'Sous la fenêtre : enchères en cours de cette carte, prix et durée restante.')),
-      withNote(settingToggle('sellMarketHistory', 'Fenêtre de vente : historique des prix', 'Sous la fenêtre : ventes passées de la carte (graphique, moyenne, taux de vente…), comme sur la page d\'une enchère.')),
+      withNote(settingToggle('sellMarketHistory', 'Fenêtre de vente : historique des prix', 'À droite de la fenêtre : ventes passées de la carte (graphique, moyenne, taux de vente…), comme sur la page d\'une enchère.')),
     ),
     h('h3', null, 'Actions à ta place'),
     h(

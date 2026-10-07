@@ -353,7 +353,7 @@ function bidsBlock() {
     btn.disabled = false;
     status.textContent = !res ? 'Page non joignable : recharge l\'onglet.' : res.ok ? `${res.count} ${op === 'myBids' ? 'enchère(s)' : 'vente(s) chargée(s)'}` : res.error ?? 'Erreur';
   };
-  const ctx = makeContext(store, Date.now());
+  const ctx = makeContext(pricingInput(), Date.now());
   // Surenchère en un clic (automatisation) : faite par l'onglet du site, après confirmation dans la page.
   const quick = featureFlags(store.settings.features).quickOutbid;
   const outbid = async (auctionId: string, btn: HTMLButtonElement) => {
@@ -712,7 +712,7 @@ let showUnsold = false;
 
 /** Onglet « Vendues » : mes ventes terminées, prix final et écart avec le prix de référence de la carte. */
 function soldBlock() {
-  const ctx = makeContext(store, Date.now());
+  const ctx = makeContext(pricingInput(), Date.now());
   if (!store.settings.apiRead) {
     // Sans API : ventes vues par l'extension (journal local).
     const done = store.journal.filter((e) => e.type === 'finished').reverse();
@@ -820,8 +820,13 @@ async function openAuction(id: string): Promise<void> {
 }
 
 /** Étiquetage automatique : activation, aperçu du plan et lancement sur l'onglet de la collection. */
-/** Prix moyens par carte (cache du content script) : servent à l'étiquetage. */
+/** Prix moyens par carte (cache du content script) : servent à l'étiquetage et au prix conseillé. */
 let catalogPrices: Record<string, CatalogPriceEntry> | null = null;
+
+/** Entrée du calcul des prix : le stockage, plus le vrai prix moyen des cartes lu via l'API. */
+function pricingInput() {
+  return { ...store, catalogPrice: catalogPriceOf(catalogPrices) };
+}
 let pricesState: 'idle' | 'loading' | 'done' | 'error' = 'idle';
 let pricesError = '';
 
@@ -975,7 +980,7 @@ function autoTagBlock(onCollection: boolean) {
 
 function render(): void {
   const now = Date.now();
-  const alloc = allocate(store, now);
+  const alloc = allocate(pricingInput(), now);
   const occupied = alloc.busy.length;
   const { lastAuctionsScan, lastPage } = store.meta;
   const stale = lastAuctionsScan == null || now - lastAuctionsScan > STALE_AFTER_MS;
@@ -1160,7 +1165,7 @@ function render(): void {
 /** Bilan des prix : d'où viennent-ils, combien de ventes par rareté, dernier chargement. */
 function priceStatus() {
   const now = Date.now();
-  const ctx = makeContext(store, now);
+  const ctx = makeContext(pricingInput(), now);
   const since = now - store.settings.windowDays * 86_400_000;
   const recent = store.priceObs.filter((o) => o.at >= since);
   const cards = Object.values(store.cards);
@@ -1244,6 +1249,8 @@ async function main(): Promise<void> {
   void refreshBidsOnOpen();
   await readCatalogPrices();
   render();
+  // Vrais prix moyens de la collection (prix conseillé de « Vendre ») : depuis le cache, complétés via l'onglet du site.
+  if (store.settings.apiRead) void loadCollectionPrices();
   ext.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && CARD_PRICES_KEY in changes) void readCatalogPrices().then(render);
   });

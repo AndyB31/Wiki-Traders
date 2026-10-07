@@ -135,6 +135,13 @@ describe('prix de référence par rareté', () => {
     expect(r.detail).toContain('estimation Ultra Rare en vente');
   });
 
+  it('le vrai prix moyen de la carte (lu via l\'API) passe avant la médiane de la rareté et nos relevés', () => {
+    const obs = [...soldOf('SR', [10, 10, 10, 10, 10]), ...sales('a', [200, 200, 200])];
+    const r = computePrice(card('a', { rarity: 'SR' }), { ...rule, floor: null, ceiling: null }, ctx(obs, { catalogPrice: (c) => (c.id === 'a' ? 400 : null) }));
+    expect(r.base).toMatchObject({ source: 'site', value: 400 });
+    expect(r.detail).toContain('moyenne site 400');
+  });
+
   it('l\'historique de la carte reste prioritaire', () => {
     const r = computePrice(card('a', { rarity: 'SR' }), { ...rule, ceiling: null }, ctx([...soldOf('SR', [10, 10, 10, 10, 10]), ...sales('a', [200, 200, 200])]));
     expect(r.base.source).toBe('history');
