@@ -183,7 +183,7 @@ Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises
 | Intégration au site | oui | Barre latérale, fenêtres, pages, onglet Paramètres |
 | Barre latérale compacte | oui | Menus Social et Progression |
 | Étiquettes visibles sur les cartes | oui, libellés | Ou pastilles de couleur |
-| Fenêtre de vente : résumé du marché / liste des enchères | oui | Nécessite la lecture via l'API |
+| Fenêtre de vente : résumé du marché / liste des enchères / historique des prix | oui | Nécessite la lecture via l'API |
 | Lecture via l'API | **non** | Mises, ventes conclues, marché, ventes en cours relues chaque minute |
 | V4 – pré-remplissage (et Mode enchère) | **non** | Ouvre la vente, remplit prix et durée |
 | Étiquetage automatique / par l'API | **non** | Range les cartes par plage de prix |

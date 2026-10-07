@@ -34,7 +34,7 @@ Un slot vide est expliqué : cartes en favori, déjà en vente, bloquées par «
 Quand tu ouvres la mise en vente d'une carte connue :
 
 - un **toast** rappelle le prix conseillé, son calcul et la durée conseillée ;
-- avec la lecture via l'API : sous « Marché · Rare », un **résumé des offres en cours** de la carte (nombre, min, médiane, max) et, sous la fenêtre, la **liste de ses enchères en cours** (prix, mise de départ ou en cours, temps restant) ;
+- avec la lecture via l'API : sous « Marché · Rare », un **résumé des offres en cours** de la carte (nombre, min, médiane, max) et, sous la fenêtre, la **liste de ses enchères en cours** (prix, mise de départ ou en cours, temps restant), puis son **historique des prix** (le même que sur la page d'une enchère : chiffres clés dont le taux de vente, graphique, liste des enchères terminées) ;
 - avec le pré-remplissage : la mise de départ et la durée sont remplies une fois (une valeur que tu modifies n'est jamais écrasée).
 
 Le clic **« Mettre aux enchères »** reste toujours le tien.

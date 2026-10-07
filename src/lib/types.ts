@@ -108,6 +108,8 @@ export interface Settings {
   sellMarketSummary: boolean;
   /** Fenêtre de vente : liste des enchères en cours de la carte, sous la fenêtre. */
   sellMarketList: boolean;
+  /** Fenêtre de vente : « Historique des prix » de la carte (comme sur la page d'une enchère), sous la fenêtre. */
+  sellMarketHistory: boolean;
   /** Étiquetage automatique par l'API (écritures limitées aux étiquettes) plutôt que par l'interface. */
   apiWrite: boolean;
   /** V4 : ouvre la fenêtre de vente et remplit le prix (le clic final reste humain). */

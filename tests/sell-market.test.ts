@@ -25,13 +25,14 @@ function mountSellModal(withMarket = true) {
   return { closed: () => closed };
 }
 
-function stubApi(cardAuctions: unknown[], rarityRows: unknown[] = []) {
+function stubApi(cardAuctions: unknown[], rarityRows: unknown[] = [], historyRows: unknown[] = []) {
   document.cookie = `sb-${REF}-auth-token=${encodeURIComponent(JSON.stringify({ access_token: jwt({ sub: ME, exp: 9_999_999_999 }) }))}`;
   document.head.innerHTML = `<script src="https://www.wiki-masters.com/_next/static/chunks/app.js"></script>`;
   vi.stubGlobal('fetch', async (url: string) => {
     if (url.includes('/_next/')) return new Response(`u="https://${REF}.supabase.co";k="${jwt({ role: 'anon', ref: REF })}"`);
     const q = decodeURIComponent(url);
     if (q.includes('snapshot_rarity=eq.')) return new Response(JSON.stringify(rarityRows));
+    if (q.includes('status=in.(settled_sold')) return new Response(JSON.stringify(historyRows));
     if (q.includes('status=eq.active') && q.includes('card_id=eq.')) return new Response(JSON.stringify(cardAuctions));
     return new Response('[]');
   });
@@ -107,5 +108,28 @@ describe('fenêtre de vente : marché de la carte', () => {
 
     enhanceSellDialog({ settings: settings({ apiRead: false }), cards, cfg: DEFAULT_SELECTORS });
     expect(document.querySelector('[data-wiky^="market"]')).toBeNull();
+  });
+
+  it('historique des prix de la carte sous la liste, avec le taux de vente, sans fermer la fenêtre au clic', async () => {
+    const modal = mountSellModal();
+    const ended = (price: number | null, status: string, daysAgo: number) => ({
+      id: `h${daysAgo}`, final_price: price, base_amount: 10, snapshot_rarity: 'SR', is_shiny: false,
+      end_at: new Date(Date.now() - daysAgo * 86_400_000).toISOString(), settled_at: null, status,
+    });
+    stubApi([], [], [ended(40, 'settled_sold', 3), ended(null, 'settled_unsold', 2), ended(null, 'settled_unsold', 1), ended(null, 'cancelled', 1)]);
+    // Autre identifiant : l'historique des ventes est mis en cache par carte (les tests précédents n'en ont pas).
+    const zico = cardsById(card('zico', { name: 'Zico', rarity: 'SR', siteId: 'c-zico-history' }));
+    enhanceSellDialog({ settings: settings(), cards: zico, cfg: DEFAULT_SELECTORS });
+    await vi.waitFor(() => expect(document.querySelector('[data-wiky="sell-history"] .ph-tiles')).not.toBeNull());
+    const box = document.querySelector<HTMLDetailsElement>('[data-wiky="sell-history"]')!;
+    expect(box.previousElementSibling!.getAttribute('data-wiky')).toBe('market-list');
+    const text = box.textContent!.replace(/\s+/g, ' ');
+    expect(text).toContain('1 vente · moyenne 40 W · 25 % vendues');
+    expect(text).toContain('1 sur 4 enchères');
+    box.querySelector<HTMLButtonElement>('[data-outcome="sold"]')!.click();
+    expect(modal.closed()).toBe(0);
+
+    enhanceSellDialog({ settings: settings({ sellMarketHistory: false }), cards: zico, cfg: DEFAULT_SELECTORS });
+    expect(document.querySelector('[data-wiky="sell-history"]')).toBeNull();
   });
 });

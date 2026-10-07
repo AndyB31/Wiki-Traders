@@ -59,6 +59,7 @@ Toutes désactivées par défaut, avec confirmation à l'activation. Voir [Autom
 | Lecture via l'API du site | Mises, ventes conclues, ventes du marché, collection complète, ventes en cours relues chaque minute |
 | Fenêtre de vente : résumé du marché | Offres en cours de la carte (nombre, min, médiane, max) |
 | Fenêtre de vente : liste des enchères de la carte | Sous la fenêtre de vente |
+| Fenêtre de vente : historique des prix | Sous la fenêtre de vente : ventes passées de la carte, graphique, taux de vente |
 | Étiquetage par l'API | L'étiquetage automatique écrit les étiquettes directement (plus fiable) |
 | Étiquetage automatique sur le site | Range les cartes par plage de prix |
 | Retirer les autres étiquettes gérées | Une seule plage par carte |

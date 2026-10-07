@@ -1,10 +1,13 @@
 /**
  * Prix moyen d'une carte sur la page d'une enchère (/marketplace/<uuid>) et dans la fiche d'une carte ouverte
- * par le site : moyenne des ventes conclues (comme le site), médiane, nombre de ventes, plus bas et plus haut.
- * L'enchère → carte et le titre → carte passent par le catalogue (mis en cache), les prix par `cardPrices`.
+ * par le site : moyenne des ventes conclues (comme le site), médiane, nombre de ventes, plus bas et plus haut, et
+ * taux de vente (enchères conclues sur toutes les enchères terminées de la carte).
+ * L'enchère → carte et le titre → carte passent par le catalogue (mis en cache), les prix par `cardPrices`,
+ * le taux de vente par `cardSalesHistory`.
  */
-import { cardIdForAuction, cardIdsByTitles, cardPrices, knownCardId, knownPrice, type CardPrice } from '../catalog';
+import { cardIdForAuction, cardIdsByTitles, cardPrices, cardSalesHistory, knownCardId, knownPrice, type CardPrice } from '../catalog';
 import { ensureStyle, formatW, isolateClicks, myCard, openCardPanels } from './dom';
+import { historyStats } from './price-history-logic';
 import { registerFeature, type FeatureContext } from './runtime';
 
 const CSS = `
@@ -34,16 +37,27 @@ function once(key: string, job: () => Promise<unknown>): void {
     .finally(() => lastCtx && paint(lastCtx));
 }
 
-export function priceSummary(p: CardPrice | undefined): { value: string; meta: string } {
+/** Taux de vente d'une carte : enchères conclues sur l'ensemble des enchères terminées (vendues, sans acheteur, annulées). */
+export interface SellRate {
+  sold: number;
+  total: number;
+  pct: number;
+}
+
+/** Taux de vente par carte du catalogue (lu avec l'historique des ventes, mis en cache 5 min par le catalogue). */
+const rates = new Map<string, SellRate | null>();
+
+export function priceSummary(p: CardPrice | undefined, rate?: SellRate | null): { value: string; meta: string } {
+  const rateText = rate ? ` · taux de vente <b>${rate.pct} %</b> (${rate.sold}/${rate.total})` : '';
   if (!p) return { value: '…', meta: 'Chargement des ventes…' };
-  if (!p.count) return { value: '—', meta: 'Aucune vente conclue' };
+  if (!p.count) return { value: '—', meta: `Aucune vente conclue${rateText}` };
   const range = p.min != null && p.max != null ? ` · min <b>${formatW(p.min)}</b> · max <b>${formatW(p.max)}</b>` : '';
   const median = p.median != null ? ` · médiane <b>${formatW(p.median)}</b>` : '';
-  return { value: `${formatW(p.mean)} W`, meta: `<b>${p.count}</b> vente${p.count > 1 ? 's' : ''}${median}${range}` };
+  return { value: `${formatW(p.mean)} W`, meta: `<b>${p.count}</b> vente${p.count > 1 ? 's' : ''}${median}${range}${rateText}` };
 }
 
 function box(host: Element, where: 'after' | 'append', siteId: string, extraClass = ''): void {
-  const s = priceSummary(knownPrice(siteId));
+  const s = priceSummary(knownPrice(siteId), rates.get(siteId));
   const key = `${siteId}|${s.value}|${s.meta}`;
   const existing = (where === 'after' ? host.parentElement : host)?.querySelector<HTMLElement>(':scope > [data-wiky="mprice"]') ?? null;
   if (existing?.dataset.key === key) return;
@@ -54,13 +68,20 @@ function box(host: Element, where: 'after' | 'append', siteId: string, extraClas
   el.innerHTML = `<span class="wiky-mprice-label">Prix moyen</span><span class="wiky-mprice-value"></span><span class="wiky-mprice-meta"></span>`;
   el.querySelector('.wiky-mprice-value')!.textContent = s.value;
   el.querySelector('.wiky-mprice-meta')!.innerHTML = s.meta;
-  el.title = 'Moyenne des ventes conclues (Wiki-Traders)';
+  el.title = 'Moyenne des ventes conclues ; taux de vente : enchères conclues sur toutes les enchères terminées (Wiki-Traders)';
   if (!existing) {
     isolateClicks(el);
     if (where === 'after') host.after(el);
     else host.append(el);
   }
   if (!knownPrice(siteId)) once(`p:${siteId}`, () => cardPrices([siteId]));
+  if (!rates.has(siteId))
+    once(`r:${siteId}`, () =>
+      cardSalesHistory(siteId).then((list) => {
+        const st = historyStats(list);
+        rates.set(siteId, st.sellRate == null ? null : { sold: st.sold, total: list.length, pct: st.sellRate });
+      }),
+    );
 }
 
 function paintAuctionPage(ctx: FeatureContext): void {

@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   apiRead: false,
   sellMarketSummary: true,
   sellMarketList: true,
+  sellMarketHistory: true,
   apiWrite: false,
   showTagOverlay: true,
   tagOverlayStyle: 'label',

@@ -1,13 +1,16 @@
 /**
  * Fenêtre « Mettre aux enchères » du site : on y ajoute, comme si c'était le site,
  *  - sous « Marché · <rareté> » : un résumé compact des offres en cours de cette carte (nombre, min, médiane, max) ;
- *  - sous la fenêtre : la liste des enchères en cours de cette carte (prix, durée restante).
+ *  - sous la fenêtre : la liste des enchères en cours de cette carte (prix, durée restante) ;
+ *  - dessous : l'« Historique des prix » de la carte, le même que sur la page d'une enchère.
  * Données lues via l'API (option « apiRead »), mises en cache une minute. Chaque partie est désactivable.
  */
 import { formatDuration, formatPrice, normalize, RARITIES } from '../lib/text';
 import type { Card, CardAuction, Rarity, Settings } from '../lib/types';
 import { fetchCardAuctions, fetchCardIdByTitle, offerStats, type OfferStats } from './api';
 import { openSellDialog } from './automation';
+import { cardSalesHistory } from './catalog';
+import { PriceHistoryPanel } from './features/price-history';
 import { qsa, type SelectorConfig } from './parsers/selectors';
 
 const TTL = 60_000;
@@ -131,15 +134,25 @@ function listNode(card: Card, auctions: CardAuction[] | null, error?: string): H
 }
 
 let current = '';
+let history: PriceHistoryPanel | null = null;
+
+const WIKY_NODES = '[data-wiky="market-summary"], [data-wiky="market-list"], [data-wiky="sell-history"]';
+
+function clearNodes(): void {
+  history?.destroy();
+  history = null;
+  for (const n of qsa(document, WIKY_NODES)) n.remove();
+}
 
 /** À appeler à chaque relecture de la page : ajoute / met à jour / retire les compléments de la fenêtre de vente. */
 export function enhanceSellDialog(state: SellMarketState): void {
   const { settings } = state;
   const wantSummary = settings.apiRead && settings.sellMarketSummary;
   const wantList = settings.apiRead && settings.sellMarketList;
+  const wantHistory = settings.apiRead && settings.sellMarketHistory;
   const open = openSellDialog(state.cfg);
-  if (!open || (!wantSummary && !wantList)) {
-    for (const n of qsa(document, '[data-wiky="market-summary"], [data-wiky="market-list"]')) n.remove();
+  if (!open || (!wantSummary && !wantList && !wantHistory)) {
+    clearNodes();
     current = '';
     return;
   }
@@ -150,13 +163,28 @@ export function enhanceSellDialog(state: SellMarketState): void {
   if (!card) return;
   const rarity = zone?.rarity ?? card.rarity;
   // La zone « Marché » du site se charge après la fenêtre : la clé change quand elle apparaît.
-  const key = `${card.id}|${rarity}|${wantSummary}|${wantList}|${!!zone}`;
+  const key = `${card.id}|${rarity}|${wantSummary}|${wantList}|${wantHistory}|${!!zone}`;
   const hasSummary = !wantSummary || !zone || !!frame.querySelector('[data-wiky="market-summary"]');
   const hasList = !wantList || !!overlay.querySelector(':scope > [data-wiky="market-list"]');
+  const hasHistory = !wantHistory || !!history?.el.isConnected;
   // Déjà en place pour cette carte : on ne touche plus au DOM du site.
-  if (key === current && hasSummary && hasList) return;
+  if (key === current && hasSummary && hasList && hasHistory) return;
   current = key;
-  for (const n of qsa(document, '[data-wiky="market-summary"], [data-wiky="market-list"]')) n.remove();
+  clearNodes();
+  const ov = overlay as HTMLElement;
+  // La fenêtre du site est centrée en ligne : on empile nos blocs dessous (défilement si ça dépasse l'écran).
+  const stack = () => {
+    if (getComputedStyle(ov).flexDirection !== 'column') Object.assign(ov.style, { flexDirection: 'column', gap: '12px' });
+  };
+  if (wantHistory) {
+    const panel = (history = new PriceHistoryPanel('sell-history', 'wiky-sell-price-history-open', 'ph-sell'));
+    // La fenêtre du site se ferme au clic à l'extérieur : notre section ne doit pas déclencher cette fermeture.
+    for (const type of ['click', 'mousedown', 'pointerdown']) panel.el.addEventListener(type, (e) => e.stopPropagation());
+    stack();
+    Object.assign(ov.style, { overflowY: 'auto', justifyContent: 'safe center' });
+    (overlay.querySelector(':scope > [data-wiky="market-list"]') ?? frame).after(panel.el);
+    panel.update();
+  }
 
   const place = (summary: HTMLElement | null, list: HTMLElement | null) => {
     if (summary && zone?.anchor.isConnected) {
@@ -165,9 +193,7 @@ export function enhanceSellDialog(state: SellMarketState): void {
     }
     if (list && overlay.isConnected) {
       overlay.querySelector(':scope > [data-wiky="market-list"]')?.remove();
-      // La fenêtre du site est centrée en ligne : on empile notre bloc dessous.
-      const ov = overlay as HTMLElement;
-      if (getComputedStyle(ov).flexDirection !== 'column') Object.assign(ov.style, { flexDirection: 'column', gap: '12px' });
+      stack();
       frame.after(list);
     }
   };
@@ -177,6 +203,8 @@ export function enhanceSellDialog(state: SellMarketState): void {
     try {
       const siteId = card.siteId ?? (await cached(`id:${card.name}`, () => fetchCardIdByTitle(card.name)));
       if (!siteId) throw new Error('carte introuvable');
+      const panel = history;
+      if (panel) cardSalesHistory(siteId).then((list) => panel.setSales(list), (e: Error) => panel.setError(e.message));
       const result = await cached(`card:${siteId}`, () => fetchCardAuctions(siteId));
       // Les enchères « à moi » ne sont pas de la concurrence : exclues des statistiques.
       const own = offerStats(result.auctions.filter((a) => !a.mine).map((a) => a.price));
@@ -185,6 +213,7 @@ export function enhanceSellDialog(state: SellMarketState): void {
     } catch (e) {
       if (current !== key) return;
       const msg = (e as Error).message;
+      if (history && !history.sales) history.setError(msg);
       place(wantSummary && zone ? summaryNode(null, msg) : null, wantList ? listNode(card, null, msg) : null);
     }
   })();
@@ -194,5 +223,7 @@ export function enhanceSellDialog(state: SellMarketState): void {
 export function resetSellMarket(): void {
   cache.clear();
   current = '';
+  history?.destroy();
+  history = null;
 }
 
