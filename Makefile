@@ -1,4 +1,4 @@
-# Wiky-Traders — installation et maintenance.
+# Wiki-Traders — installation et maintenance.
 #   make install            construit l'extension, demande où l'installer, explique comment la charger
 #   make install DEST=~/X   idem, sans question
 #   make update             récupère main, reconstruit et met à jour le dossier installé
@@ -7,13 +7,13 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 TARGET_FILE := .install-target
-DEFAULT_DEST := $(HOME)/Wiky-Traders
+DEFAULT_DEST := $(HOME)/Wiki-Traders
 DEST ?=
 
 .PHONY: help install deps build test zip update updater updater-uninstall clean
 
 help: ## Affiche cette aide
-	@echo "Wiky-Traders — commandes :"
+	@echo "Wiki-Traders — commandes :"
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{ printf "  make %-18s %s\n", $$1, $$2 }'
 
 deps: ## Vérifie Node.js (20+) et installe les dépendances si besoin
@@ -28,9 +28,9 @@ build: deps ## Construit l'extension dans dist/
 test: deps ## Lance les vérifications (types et tests)
 	@npx tsc --noEmit && npx vitest run
 
-zip: deps ## Construit wiky-traders.zip (à partager)
+zip: deps ## Construit wiki-traders.zip (à partager)
 	@npm run zip
-	@echo "✔ wiky-traders.zip prêt à partager"
+	@echo "✔ wiki-traders.zip prêt à partager"
 
 install: build ## Construit, copie l'extension dans le dossier choisi et explique comment la charger
 	@dest="$(DEST)"; \
@@ -48,7 +48,7 @@ install: build ## Construit, copie l'extension dans le dossier choisi et expliqu
 	if [ "$$dest" = "$$PWD" ] || [ "$$dest" = "$$PWD/" ]; then echo "✗ Choisis un autre dossier que le dépôt lui-même."; exit 1; fi; \
 	if [ "$$dest" != "$$PWD/dist" ]; then \
 	  if [ -d "$$dest" ] && [ -n "$$(ls -A "$$dest" 2>/dev/null)" ] && [ ! -f "$$dest/manifest.json" ]; then \
-	    echo "✗ $$dest existe et ne contient pas une extension Wiky-Traders : choisis un dossier vide ou nouveau."; exit 1; \
+	    echo "✗ $$dest existe et ne contient pas une extension Wiki-Traders : choisis un dossier vide ou nouveau."; exit 1; \
 	  fi; \
 	  mkdir -p "$$dest" && cp -R dist/. "$$dest/"; \
 	fi; \
@@ -72,7 +72,7 @@ install: build ## Construit, copie l'extension dans le dossier choisi et expliqu
 	echo "   → choisis $$dest/manifest.json (à refaire à chaque démarrage de Firefox)."; \
 	echo ""; \
 	echo " Ensuite :"; \
-	echo "   • Réglages : Paramètres → onglet Wiky-Traders sur le site ; active « Lecture via l'API »"; \
+	echo "   • Réglages : Paramètres → onglet Wiki-Traders sur le site ; active « Lecture via l'API »"; \
 	echo "     (Automatisations) pour les prix, les familles et les mises."; \
 	echo "   • Mettre à jour : bouton « Mettre à jour » dans les réglages, ou « make update »."; \
 	echo "   • Déjà chargée avant ? Clique ↻ sur l'extension puis recharge les onglets WikiMasters."; \
@@ -91,4 +91,4 @@ updater-uninstall: ## Désinstalle le programme d'aide
 	@node scripts/updater/install.mjs --uninstall
 
 clean: ## Supprime dist/ et le zip
-	@rm -rf dist wiky-traders.zip
+	@rm -rf dist wiki-traders.zip

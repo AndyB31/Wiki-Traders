@@ -27,7 +27,7 @@ import {
   type ValidationError,
 } from './options-logic';
 
-// Onglet Wiky-Traders de la page Paramètres du site (iframe).
+// Onglet Wiki-Traders de la page Paramètres du site (iframe).
 initEmbed();
 
 const app = document.getElementById('app')!;
@@ -228,7 +228,7 @@ function refreshQuickStart(): void {
   const done = checks.filter((c) => c.ok).length;
   mount(
     ui.quick,
-    h('p', { class: 'intro' }, done === checks.length ? 'Tout est prêt : Wiky-Traders peut te proposer des ventes.' : `${done} / ${checks.length} prêts. Les points restants se règlent en un clic.`),
+    h('p', { class: 'intro' }, done === checks.length ? 'Tout est prêt : Wiki-Traders peut te proposer des ventes.' : `${done} / ${checks.length} prêts. Les points restants se règlent en un clic.`),
     h(
       'ul',
       { class: 'checks' },
@@ -393,7 +393,7 @@ function renderRules(): void {
             h('tbody', null, rules.map(ruleRow)),
           ),
         )
-      : h('p', { class: 'muted' }, 'Aucune règle : ajoute une étiquette pour que Wiky-Traders te propose des ventes.'),
+      : h('p', { class: 'muted' }, 'Aucune règle : ajoute une étiquette pour que Wiki-Traders te propose des ventes.'),
     h(
       'div',
       { class: 'row', style: 'margin-top:8px' },
@@ -430,7 +430,7 @@ function rulesSection() {
     'ventes',
     'Mes ventes : répartition par étiquette',
     [
-      'Chaque étiquette du site réserve des slots. Ex. : 1 slot pour tes cartes « 50-100 » et 4 slots pour « 20-50 » ; Wiky-Traders propose une carte de cette étiquette pour chaque slot libre, avec une mise de départ égale à un % de son prix moyen.',
+      'Chaque étiquette du site réserve des slots. Ex. : 1 slot pour tes cartes « 50-100 » et 4 slots pour « 20-50 » ; Wiki-Traders propose une carte de cette étiquette pour chaque slot libre, avec une mise de départ égale à un % de son prix moyen.',
     ],
     ui.quota,
     ui.rules,
@@ -468,7 +468,7 @@ function pricingSection() {
   return section(
     'prix',
     'Prix conseillé',
-    'Comment Wiky-Traders calcule le prix moyen d\'une carte et choisit quoi proposer. Les valeurs par défaut conviennent à la plupart des joueurs.',
+    'Comment Wiki-Traders calcule le prix moyen d\'une carte et choisit quoi proposer. Les valeurs par défaut conviennent à la plupart des joueurs.',
     h(
       'div',
       { class: 'grid' },
@@ -628,7 +628,7 @@ function notificationsSection() {
   return section(
     'notifications',
     'Notifications',
-    'Wiky-Traders te prévient quand une enchère se termine ou qu\'un slot se libère.',
+    'Wiki-Traders te prévient quand une enchère se termine ou qu\'un slot se libère.',
     h('div', { class: 'toggles' }, settingToggle('notifications', 'Notifications', 'Alertes du navigateur pour tes ventes.')),
     field(
       'Heures silencieuses',
@@ -643,11 +643,11 @@ function displaySection() {
   return section(
     'affichage',
     'Affichage sur le site',
-    'Ce que Wiky-Traders ajoute directement dans les pages de WikiMasters.',
+    'Ce que Wiki-Traders ajoute directement dans les pages de WikiMasters.',
     h(
       'div',
       { class: 'toggles' },
-      settingToggle('siteIntegration', 'Intégration au site', 'Résumé et menu Wiky-Traders dans la barre latérale, onglet dans Paramètres.'),
+      settingToggle('siteIntegration', 'Intégration au site', 'Résumé et menu Wiki-Traders dans la barre latérale, onglet dans Paramètres.'),
       settingToggle('compactNav', 'Barre latérale compacte', 'Menus regroupés (Social, Progression) pour faire de la place.'),
       settingToggle('showTagOverlay', 'Étiquettes visibles sur les cartes', 'Sur chaque carte de la collection, aux couleurs du site.'),
     ),
@@ -1058,7 +1058,7 @@ function revert(): void {
 }
 
 function exportSettings(): void {
-  downloadJson(`wiky-traders-reglages-${new Date().toISOString().slice(0, 10)}.json`, { version: 1, rules, settings, manualPrices });
+  downloadJson(`wiki-traders-reglages-${new Date().toISOString().slice(0, 10)}.json`, { version: 1, rules, settings, manualPrices });
 }
 
 async function importSettings(file: File): Promise<void> {
@@ -1078,7 +1078,7 @@ async function importSettings(file: File): Promise<void> {
 }
 
 async function wipe(): Promise<void> {
-  if (!confirm('Effacer toutes les données de Wiky-Traders (règles, cartes, historique, journal) ?')) return;
+  if (!confirm('Effacer toutes les données de Wiki-Traders (règles, cartes, historique, journal) ?')) return;
   await clearAll();
   await load();
   notice = { text: 'Toutes les données ont été effacées.', kind: 'ok' };
@@ -1148,7 +1148,7 @@ function render(): void {
       'header',
       { class: 'row' },
       h('img', { src: 'icons/icon-48.png', width: 32, height: 32, alt: '' }),
-      h('h1', { class: 'grow' }, 'Wiky-Traders – Réglages'),
+      h('h1', { class: 'grow' }, 'Wiki-Traders – Réglages'),
       h('a', { href: 'journal.html' }, 'Journal →'),
     ),
     h(

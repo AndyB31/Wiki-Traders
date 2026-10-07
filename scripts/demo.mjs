@@ -175,7 +175,7 @@ const dealCard = ([id, , title, label, price, left, glow]) => `<div id="marketpl
   <div class="flex flex-col items-end"><span class="text-[10px] uppercase tracking-wide opacity-40">Durée</span><span class="tabular-nums font-medium text-xs">${left}</span></div></div>
   <p class="w-full text-[10px] opacity-40 truncate">Vendu par quelqu'un</p></div></a></div>`;
 
-// Barre latérale réelle du site (relevée sur wiki-masters.com, avec l'autre extension) : intégration Wiky-Traders.
+// Barre latérale réelle du site (relevée sur wiki-masters.com, avec l'autre extension) : intégration Wiki-Traders.
 const SITE_NAV = readFileSync(join(root, 'tests/fixtures/site-nav.html'), 'utf8');
 const shell = (body) => `<!doctype html><html lang="fr" class="h-full"><head><meta charset="utf-8"><title>WikiMasters</title><script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&display=swap" rel="stylesheet">
@@ -820,7 +820,7 @@ const navText = await integ.$eval('[data-wiky="nav-recap"] .wiky-status', (e) =>
 ok(/Slots ?\d+\/5/.test(navText), `résumé toujours visible : ${navText.slice(0, 90)}…`);
 const social = await integ.$$eval('[data-group="social"] .wiky-group-items a', (as) => as.map((a) => a.textContent.trim()));
 ok(social.join() === 'Échanges,Guilde,Amis,Messages,Bataille', `menu Social : ${social.join(', ')}`);
-ok((await integ.$$eval('[role="tablist"] [role="tab"]', (t) => t.map((x) => x.textContent))).includes('Wiky-Traders'), 'onglet « Wiky-Traders » dans Paramètres');
+ok((await integ.$$eval('[role="tablist"] [role="tab"]', (t) => t.map((x) => x.textContent))).includes('Wiki-Traders'), 'onglet « Wiki-Traders » dans Paramètres');
 const navOrder = await integ.$$eval('nav.w-64 > *', (els) => els.filter((e) => e.dataset.group || e.dataset.wiky === 'nav-recap' || (e.matches('a') && !e.hasAttribute('data-wiky-grouped'))).map((e) => e.dataset.group ?? (e.dataset.wiky === 'nav-recap' ? 'récap' : e.textContent.trim())));
 ok(navOrder.join() === 'Paquets,collection,market,social,progress,récap,settings', `barre latérale : ${navOrder.join(' › ')}`);
 await integ.click('[data-group="social"] .wiky-group-head');
@@ -841,7 +841,7 @@ await integ.waitForURL(/wiky=settings/);
 const optFrame = await (await integ.waitForSelector('#wiky-page iframe')).contentFrame();
 await optFrame.waitForSelector('section.card');
 await integ.waitForTimeout(400);
-ok(true, 'réglages Wiky-Traders dans la page Paramètres du site');
+ok(true, 'réglages Wiki-Traders dans la page Paramètres du site');
 await integ.screenshot({ path: join(shots, 'site-settings.png') });
 await integ.goto(`${ORIGIN}/collection?wiky=cards`);
 const cardsFrame = await (await integ.waitForSelector('#wiky-page iframe')).contentFrame();

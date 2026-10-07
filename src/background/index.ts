@@ -163,7 +163,7 @@ async function updateBadge(): Promise<void> {
   await ext.action.setBadgeBackgroundColor({ color: '#f59e0b' });
   await ext.action.setBadgeText({ text: unknown ? '?' : free > 0 ? String(free) : '' });
   await ext.action.setTitle({
-    title: unknown ? 'Wiky-Traders – ouvre la page de tes enchères' : `Wiky-Traders – ${free} slot(s) libre(s) sur ${store.settings.slots}`,
+    title: unknown ? 'Wiki-Traders – ouvre la page de tes enchères' : `Wiki-Traders – ${free} slot(s) libre(s) sur ${store.settings.slots}`,
   });
 }
 
@@ -218,7 +218,7 @@ async function runUpdateCheck(): Promise<UpdateInfo> {
   const info = await checkForUpdate();
   await ext.storage.local.set({ [UPDATE_KEY]: info });
   // Badge « ↑ » sur l'icône quand une mise à jour attend (le badge des slots libres reprend la main ensuite).
-  if (info.status === 'available') void ext.action.setTitle({ title: `Wiky-Traders – mise à jour disponible (${info.behind} nouveauté${info.behind > 1 ? 's' : ''})` });
+  if (info.status === 'available') void ext.action.setTitle({ title: `Wiki-Traders – mise à jour disponible (${info.behind} nouveauté${info.behind > 1 ? 's' : ''})` });
   return info;
 }
 

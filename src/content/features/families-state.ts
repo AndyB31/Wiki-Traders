@@ -136,7 +136,7 @@ export function ensureImported(): Promise<void> {
       }
       await save({ myFamilies: merged.families, familiesImportedAt: Date.now() });
     } catch (e) {
-      console.warn('[Wiky-Traders] import des familles', e);
+      console.warn('[Wiki-Traders] import des familles', e);
     }
   })();
   return importing;
@@ -208,7 +208,7 @@ export async function resolveCardRefs(refs: CardRef[], cards: Record<string, Car
         noId.delete(title);
       }
     } catch (e) {
-      console.warn('[Wiky-Traders] cartes du catalogue', e);
+      console.warn('[Wiki-Traders] cartes du catalogue', e);
     }
   }
   for (const [id, ref] of byId) {

@@ -4,7 +4,7 @@
 
 Une fois l'extension [installée](Installation.md), voici la configuration conseillée, dans l'ordre. Compte 10 minutes.
 
-Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou bloc Wiky-Traders → *Réglages*, ou clic droit sur l'icône → *Options*). Clique sur **Enregistrer** en bas de page après chaque série de modifications.
+Les réglages sont dans **Paramètres → onglet Wiki-Traders** sur le site (ou bloc Wiki-Traders → *Réglages*, ou clic droit sur l'icône → *Options*). Clique sur **Enregistrer** en bas de page après chaque série de modifications.
 
 ## Étape 1 – Faire connaître ta collection
 
@@ -58,7 +58,7 @@ Sans palier, la durée par défaut du site (1 h) est gardée. La durée conseill
 ## Étape 5 – Notifications et affichage
 
 - **Notifications** : une alerte à chaque fin d'enchère, sauf pendant les **heures silencieuses** (23 h – 8 h par défaut).
-- **Intégration au site** : le bloc et le menu Wiky-Traders dans la barre latérale (conseillé).
+- **Intégration au site** : le bloc et le menu Wiki-Traders dans la barre latérale (conseillé).
 - **Barre latérale compacte** : regroupe Échanges, Guilde, Amis, Messages, Bataille dans *Social*, et Profil, Succès, Classement dans *Progression*.
 - **Étiquettes visibles sur les cartes** : en libellés ou en simples pastilles de couleur.
 
@@ -78,6 +78,6 @@ Ce sont des **lectures seules** avec ta session, mais l'option demande une confi
 
 ## Étape 7 – Vérifier
 
-Clique sur le bloc **Wiky-Traders** de la barre latérale : la fenêtre **Vendre** liste les slots à remplir avec une carte, un prix et une durée. Si un slot reste vide, la raison est indiquée.
+Clique sur le bloc **Wiki-Traders** de la barre latérale : la fenêtre **Vendre** liste les slots à remplir avec une carte, un prix et une durée. Si un slot reste vide, la raison est indiquée.
 
 Tu es prêt : voir **[Vendre](Vendre.md)**.

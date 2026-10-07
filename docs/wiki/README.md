@@ -1,8 +1,8 @@
-# Wiky-Traders
+# Wiki-Traders
 
 Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : l'extension garde tes slots d'enchères remplis selon tes règles, calcule le bon prix et la bonne durée… et te laisse cliquer.
 
-![Wiky-Traders dans WikiMasters](../screenshots/site-sidebar.png)
+![Wiki-Traders dans WikiMasters](../screenshots/site-sidebar.png)
 
 ## Par où commencer
 
@@ -16,7 +16,7 @@ Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : l'extens
 | --- | --- |
 | [Fonctionnalités](Fonctionnalites.md) | Prix sur les cartes, classement, paquets, échanges, mises… |
 | [Familles](Familles.md) | Regrouper des cartes, ajout par sélection multiple, progression, marché des manquantes |
-| [Intégration au site](Integration-au-site.md) | Barre latérale compacte, bloc Wiky-Traders, fenêtres, pages, onglet Paramètres |
+| [Intégration au site](Integration-au-site.md) | Barre latérale compacte, bloc Wiki-Traders, fenêtres, pages, onglet Paramètres |
 | [Vendre](Vendre.md) | Slots, cartes proposées, prix et durée conseillés, fenêtre de vente, Mode enchère |
 | [Prix conseillé](Prix-conseille.md) | D'où vient le prix de référence, comment le % et l'arrondi s'appliquent |
 | [Mises et ventes](Mises-et-ventes.md) | Mes mises, ventes en cours, ventes conclues, journal |
@@ -28,4 +28,4 @@ Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : l'extens
 
 ## Le principe
 
-Les règles de WikiMasters (section 3) interdisent les bots qui jouent ou échangent à ta place. Par défaut, Wiky-Traders **réfléchit** (quel slot est libre, quelle carte, quel prix) et **tu cliques**. Les options qui agissent sur le site sont désactivées par défaut et demandent une confirmation : voir [Automatisations et risques](Automatisations-et-risques.md).
+Les règles de WikiMasters (section 3) interdisent les bots qui jouent ou échangent à ta place. Par défaut, Wiki-Traders **réfléchit** (quel slot est libre, quelle carte, quel prix) et **tu cliques**. Les options qui agissent sur le site sont désactivées par défaut et demandent une confirmation : voir [Automatisations et risques](Automatisations-et-risques.md).

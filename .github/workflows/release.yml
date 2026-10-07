@@ -32,7 +32,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest wiky-traders.zip \
+          gh release create latest wiki-traders.zip \
             --title "Dernière version" \
             --notes "Construite depuis ${GITHUB_SHA::7}. Installation : décompresser, puis « Charger l'extension non empaquetée »." \
             --target "$GITHUB_SHA" --latest

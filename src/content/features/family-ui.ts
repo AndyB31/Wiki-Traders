@@ -1,6 +1,6 @@
 /**
  * Briques d'interface des familles, dans le style du site (variables --color-*, cartes natives, orange
- * Wiky-Traders) : styles, boîtes de dialogue (confirmation, saisie, code), menu « Ajouter à une famille »,
+ * Wiki-Traders) : styles, boîtes de dialogue (confirmation, saisie, code), menu « Ajouter à une famille »,
  * balisage des cartes. Tout nœud ajouté porte `data-wiky` (ignoré par l'observateur de la page).
  */
 import { RARITIES, formatPrice } from '../../lib/text';

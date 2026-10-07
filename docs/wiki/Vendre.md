@@ -4,7 +4,7 @@
 
 ## La fenêtre « Vendre »
 
-Ouvre-la d'un clic sur le bloc **Wiky-Traders** de la barre latérale (ou avec l'icône de l'extension). Chaque **slot libre** affiche :
+Ouvre-la d'un clic sur le bloc **Wiki-Traders** de la barre latérale (ou avec l'icône de l'extension). Chaque **slot libre** affiche :
 
 - l'**étiquette** du slot (ex. `20-50`) ;
 - la **carte proposée**, sa rareté (point coloré) et son nombre d'exemplaires (×3) ;
@@ -58,6 +58,6 @@ Le prix est celui de la règle d'étiquette de la carte, ou à défaut son prix 
 
 ## Après la mise en vente
 
-- La vente apparaît dans **Mes ventes** et dans le bloc Wiky-Traders (slots occupés).
+- La vente apparaît dans **Mes ventes** et dans le bloc Wiki-Traders (slots occupés).
 - À la fin de l'enchère : alarme locale, **notification** (« Slot libéré : remets une carte 20-50 »), badge sur l'icône.
 - Le **journal** garde la trace de la vente pour ajuster tes pourcentages.

@@ -68,7 +68,7 @@ export function runFeatures(ctx: FeatureContext): void {
         m.cleanup?.();
       }
     } catch (e) {
-      console.warn('[Wiky-Traders]', m.keys.join(','), e);
+      console.warn('[Wiki-Traders]', m.keys.join(','), e);
     }
   }
 }

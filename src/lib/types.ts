@@ -120,7 +120,7 @@ export interface Settings {
   autoTagClearUnpriced: boolean;
   /** Surcharges des sélecteurs CSS (voir content/parsers/selectors.ts). */
   selectorOverrides: Record<string, string>;
-  /** Intégration au site : résumé et menu Wiky-Traders dans la barre latérale, fenêtres et pages, onglet dans Paramètres. */
+  /** Intégration au site : résumé et menu Wiki-Traders dans la barre latérale, fenêtres et pages, onglet dans Paramètres. */
   siteIntegration: boolean;
   /** Barre latérale du site plus compacte, avec les menus regroupés (Social, Progression). */
   compactNav: boolean;
@@ -232,7 +232,7 @@ export interface CatalogCard {
   def: number | null;
 }
 
-/** Famille de cartes (gérée par Wiky-Traders). */
+/** Famille de cartes (gérée par Wiki-Traders). */
 export interface CardFamily {
   id: string;
   name: string;
@@ -316,7 +316,7 @@ export interface StoreShape {
   salesCache: MySalesResult | null;
   /** Familles lues dans la page (autre extension), avec la date du relevé. */
   families: { at: number; list: Family[] } | null;
-  /** Mes familles (Wiky-Traders). */
+  /** Mes familles (Wiki-Traders). */
   myFamilies: CardFamily[];
   /** Import des familles de « Prix moyen collection » : date (null = jamais). */
   familiesImportedAt: number | null;

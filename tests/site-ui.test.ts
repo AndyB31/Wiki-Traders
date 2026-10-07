@@ -37,7 +37,7 @@ describe('barre latérale du site', () => {
     expect(siteNav()!.className).toContain('w-64');
   });
 
-  it('arborescence : Paquets en haut, menus, récapitulatif puis Paramètres tout en bas ; pages Wiky-Traders rangées avec celles du site', () => {
+  it('arborescence : Paquets en haut, menus, récapitulatif puis Paramètres tout en bas ; pages Wiki-Traders rangées avec celles du site', () => {
     renderSiteUi(store(), actions);
     const nav = siteNav()!;
     expect(nav.getAttribute('data-wiky-nav')).toBe('compact');
@@ -54,7 +54,7 @@ describe('barre latérale du site', () => {
     expect(items('market')).toEqual(['Parcourir', 'Mes ventes', 'Mes enchères', 'Historique']);
     expect(items('social')).toEqual(['Échanges', 'Guilde', 'Amis', 'Messages', 'Bataille']);
     expect(items('progress')).toEqual(['Profil', 'Succès', 'Classement']);
-    expect(items('settings')).toEqual(['Paramètres du site', 'Réglages Wiky-Traders', 'Outils']);
+    expect(items('settings')).toEqual(['Paramètres du site', 'Réglages Wiki-Traders', 'Outils']);
     // Les pages de l'extension se distinguent par leur icône orange ; les onglets du Marché (pages du site) restent neutres.
     expect(nav.querySelectorAll('[data-group="collection"] .wiky-sub:not(.site-tab) .wiky-ico')).toHaveLength(2);
     expect(nav.querySelectorAll('[data-group="market"] .wiky-sub.site-tab')).toHaveLength(4);
@@ -123,7 +123,7 @@ describe('barre latérale du site', () => {
   });
 });
 
-describe('résumé Wiky-Traders toujours visible', () => {
+describe('résumé Wiki-Traders toujours visible', () => {
   it('slots, mises gagnées / perdues et synchro, avant « Paramètres »', () => {
     const now = Date.now();
     const s = store(
@@ -162,19 +162,19 @@ describe('résumé Wiky-Traders toujours visible', () => {
     expect(page.querySelector('iframe')!.getAttribute('src')).toContain('view=cards');
     expect(document.querySelector('main h1')!.textContent).toBe('Collection');
     expect(document.querySelector('.wiky-group-items a.wiky-sub.is-active')!.getAttribute('href')).toBe('/collection?wiky=cards');
-    // Sur une page Wiky-Traders, « Ma collection » (lien du site) ne paraît pas active.
+    // Sur une page Wiki-Traders, « Ma collection » (lien du site) ne paraît pas active.
     const mine = [...document.querySelectorAll('[data-group="collection"] .wiky-group-items a')].find((a) => a.textContent!.includes('Ma collection'))!;
     expect(mine.className).not.toMatch(/color-accent\)\]\/10/);
   });
 });
 
 describe('Paramètres du site', () => {
-  it('ajoute un onglet « Wiky-Traders » à côté des onglets du site', () => {
+  it('ajoute un onglet « Wiki-Traders » à côté des onglets du site', () => {
     history.replaceState(null, '', '/settings');
     document.querySelector('main')!.innerHTML = '<h1>Paramètres</h1><div role="tablist"><button role="tab" aria-selected="true" class="tab">Compte</button><button role="tab" aria-selected="false" class="tab">Affichage</button></div>';
     renderSiteUi(store(), actions);
     const tabs = [...document.querySelectorAll('[role="tablist"] [role="tab"]')];
-    expect(tabs.map((t) => t.textContent)).toEqual(['Compte', 'Affichage', 'Wiky-Traders']);
+    expect(tabs.map((t) => t.textContent)).toEqual(['Compte', 'Affichage', 'Wiki-Traders']);
     expect(tabs[2].className).toBe('tab');
   });
 
@@ -182,7 +182,7 @@ describe('Paramètres du site', () => {
     history.replaceState(null, '', '/settings?wiky=settings');
     renderSiteUi(store(), actions);
     const page = document.getElementById('wiky-page')!;
-    expect(page.querySelector('.wiky-tab.is-active')!.textContent).toBe('Wiky-Traders');
+    expect(page.querySelector('.wiky-tab.is-active')!.textContent).toBe('Wiki-Traders');
     expect(page.querySelector('iframe')!.getAttribute('src')).toContain('options.html?embed=1');
   });
 });

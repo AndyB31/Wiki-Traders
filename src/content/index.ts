@@ -677,7 +677,7 @@ async function sellFromCollection(cardId: string, tile: Element): Promise<void> 
   const durationMin = durationFor(price, store.settings.durationRules);
   const now = Date.now();
   automating = true;
-  // Le toast « prix conseillé » et la fenêtre de vente reprennent ce prix, comme pour une proposition de Wiky-Traders.
+  // Le toast « prix conseillé » et la fenêtre de vente reprennent ce prix, comme pour une proposition de Wiki-Traders.
   await save({ pendingFocus: { cardId, cardName: name, price, detail, at: now, durationMin, autoOpen: true, arrivedAt: now, prefilledAt: now, ...(myTabId != null ? { tabId: myTabId } : {}) } });
   showProgress(name, 'Ouverture de la vente…');
   try {
@@ -701,7 +701,7 @@ async function sellFromCollection(cardId: string, tile: Element): Promise<void> 
   }
 }
 
-/** Barre latérale, fenêtres et pages Wiky-Traders dans le site. */
+/** Barre latérale, fenêtres et pages Wiki-Traders dans le site. */
 function drawSiteUi(): void {
   if (!store) return;
   renderAuctionSwitch({

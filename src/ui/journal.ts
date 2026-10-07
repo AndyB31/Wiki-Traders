@@ -28,7 +28,7 @@ function render(): void {
   const entries = [...store.journal].reverse().filter((e) => filter === 'all' || e.type === filter);
   mount(
     app,
-    h('header', { class: 'row' }, h('img', { src: 'icons/icon-48.png', width: 32, height: 32, alt: '' }), h('h1', { class: 'grow' }, 'Wiky-Traders – Journal'), h('a', { href: 'options.html' }, '← Réglages')),
+    h('header', { class: 'row' }, h('img', { src: 'icons/icon-48.png', width: 32, height: 32, alt: '' }), h('h1', { class: 'grow' }, 'Wiki-Traders – Journal'), h('a', { href: 'options.html' }, '← Réglages')),
     h(
       'section',
       { class: 'card' },
@@ -56,7 +56,7 @@ function render(): void {
           { onchange: (e: Event) => ((filter = (e.target as HTMLSelectElement).value as typeof filter), render()) },
           (['all', 'proposed', 'created', 'finished'] as const).map((t) => h('option', { value: t, selected: filter === t }, t === 'all' ? 'Tout' : LABEL[t])),
         ),
-        h('button', { onclick: () => downloadJson(`wiky-traders-journal-${Date.now()}.json`, store.journal) }, 'Exporter'),
+        h('button', { onclick: () => downloadJson(`wiki-traders-journal-${Date.now()}.json`, store.journal) }, 'Exporter'),
         h('button', { class: 'danger', onclick: async () => confirm('Vider le journal ?') && (await save({ journal: [] })) }, 'Vider'),
       ),
       entries.length

@@ -223,7 +223,7 @@ export function quickStartChecks(input: { cardCount: number; rules: TagRule[]; s
       id: 'collection',
       ok: cardCount > 0,
       label: 'Collection connue',
-      detail: cardCount > 0 ? `${plural(cardCount, 'carte')} relevée${cardCount > 1 ? 's' : ''}.` : 'Ouvre ta collection sur le site pour que Wiky-Traders la relève.',
+      detail: cardCount > 0 ? `${plural(cardCount, 'carte')} relevée${cardCount > 1 ? 's' : ''}.` : 'Ouvre ta collection sur le site pour que Wiki-Traders la relève.',
     },
     {
       id: 'api',

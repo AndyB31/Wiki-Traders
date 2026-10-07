@@ -173,7 +173,7 @@ export function openRanking(ctx: FeatureContext): void {
   overlay.className = 'wiky-rk-overlay';
   overlay.innerHTML = `
     <div class="wiky-rk" role="dialog" aria-modal="true" aria-label="Plus chères">
-      <div class="wiky-rk-head"><span class="wiky-ico">${ICON.replace('<svg ', '<svg width="18" height="18" ')}</span><div><small>Wiky-Traders</small><h2>Plus chères</h2></div>
+      <div class="wiky-rk-head"><span class="wiky-ico">${ICON.replace('<svg ', '<svg width="18" height="18" ')}</span><div><small>Wiki-Traders</small><h2>Plus chères</h2></div>
         <button type="button" class="wiky-rk-refresh" title="Relit les ventes de toutes tes cartes (sinon les prix sont gardés 6 h)">↻ Rafraîchir les prix</button>
         <button type="button" class="wiky-rk-close" aria-label="Fermer" title="Fermer">×</button></div>
       <div class="wiky-rk-filters">

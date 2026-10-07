@@ -1,5 +1,5 @@
 /**
- * Pages de l'extension affichées dans le site (fenêtre ou page Wiky-Traders) :
+ * Pages de l'extension affichées dans le site (fenêtre ou page Wiki-Traders) :
  *  - `?embed=1` : dans une iframe de la page WikiMasters ;
  *  - `&view=<onglet>` : un seul onglet de la popup, sans en-tête ni barre d'onglets ;
  *  - `&theme=<json>` : couleurs du site (lues par le content script) appliquées à la page.
@@ -17,7 +17,7 @@ export interface SiteTheme {
   foreground?: string;
 }
 
-/** Orange Wiky-Traders, pendant du violet de « Familles ». */
+/** Orange Wiki-Traders, pendant du violet de « Familles ». */
 const ORANGE = '#f97316';
 
 function applyTheme(t: SiteTheme): void {

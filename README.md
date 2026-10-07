@@ -1,4 +1,4 @@
-# Wiky-Traders
+# Wiki-Traders
 
 > Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : une extension navigateur qui garde tes slots d'enchères remplis selon tes règles, calcule le bon prix… et te laisse cliquer.
 
@@ -6,7 +6,7 @@
 ![Manifest](https://img.shields.io/badge/Manifest-V3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178c6)
 
-![Wiky-Traders intégré à WikiMasters : barre latérale, résumé et réglages](docs/screenshots/site-settings.png)
+![Wiki-Traders intégré à WikiMasters : barre latérale, résumé et réglages](docs/screenshots/site-settings.png)
 
 📖 **Documentation complète : [docs/wiki](docs/wiki/README.md)** (installation, premiers pas, chaque réglage, dépannage).
 
@@ -32,7 +32,7 @@
 
 Les [règles de la communauté](https://www.wiki-masters.com/rules) (section 3) et les [conditions d'utilisation](https://www.wiki-masters.com/terms) (section 6) de WikiMasters interdisent les bots, scripts et macros qui jouent ou échangent à ta place, sous peine de bannissement.
 
-Par défaut, Wiky-Traders fait **tout le travail de réflexion** (quel slot est libre, quelle carte vendre, à quel prix) mais **c'est toi qui cliques sur « Mettre aux enchères »**.
+Par défaut, Wiki-Traders fait **tout le travail de réflexion** (quel slot est libre, quelle carte vendre, à quel prix) mais **c'est toi qui cliques sur « Mettre aux enchères »**.
 
 | L'extension | Toi |
 | --- | --- |
@@ -47,7 +47,7 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 
 | | |
 | --- | --- |
-| **Intégré au site** | Barre latérale rangée en arborescence (Paquets en haut ; menus Collection, Marché, Social, Progression ; pages de l'extension à l'icône orange), **récapitulatif** toujours visible (slots occupés / libres, prochaine fin, gagnées / perdues sur 24 h, synchro) avec la liste des **mises en direct** relue toutes les 2 s, Paramètres tout en bas avec un onglet **Wiky-Traders**. |
+| **Intégré au site** | Barre latérale rangée en arborescence (Paquets en haut ; menus Collection, Marché, Social, Progression ; pages de l'extension à l'icône orange), **récapitulatif** toujours visible (slots occupés / libres, prochaine fin, gagnées / perdues sur 24 h, synchro) avec la liste des **mises en direct** relue toutes les 2 s, Paramètres tout en bas avec un onglet **Wiki-Traders**. |
 | **Vendre** | Slots par étiquette (quota, % du prix, plancher / plafond, exemplaires à garder, liste noire, favoris jamais proposés), prix et durée conseillés avec le détail du calcul. Dans Marché → **Mes ventes**, un clic sur un slot libre ouvre « Vendre » : carte proposée, autre carte, recherche ou **carte au hasard** d'une étiquette. **Mode enchère** sur la collection : un clic sur une carte ouvre sa mise en vente pré-remplie. |
 | **Marché enrichi** | Sur chaque enchère : **prix moyen de la carte et écart** (vert = bonne affaire). **Mes enchères** : tes mises, en cours ou historique. **Historique** : tes ventes, statistiques, filtres vendues / invendues, écart à la moyenne. |
 | **Page d'une enchère** | **Historique des prix** de la carte : chiffres clés (ventes, moyenne, médiane, extrêmes, tendance 30 j, taux de vente), graphique en **points, bougies ou ligne**, moyenne glissante de 2 j à 1 mois, filtre vendues / sans acheteur ; **autres enchères de la même carte**. |
@@ -86,9 +86,9 @@ cd Wiky-Traders
 make install
 ```
 
-`make install` vérifie Node.js, installe les dépendances, construit l'extension, **demande où l'installer** (par défaut `~/Wiky-Traders`), propose la mise à jour en un clic et affiche comment la charger dans ton navigateur. Sans question : `make install DEST=~/Wiky-Traders`. `make help` liste les autres commandes (`make update`, `make zip`…).
+`make install` vérifie Node.js, installe les dépendances, construit l'extension, **demande où l'installer** (par défaut `~/Wiki-Traders`), propose la mise à jour en un clic et affiche comment la charger dans ton navigateur. Sans question : `make install DEST=~/Wiki-Traders`. `make help` liste les autres commandes (`make update`, `make zip`…).
 
-Sans `make` : `npm install && npm run build`, puis charge le dossier **`dist/`**. (`npm run zip` produit en plus `wiky-traders.zip`.)
+Sans `make` : `npm install && npm run build`, puis charge le dossier **`dist/`**. (`npm run zip` produit en plus `wiki-traders.zip`.)
 
 > Le navigateur reconnaît une extension non empaquetée à son **dossier** : garde toujours le même (un nouveau dossier = nouvelle extension, sans tes réglages ; Réglages → Avancé → Exporter / Importer pour les reprendre).
 
@@ -104,7 +104,7 @@ Sans `make` : `npm install && npm run build`, puis charge le dossier **`dist/`**
 
 1. Ouvre `arc://extensions` (ou `chrome://extensions`).
 2. Active le **Mode développeur**, puis **Load unpacked** → dossier `dist/`.
-3. Vérifie que la carte « Wiky-Traders » indique bien *Loaded from: …/Wiky-Traders/dist*.
+3. Vérifie que la carte « Wiki-Traders » indique bien *Loaded from: …/Wiky-Traders/dist*.
 
 **Firefox (128+)**
 
@@ -112,23 +112,23 @@ Sans `make` : `npm install && npm run build`, puis charge le dossier **`dist/`**
 2. Clique sur **Charger un module complémentaire temporaire** et choisis `dist/manifest.json`.
 3. Firefox oublie les modules temporaires à la fermeture : recommence à chaque démarrage.
 
-La page de réglages s'ouvre à l'installation. Épingle l'icône 🧩 → Wiky-Traders dans la barre d'outils pour l'avoir sous la main.
+La page de réglages s'ouvre à l'installation. Épingle l'icône 🧩 → Wiki-Traders dans la barre d'outils pour l'avoir sous la main.
 
 ### 4. Vérifier que tout marche
 
 1. Va sur [wiki-masters.com](https://www.wiki-masters.com) et connecte-toi.
-2. Ouvre (ou recharge) un onglet du site : le bloc orange **Wiky-Traders** apparaît dans la barre latérale, au-dessus de *Paramètres*.
+2. Ouvre (ou recharge) un onglet du site : le bloc orange **Wiki-Traders** apparaît dans la barre latérale, au-dessus de *Paramètres*.
 3. Ouvre ta **collection** : les étiquettes s'affichent sur les cartes et l'interrupteur **Mode enchère** apparaît à côté du titre.
 
 Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
-> **Tu utilises une autre extension WikiMasters ?** Wiky-Traders importe ses familles au premier lancement (et ses statistiques de tirage à la demande). Si elle propose les mêmes fonctions, désactive-la ensuite pour éviter les doublons (prix, « Plus chères », Familles…).
+> **Tu utilises une autre extension WikiMasters ?** Wiki-Traders importe ses familles au premier lancement (et ses statistiques de tirage à la demande). Si elle propose les mêmes fonctions, désactive-la ensuite pour éviter les doublons (prix, « Plus chères », Familles…).
 
 ### 5. Mettre à jour
 
 **En un clic** : installe une fois le programme d'aide (`make install` le propose, sinon `make updater`). Quand `main` a des nouveautés, le récapitulatif affiche **« ↑ Mise à jour disponible »** ; Réglages → **Mises à jour** → **Mettre à jour** récupère la dernière version, reconstruit, recharge l'extension et les onglets WikiMasters.
 
-**À la main** : `make update` (ou `git pull && npm install && npm run build`), puis **↻** sous Wiky-Traders dans la page des extensions et **recharge les onglets WikiMasters** (une extension rechargée ne remplace pas le script d'une page déjà ouverte). Tes réglages et données sont conservés.
+**À la main** : `make update` (ou `git pull && npm install && npm run build`), puis **↻** sous Wiki-Traders dans la page des extensions et **recharge les onglets WikiMasters** (une extension rechargée ne remplace pas le script d'une page déjà ouverte). Tes réglages et données sont conservés.
 
 **Sans le dépôt** : le dernier zip construit est publié à chaque mise à jour de `main` dans la release [« Dernière version »](https://github.com/AndyB31/Wiky-Traders/releases/tag/latest) : décompresse-le dans le **même dossier** qu'avant, puis ↻.
 
@@ -138,7 +138,7 @@ Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
 ## Configuration pas à pas
 
-Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou clic droit sur l'icône → *Options*). La page commence par un **Démarrage rapide** qui coche ce qui est prêt et règle le reste en un clic ; chaque section s'explique avec un exemple. **Enregistrer** (ou Ctrl/⌘ + S) quand tu as fini.
+Les réglages sont dans **Paramètres → onglet Wiki-Traders** sur le site (ou clic droit sur l'icône → *Options*). La page commence par un **Démarrage rapide** qui coche ce qui est prêt et règle le reste en un clic ; chaque section s'explique avec un exemple. **Enregistrer** (ou Ctrl/⌘ + S) quand tu as fini.
 
 1. **Règles par étiquette** : une ligne par étiquette de ta collection. Par défaut : 1 slot « 50-100 » et 4 slots « 20-50 », à **70 %** du prix de référence, en gardant 1 exemplaire. Les étiquettes trouvées dans ta collection s'ajoutent en un clic.
 2. **Nombre de slots** : le nombre d'enchères simultanées permises par le site (lu automatiquement dans « Mes ventes (2/5) »).
@@ -199,7 +199,7 @@ Les réglages s'exportent et s'importent en JSON (Réglages → Avancé).
 | Rien n'apparaît sur le site | Recharge l'onglet WikiMasters après avoir rechargé l'extension ; vérifie le dossier chargé (`dist/`) et qu'une seule copie est installée. |
 | L'ancienne interface est toujours là | Même chose : recharge la page du site (Cmd/Ctrl + R). |
 | « Aucune carte connue » | Ouvre ta collection une fois. |
-| Slots / ventes pas à jour | Clique ↻ dans le bloc Wiky-Traders, ou active la lecture via l'API pour la relève automatique. |
+| Slots / ventes pas à jour | Clique ↻ dans le bloc Wiki-Traders, ou active la lecture via l'API pour la relève automatique. |
 | Un slot reste vide | La fenêtre Vendre explique pourquoi (favoris, déjà en vente, « garder au moins »…). |
 | Prix « — » ou faux | « ↻ Rafraîchir les prix » (Étiquettes, Plus chères, légende de la collection) ; « Jamais vendue » = aucune vente connue. |
 | Peu de cartes étiquetées | Active la lecture via l'API : l'étiquetage utilise alors le prix moyen de chaque carte (seules les cartes jamais vendues restent sans prix). |
@@ -249,7 +249,7 @@ make help            # toutes les commandes
 make install         # dépendances, construction, installation dans un dossier, instructions
 make update          # git pull, construction, mise à jour du dossier installé
 make test            # TypeScript + tests unitaires (Vitest + jsdom)
-make zip             # wiky-traders.zip
+make zip             # wiki-traders.zip
 npm run dev          # construction en continu dans dist/ (recharger l'extension après modification)
 npm run demo         # parcours complet dans Chromium + captures du README
 ```
@@ -258,7 +258,7 @@ npm run demo         # parcours complet dans Chromium + captures du README
 
 ## Confidentialité
 
-- Aucune donnée personnelle n'est envoyée ailleurs que sur WikiMasters ; pas de serveur Wiky-Traders, pas de statistiques.
+- Aucune donnée personnelle n'est envoyée ailleurs que sur WikiMasters ; pas de serveur Wiki-Traders, pas de statistiques.
 - Sans la **lecture via l'API**, l'extension ne fait aucune requête : elle lit seulement ce que la page affiche.
 - Avec elle, l'extension interroge l'API du site (celle qu'utilise le site lui-même) **avec ta session, en lecture seule** ; l'étiquetage par l'API, s'il est activé, n'écrit que des étiquettes.
 - La vérification des mises à jour interroge l'**API publique de GitHub** (dernier commit de `main`) ; rien de personnel n'est envoyé.

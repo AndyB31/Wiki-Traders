@@ -112,7 +112,7 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
   const draw = (prices: Map<string, CardPrice>, loading: boolean) => {
     if (seq !== recapSeq) return;
     const recap = buildRecap(result.cards, prices, ownedOf(result.owned));
-    const { body, foot } = floatingPanel('pack-recap', result.packs > 1 ? `Wiky-Traders · ${result.packs} paquets` : 'Wiky-Traders · paquet', result.title, () => {
+    const { body, foot } = floatingPanel('pack-recap', result.packs > 1 ? `Wiki-Traders · ${result.packs} paquets` : 'Wiki-Traders · paquet', result.title, () => {
       dismissedAt = result.at;
     });
     for (const r of recap.rows) {
@@ -382,7 +382,7 @@ function drawAutoPill(): void {
   }
   pill.dataset.key = text;
   pill.replaceChildren(node('span', 'part', 'wiky-dot'), node('span', 'part', '', `Ouverture auto · ${text}`), button('Arrêter', () => void setAuto(false), 'ghost', true));
-  pill.title = 'Ouverture automatique des paquets (Wiky-Traders)';
+  pill.title = 'Ouverture automatique des paquets (Wiki-Traders)';
 }
 
 function autoBox(a: AutoOpenState): HTMLElement {

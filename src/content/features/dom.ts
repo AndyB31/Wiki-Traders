@@ -108,7 +108,7 @@ const TOOLS_CSS = `
 `;
 
 /**
- * Barre d'outils Wiky-Traders sur la ligne du titre de la collection (ou de la collection globale),
+ * Barre d'outils Wiki-Traders sur la ligne du titre de la collection (ou de la collection globale),
  * juste avant l'interrupteur « Mode enchère » s'il est déjà là, sinon avant « Sélectionner ».
  */
 export function collectionTools(): HTMLElement | null {

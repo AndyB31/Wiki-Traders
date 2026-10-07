@@ -1,7 +1,7 @@
 /**
  * Petits éléments d'interface « comme le site » partagés par les modules (paquets, échanges, mises) :
  * panneau, boutons, pastille de rareté, fenêtre de confirmation. Mêmes variables de couleur que le site
- * (--color-surface, --color-border, --color-foreground) et orange Wiky-Traders (#f97316).
+ * (--color-surface, --color-border, --color-foreground) et orange Wiki-Traders (#f97316).
  * Tout nœud porte `data-wiky` (ignoré par l'observateur de mutations).
  */
 import type { Rarity } from '../../lib/types';

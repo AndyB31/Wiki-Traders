@@ -38,8 +38,8 @@ async function selectedSource() {
   const els = selectedCollectionCards();
   const announced = siteSelectedCount();
   if (announced != null && els.length !== announced) {
-    console.warn(`[Wiky-Traders] sélection : ${els.length} carte(s) détectée(s), le site en annonce ${announced}`);
-    if (!els.length) throw new Error(`le site annonce ${plural(announced, 'carte sélectionnée', 'cartes sélectionnées')}, mais Wiky-Traders n'en reconnaît aucune`);
+    console.warn(`[Wiki-Traders] sélection : ${els.length} carte(s) détectée(s), le site en annonce ${announced}`);
+    if (!els.length) throw new Error(`le site annonce ${plural(announced, 'carte sélectionnée', 'cartes sélectionnées')}, mais Wiki-Traders n'en reconnaît aucune`);
   }
   const res = await resolveNativeCards(els, ctx?.cards ?? {}, !!ctx?.apiRead);
   if (announced != null && els.length && els.length < announced) {

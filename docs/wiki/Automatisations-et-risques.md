@@ -4,7 +4,7 @@
 
 > ⚠️ Les [règles de la communauté](https://www.wiki-masters.com/rules) (section 3) et les [conditions d'utilisation](https://www.wiki-masters.com/terms) (section 6) de WikiMasters interdisent les bots, scripts et macros qui jouent ou échangent à ta place. Le risque est un **bannissement définitif, avec perte des cartes**, sans préavis.
 
-Par défaut, Wiky-Traders ne fait que **lire** ce que la page affiche et **conseiller**. Les options ci-dessous vont plus loin : elles sont désactivées et demandent une confirmation ; tant que le pré-remplissage ou l'étiquetage automatique est actif, un avertissement reste affiché en bas de la popup.
+Par défaut, Wiki-Traders ne fait que **lire** ce que la page affiche et **conseiller**. Les options ci-dessous vont plus loin : elles sont désactivées et demandent une confirmation ; tant que le pré-remplissage ou l'étiquetage automatique est actif, un avertissement reste affiché en bas de la popup.
 
 | Option | Ce qu'elle fait sur le site | Niveau |
 | --- | --- | --- |

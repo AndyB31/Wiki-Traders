@@ -2,9 +2,9 @@
 
 # Mises et ventes
 
-Le menu **Marché** de la barre latérale ouvre directement les onglets du site, enrichis par Wiky-Traders :
+Le menu **Marché** de la barre latérale ouvre directement les onglets du site, enrichis par Wiki-Traders :
 
-| Onglet | Ce que Wiky-Traders ajoute |
+| Onglet | Ce que Wiki-Traders ajoute |
 | --- | --- |
 | **Parcourir** | Sur chaque enchère, sous son prix : la **moyenne de la carte** et l'**écart** du prix actuel — vert sous la moyenne (≥ 10 % moins cher : bonne affaire), rouge au-dessus, gris au prix ; « Jamais vendue » sans référence. Aussi dans les autres onglets du Marché. |
 | **Mes ventes** | Tes slots : les ventes du site et, à côté, une carte « Slot libre » par slot vide. Clic sur un slot libre : **Vendre** intégré (carte proposée, autre carte du slot, recherche, **carte au hasard** d'une étiquette, prix et durée modifiables). Avec l'option *Vendre depuis le classement*, mise en vente directe après confirmation ; sinon la carte s'ouvre avec prix et durée pré-remplis. |
@@ -38,7 +38,7 @@ Elles sont relues :
 
 - **automatiquement via l'API** (si la lecture via l'API est activée) : au chargement d'une page du site, puis chaque minute tant qu'un onglet WikiMasters est visible, et en revenant sur l'onglet ;
 - en ouvrant Marché → **Mes ventes** ;
-- avec **↻** (bloc Wiky-Traders) ou 🔄 : via l'API, sinon l'extension va sur Marché → *Mes ventes* et relit la liste.
+- avec **↻** (bloc Wiki-Traders) ou 🔄 : via l'API, sinon l'extension va sur Marché → *Mes ventes* et relit la liste.
 
 Une vente qui disparaît de la liste est comptée comme terminée (journal, prix final dans l'historique). Le nombre total de slots vient de tes réglages ou de « Mes ventes (2/5) » sur le site.
 
@@ -55,7 +55,7 @@ Une vente qui disparaît de la liste est comptée comme terminée (journal, prix
 
 La liste est **relue à chaque ouverture** de « Mes mises » (popup ou fenêtre du site). La case **En cours seulement** (mémorisée) n'affiche que les mises encore en jeu, en tête ou surenchéries.
 
-Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant et le **prix de la carte** (médiane de ses ventes) pour juger si tu paies trop cher. Le bloc Wiky-Traders résume les mises en cours et les résultats des dernières 24 h.
+Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant et le **prix de la carte** (médiane de ses ventes) pour juger si tu paies trop cher. Le bloc Wiki-Traders résume les mises en cours et les résultats des dernières 24 h.
 
 ![Mises](../screenshots/window-bids.png)
 

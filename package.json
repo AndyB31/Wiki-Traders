@@ -1,5 +1,5 @@
 {
-  "name": "wiky-traders",
+  "name": "wiki-traders",
   "version": "0.6.0",
   "private": true,
   "description": "Copilote d'enchères pour WikiMasters (extension navigateur Manifest V3)",
@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node scripts/build.mjs --watch",
     "build": "node scripts/build.mjs",
-    "zip": "node scripts/build.mjs && cd dist && zip -qr ../wiky-traders.zip .",
+    "zip": "node scripts/build.mjs && cd dist && zip -qr ../wiki-traders.zip .",
     "icons": "node scripts/gen-icons.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

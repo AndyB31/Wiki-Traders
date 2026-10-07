@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Installe (ou désinstalle avec --uninstall) le programme d'aide aux mises à jour de Wiky-Traders.
+ * Installe (ou désinstalle avec --uninstall) le programme d'aide aux mises à jour de Wiki-Traders.
  *
  *   Depuis le dépôt :            npm run updater:install
  *   Depuis un zip décompressé :  node <dossier de l'extension>/updater/install.mjs
@@ -101,7 +101,7 @@ if (os === 'win32') {
 
 const manifest = {
   name: NAME,
-  description: 'Wiky-Traders – mises à jour',
+  description: 'Wiki-Traders – mises à jour',
   path: launcher,
   type: 'stdio',
   allowed_origins: allowed.map((id) => `chrome-extension://${id}/`),
@@ -130,5 +130,5 @@ if (os === 'win32') {
 console.log(`✔ Programme d'aide installé (${mode === 'git' ? 'dépôt git' : 'extension décompressée'} : ${dir})`);
 console.log(`  Navigateurs : ${done.length ? done.join(', ') : 'aucun trouvé'}`);
 console.log(`  Extension autorisée : ${allowed.join(', ')}`);
-console.log('  Recharge l\'extension (↻) puis clique sur « Mettre à jour » dans les réglages Wiky-Traders.');
+console.log('  Recharge l\'extension (↻) puis clique sur « Mettre à jour » dans les réglages Wiki-Traders.');
 if (!ids.length) console.log('  Si le bouton dit que le programme est introuvable, relance avec : --id <identifiant affiché dans les réglages>');

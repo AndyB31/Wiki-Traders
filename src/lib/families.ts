@@ -1,5 +1,5 @@
 /**
- * Familles de cartes (Wiky-Traders) : logique pure, sans DOM ni réseau.
+ * Familles de cartes (Wiki-Traders) : logique pure, sans DOM ni réseau.
  *  - possession exacte (identifiant du site présent dans ma collection, sinon nom identique) : pas d'heuristique
  *    par mots-clés, rien « à vérifier » ;
  *  - statistiques (possédées, valeur, coût pour compléter) calculées en mémoire à partir des prix moyens ;

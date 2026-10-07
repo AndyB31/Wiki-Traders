@@ -54,7 +54,7 @@ function box(host: Element, where: 'after' | 'append', siteId: string, extraClas
   el.innerHTML = `<span class="wiky-mprice-label">Prix moyen</span><span class="wiky-mprice-value"></span><span class="wiky-mprice-meta"></span>`;
   el.querySelector('.wiky-mprice-value')!.textContent = s.value;
   el.querySelector('.wiky-mprice-meta')!.innerHTML = s.meta;
-  el.title = 'Moyenne des ventes conclues (Wiky-Traders)';
+  el.title = 'Moyenne des ventes conclues (Wiki-Traders)';
   if (!existing) {
     isolateClicks(el);
     if (where === 'after') host.after(el);

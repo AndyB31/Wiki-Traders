@@ -31,7 +31,7 @@ export function updatePanel(): HTMLElement {
       : busy === 'update' ? 'Mise à jour en cours… (récupération, construction, puis rechargement)'
       : !info ? 'Pas encore vérifié.'
       : status === 'available' ? `Mise à jour disponible : ${info.behind} nouveauté${info.behind > 1 ? 's' : ''}.`
-      : status === 'up-to-date' ? 'Wiky-Traders est à jour.'
+      : status === 'up-to-date' ? 'Wiki-Traders est à jour.'
       : status === 'unknown' ? 'Version locale (non publiée) : comparaison impossible.'
       : `Vérification impossible : ${info.error ?? 'erreur'}.`;
     const canUpdate = helper?.ok && (status === 'available' || status === 'unknown') && !busy;
@@ -40,7 +40,7 @@ export function updatePanel(): HTMLElement {
           'div',
           { class: 'warn small' },
           h('p', { style: 'margin:0 0 6px' }, 'Pour mettre à jour en un clic, installe une fois le programme d\'aide (Node.js 20+ requis) :'),
-          h('pre', { class: 'mono', style: 'margin:0 0 6px;white-space:pre-wrap' }, `cd <dossier Wiky-Traders>\nnpm run updater:install -- --id ${helper.id ?? ext.runtime.id}`),
+          h('pre', { class: 'mono', style: 'margin:0 0 6px;white-space:pre-wrap' }, `cd <dossier Wiki-Traders>\nnpm run updater:install -- --id ${helper.id ?? ext.runtime.id}`),
           h('p', { class: 'muted', style: 'margin:0' }, 'Installation depuis un zip : node <dossier de l\'extension>/updater/install.mjs --id ' + (helper.id ?? ext.runtime.id) + ' — puis recharge l\'extension (↻).'),
         )
       : null;

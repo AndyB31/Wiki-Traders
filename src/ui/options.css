@@ -139,7 +139,7 @@ details.advanced > summary h2 { margin: 0; }
 button.link { border: 0; background: none; padding: 0; text-align: left; text-decoration: underline; }
 button.link.error { color: var(--danger); }
 
-/* Onglet Wiky-Traders de la page Paramètres du site. */
+/* Onglet Wiki-Traders de la page Paramètres du site. */
 .embed #app { padding: 8px 4px 90px; max-width: none; }
 .embed #app > header { display: none; }
 .embed .sticky { border-radius: 12px 12px 0 0; }

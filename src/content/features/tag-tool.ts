@@ -1,6 +1,6 @@
 /**
  * Bouton « Étiquettes » sur la ligne du titre de la collection, juste après « Plus chères » : c'est depuis la
- * collection qu'on lance l'étiquetage. Il ouvre la fenêtre « Étiquetage » de Wiky-Traders par-dessus la page.
+ * collection qu'on lance l'étiquetage. Il ouvre la fenêtre « Étiquetage » de Wiki-Traders par-dessus la page.
  */
 import { openModal } from '../site-ui';
 import { collectionTools, isCollection, removeTool } from './dom';

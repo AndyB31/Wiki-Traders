@@ -483,7 +483,7 @@ function familyCardToCard(f: FamilyCard): Card {
 }
 
 /**
- * Familles à afficher : celles de Wiky-Traders (page Familles du site), sinon celles lues dans l'extension
+ * Familles à afficher : celles de Wiki-Traders (page Familles du site), sinon celles lues dans l'extension
  * « Prix moyen collection ». La possession est recalculée d'après ma collection.
  */
 function shownFamilies(): Family[] {
@@ -497,7 +497,7 @@ function shownFamilies(): Family[] {
   return store.families?.list ?? [];
 }
 
-/** Familles (Wiky-Traders, ou « Prix moyen collection ») : toutes leurs cartes, possédées ou non. */
+/** Familles (Wiki-Traders, ou « Prix moyen collection ») : toutes leurs cartes, possédées ou non. */
 function familyList() {
   const families = shownFamilies();
   if (!families.length) {
@@ -505,7 +505,7 @@ function familyList() {
       h(
         'p',
         { class: 'muted small' },
-        'Aucune famille. Crée-les sur WikiMasters : menu Wiky-Traders → Familles (celles d\'une autre extension y sont importées).',
+        'Aucune famille. Crée-les sur WikiMasters : menu Wiki-Traders → Familles (celles d\'une autre extension y sont importées).',
       ),
     ];
   }
@@ -1098,7 +1098,7 @@ function render(): void {
       'header',
       { class: 'row' },
       h('img', { src: 'icons/icon-32.png', width: 20, height: 20, alt: '' }),
-      h('h1', { class: 'grow' }, 'Wiky-Traders'),
+      h('h1', { class: 'grow' }, 'Wiki-Traders'),
       h(
         'button',
         { class: refreshing ? 'spin' : '', title: 'Actualiser mes ventes : Marché → onglet « Mes ventes »', disabled: refreshing, onclick: refreshSales },

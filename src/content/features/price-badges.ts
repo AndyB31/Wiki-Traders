@@ -58,7 +58,7 @@ function stateOf(siteId: string, rarity: Rarity | null, now: number): { state: S
     return {
       state: 'value',
       text: `Moy. ${formatW(v)} W`,
-      title: `Moyenne de ${n} vente${n > 1 ? 's' : ''} conclue${n > 1 ? 's' : ''}${sameRarity ? ` en ${rarity}` : ''}${median} (Wiky-Traders)`,
+      title: `Moyenne de ${n} vente${n > 1 ? 's' : ''} conclue${n > 1 ? 's' : ''}${sameRarity ? ` en ${rarity}` : ''}${median} (Wiki-Traders)`,
     };
   }
   if (now - (failedAt.get(siteId) ?? 0) < RETRY_MS) return { state: 'error', text: 'Prix indispo.', title: 'Erreur temporaire, nouvel essai dans une minute' };

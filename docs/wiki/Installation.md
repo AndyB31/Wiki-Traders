@@ -2,7 +2,7 @@
 
 # Installation
 
-Wiky-Traders n'est pas publiée sur les boutiques d'extensions : on la construit depuis les sources, puis on la charge « non empaquetée ».
+Wiki-Traders n'est pas publiée sur les boutiques d'extensions : on la construit depuis les sources, puis on la charge « non empaquetée ».
 
 ## 1. Prérequis
 
@@ -24,7 +24,7 @@ cd Wiky-Traders
 make install
 ```
 
-`make install` vérifie Node.js, installe les dépendances, construit, **demande le dossier d'installation** (par défaut `~/Wiky-Traders`), propose la mise à jour en un clic, puis affiche les étapes pour charger l'extension (Chrome, Arc, Edge, Brave, Firefox). Sans question : `make install DEST=~/Wiky-Traders`. Autres commandes : `make help`.
+`make install` vérifie Node.js, installe les dépendances, construit, **demande le dossier d'installation** (par défaut `~/Wiki-Traders`), propose la mise à jour en un clic, puis affiche les étapes pour charger l'extension (Chrome, Arc, Edge, Brave, Firefox). Sans question : `make install DEST=~/Wiki-Traders`. Autres commandes : `make help`.
 
 > Le navigateur reconnaît une extension non empaquetée à son **dossier**. Tu l'utilises déjà depuis un dossier ? Donne le même pour garder tes réglages et tes familles. Un nouveau dossier = nouvelle extension (Réglages → Avancé → Exporter, puis Importer, pour reprendre tes réglages).
 
@@ -37,7 +37,7 @@ npm run build      # crée le dossier dist/
 
 Le dossier **`dist/`** est l'extension. Ne le déplace pas après l'avoir chargé : le navigateur le relit à chaque rechargement.
 
-> `npm run zip` crée aussi `wiky-traders.zip` (le contenu de `dist/`), pratique pour l'installer sur un autre ordinateur : dézippe-le puis charge le dossier obtenu.
+> `npm run zip` crée aussi `wiki-traders.zip` (le contenu de `dist/`), pratique pour l'installer sur un autre ordinateur : dézippe-le puis charge le dossier obtenu.
 
 ## 3. Charger l'extension
 
@@ -50,13 +50,13 @@ Le dossier **`dist/`** est l'extension. Ne le déplace pas après l'avoir charg�
    - Opera : `opera://extensions`
 2. Active le **Mode développeur** (en haut à droite ; dans Edge, en bas à gauche).
 3. **Charger l'extension non empaquetée** → choisis le dossier `dist/`.
-4. Épingle l'extension : icône 🧩 de la barre d'outils → 📌 à côté de Wiky-Traders.
+4. Épingle l'extension : icône 🧩 de la barre d'outils → 📌 à côté de Wiki-Traders.
 
 ### Arc
 
 1. Ouvre `arc://extensions` (ou `chrome://extensions`).
 2. Active **Developer mode**, puis **Load unpacked** → dossier `dist/`.
-3. Sur la carte Wiky-Traders, *Source* doit indiquer **Unpacked extension** et *Loaded from* le chemin de ton dossier `dist/`.
+3. Sur la carte Wiki-Traders, *Source* doit indiquer **Unpacked extension** et *Loaded from* le chemin de ton dossier `dist/`.
 
 ### Firefox 128+
 
@@ -73,9 +73,9 @@ La page de réglages s'ouvre automatiquement après l'installation.
 1. Va sur [wiki-masters.com](https://www.wiki-masters.com) et connecte-toi.
 2. Recharge l'onglet (Cmd/Ctrl + R).
 3. Tu dois voir :
-   - le bloc orange **Wiky-Traders** dans la barre latérale, au-dessus de *Paramètres* ;
+   - le bloc orange **Wiki-Traders** dans la barre latérale, au-dessus de *Paramètres* ;
    - les menus **Social** et **Progression** qui regroupent les liens du site ;
-   - un onglet **Wiky-Traders** dans *Paramètres*.
+   - un onglet **Wiki-Traders** dans *Paramètres*.
 
 Rien de tout ça ? Voir [Dépannage](Depannage.md#rien-napparait-sur-le-site).
 
@@ -108,7 +108,7 @@ npm run build
 
 Ensuite :
 
-1. page des extensions → **↻** sous Wiky-Traders ;
+1. page des extensions → **↻** sous Wiki-Traders ;
 2. **recharge chaque onglet WikiMasters ouvert** : une extension rechargée ne remplace pas le script déjà chargé dans une page.
 
 Tes réglages, ta collection connue et ton journal sont conservés.

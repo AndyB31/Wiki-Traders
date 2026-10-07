@@ -1,9 +1,9 @@
 /**
- * Wiky-Traders intégré au site, à la manière de « Familles » (violet) de l'extension « Prix moyen collection », en orange :
+ * Wiki-Traders intégré au site, à la manière de « Familles » (violet) de l'extension « Prix moyen collection », en orange :
  *  - barre latérale plus compacte, liens regroupés en menus (Social, Progression) ;
- *  - résumé toujours visible (synchro, slots libres, mises en cours gagnées / perdues) et menu Wiky-Traders ;
+ *  - résumé toujours visible (synchro, slots libres, mises en cours gagnées / perdues) et menu Wiki-Traders ;
  *  - fonctionnalités en fenêtre par-dessus la page (vendre, mises…) ou en page (cartes, ventes conclues) ;
- *  - onglet « Wiky-Traders » dans Paramètres (/settings?wiky=settings).
+ *  - onglet « Wiki-Traders » dans Paramètres (/settings?wiky=settings).
  * Les liens du site ne sont jamais déplacés (React les gère) : ils sont masqués et reproduits dans nos menus,
  * un clic sur la copie déclenche le lien d'origine (navigation du site, sans rechargement).
  */
@@ -66,11 +66,11 @@ const ITEMS: { view: View; label: string; title: string; icon: string; page?: st
 
 /**
  * Arborescence de la barre latérale (barre compacte) : « Paquets » reste en haut, le reste est rangé en menus ;
- * le récapitulatif Wiky-Traders puis « Paramètres » ferment la barre. Les pages de l'extension sont rangées avec
+ * le récapitulatif Wiki-Traders puis « Paramètres » ferment la barre. Les pages de l'extension sont rangées avec
  * celles du site, reconnaissables à leur icône orange.
  *  - `site` : lien du site (masqué, reproduit dans le menu ; `label` remplace son libellé) ;
- *  - `wiky` : fonctionnalité Wiky-Traders (fenêtre ou page) ;
- *  - `link` : page Wiky-Traders sans vue de popup (réglages).
+ *  - `wiky` : fonctionnalité Wiki-Traders (fenêtre ou page) ;
+ *  - `link` : page Wiki-Traders sans vue de popup (réglages).
  */
 /** Onglets de la page Marché du site (sans adresse propre : on clique sur l'onglet, voir features/market-tabs.ts). */
 export type MarketTab = 'browse' | 'sales' | 'bids' | 'history';
@@ -85,7 +85,7 @@ type TreeEntry =
 interface TreeGroup {
   id: string;
   label: string;
-  /** Icône reprise du lien du site `iconFrom`, sinon icône Wiky-Traders. */
+  /** Icône reprise du lien du site `iconFrom`, sinon icône Wiki-Traders. */
   icon: string;
   iconFrom?: string;
   /** Page ouverte par un clic sur le titre du menu (lien du site). */
@@ -128,7 +128,7 @@ const SETTINGS_GROUP: TreeGroup = {
   icon: 'sliders',
   iconFrom: '/settings',
   href: '/settings',
-  entries: [{ site: '/settings', label: 'Paramètres du site' }, { link: '/settings?wiky=settings', label: 'Réglages Wiky-Traders', icon: 'sliders', route: 'settings' }, { wiky: 'tools' }],
+  entries: [{ site: '/settings', label: 'Paramètres du site' }, { link: '/settings?wiky=settings', label: 'Réglages Wiki-Traders', icon: 'sliders', route: 'settings' }, { wiky: 'tools' }],
 };
 
 /** Liens du site laissés en haut, hors menus. */
@@ -316,7 +316,7 @@ function copyOfSiteLink(a: HTMLAnchorElement, label: string | undefined, inactiv
   const copy = a.cloneNode(true) as HTMLAnchorElement;
   copy.removeAttribute('data-wiky-grouped');
   copy.removeAttribute('id');
-  // Sur une page Wiky-Traders (ex. /collection?wiky=families), le lien du site ne doit pas paraître actif.
+  // Sur une page Wiki-Traders (ex. /collection?wiky=families), le lien du site ne doit pas paraître actif.
   if (inactive && isActiveLink(copy)) {
     copy.className = copy.classList.contains('wm-family-nav') ? copy.className.replace(/\bis-active\b/, '') : NAV_ITEM_CLASS;
     copy.removeAttribute('aria-current');
@@ -334,7 +334,7 @@ function copyOfSiteLink(a: HTMLAnchorElement, label: string | undefined, inactiv
   return copy;
 }
 
-/** Élément Wiky-Traders d'un menu (icône orange) : fenêtre par-dessus la page, ou page du site. */
+/** Élément Wiki-Traders d'un menu (icône orange) : fenêtre par-dessus la page, ou page du site. */
 function wikySub(item: (typeof ITEMS)[number], route: View | 'settings' | null, count: number): HTMLElement {
   const inner = `<span class="wiky-ico">${icon(item.icon, 18)}</span><span>${item.label}</span>${count ? `<span class="wiky-count">${count}</span>` : ''}`;
   if (item.page) return el('a', { class: `wiky-sub${route === item.view ? ' is-active' : ''}`, href: `${item.page}?wiky=${item.view}`, 'data-wiky-view': item.view }, inner);
@@ -438,8 +438,8 @@ function buildGroup(
 }
 
 /**
- * Barre latérale compacte : « Paquets » en haut, puis les menus (liens du site et pages Wiky-Traders mêlés),
- * le récapitulatif Wiky-Traders et « Paramètres » tout en bas. Reconstruite seulement si quelque chose change.
+ * Barre latérale compacte : « Paquets » en haut, puis les menus (liens du site et pages Wiki-Traders mêlés),
+ * le récapitulatif Wiki-Traders et « Paramètres » tout en bas. Reconstruite seulement si quelque chose change.
  */
 function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions): void {
   const integration = store.settings.siteIntegration;
@@ -519,7 +519,7 @@ function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions
   recap.replaceChildren(status);
 }
 
-// ---------------------------------------------------------------- résumé et menu Wiky-Traders
+// ---------------------------------------------------------------- résumé et menu Wiki-Traders
 
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n > 1 ? many : one}`;
@@ -581,7 +581,7 @@ function statusHtml(s: SiteSummary, now: number, toggle = true, bidsRow = true):
     ? `<div class="wiky-row"><span>24 h</span><span>${s.won24 ? `<b class="wiky-win">${plural(s.won24, 'gagnée')}</b>` : ''}${s.won24 && s.lost24 ? ' · ' : ''}${s.lost24 ? `<b class="wiky-lose">${plural(s.lost24, 'perdue')}</b>` : ''}</span></div>`
     : '';
   return `
-    <div class="wiky-status-head"><span class="wiky-ico">${icon('coins', 18)}</span>Wiky-Traders<span class="wiky-dot ${stale}" title="${stale === 'none' ? 'Jamais synchronisé' : stale ? 'Données anciennes' : 'Données à jour'}"></span>
+    <div class="wiky-status-head"><span class="wiky-ico">${icon('coins', 18)}</span>Wiki-Traders<span class="wiky-dot ${stale}" title="${stale === 'none' ? 'Jamais synchronisé' : stale ? 'Données anciennes' : 'Données à jour'}"></span>
       ${toggle ? `<span class="wiky-status-toggle" role="button" tabindex="0" data-act="toggle" title="Afficher / masquer le menu"><span class="wiky-chev" style="margin:0">${icon('chevron', 14)}</span></span>` : ''}</div>
     <div class="wiky-row"><span>Slots</span><span><b>${s.occupied}/${s.slots}</b> · ${free ? `<b class="wiky-win">${plural(free, 'libre')}</b>` : 'complets'}</span></div>
     <div class="wiky-slots">${segs}</div>
@@ -675,11 +675,11 @@ export function openModal(view: View): void {
   const item = ITEMS.find((i) => i.view === view)!;
   const overlay = el('div', { 'data-wiky': 'modal', class: 'wiky-modal-overlay' });
   const box = el('div', { class: `wiky-modal${item.wide ? ' wide' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': item.title });
-  const head = el('div', { class: 'wiky-modal-head' }, `<span class="wiky-ico">${icon(item.icon, 18)}</span><div><small>Wiky-Traders</small><h2></h2></div>`);
+  const head = el('div', { class: 'wiky-modal-head' }, `<span class="wiky-ico">${icon(item.icon, 18)}</span><div><small>Wiki-Traders</small><h2></h2></div>`);
   head.querySelector('h2')!.textContent = item.title;
   const close = el('button', { type: 'button', class: 'wiky-modal-close', 'aria-label': 'Fermer', title: 'Fermer' }, icon('x', 18));
   head.append(close);
-  const frame = el('iframe', { src: frameUrl('popup', view), title: `Wiky-Traders – ${item.title}` }) as HTMLIFrameElement;
+  const frame = el('iframe', { src: frameUrl('popup', view), title: `Wiki-Traders – ${item.title}` }) as HTMLIFrameElement;
   box.append(head, frame);
   overlay.append(box);
   // Les fenêtres du site se ferment au clic à l'extérieur : un clic dans la nôtre ne doit pas les fermer.
@@ -731,7 +731,7 @@ function renderPage(): void {
   if (route === 'settings') {
     const tabs = el('div', { class: 'wiky-tabs', role: 'tablist' });
     tabs.append(el('a', { class: 'wiky-tab', href: '/settings', role: 'tab', 'aria-selected': 'false' }, 'Général'));
-    tabs.append(el('span', { class: 'wiky-tab is-active', role: 'tab', 'aria-selected': 'true' }, 'Wiky-Traders'));
+    tabs.append(el('span', { class: 'wiky-tab is-active', role: 'tab', 'aria-selected': 'true' }, 'Wiki-Traders'));
     page.append(tabs);
   }
   if (item?.native) {
@@ -741,12 +741,12 @@ function renderPage(): void {
     return;
   }
   const frameBox = el('div', { class: 'wiky-frame' });
-  frameBox.append(el('iframe', { src: route === 'settings' ? frameUrl('options') : frameUrl('popup', route), title: `Wiky-Traders – ${title}` }));
+  frameBox.append(el('iframe', { src: route === 'settings' ? frameUrl('options') : frameUrl('popup', route), title: `Wiki-Traders – ${title}` }));
   page.append(frameBox);
   main.append(page);
 }
 
-/** Page Paramètres du site : un onglet « Wiky-Traders » à côté des siens (ou un raccourci sous le titre). */
+/** Page Paramètres du site : un onglet « Wiki-Traders » à côté des siens (ou un raccourci sous le titre). */
 function renderSettingsEntry(): void {
   const existing = document.querySelector('[data-wiky="settings-entry"]');
   if (location.pathname !== '/settings' || currentRoute() === 'settings') {
@@ -766,13 +766,13 @@ function renderSettingsEntry(): void {
     entry.removeAttribute('aria-controls');
     entry.setAttribute('aria-selected', 'false');
     entry.removeAttribute('data-state');
-    entry.textContent = 'Wiky-Traders';
+    entry.textContent = 'Wiki-Traders';
     entry.style.color = '#fdba74';
     tablist.append(entry);
   } else {
     entry = el('div', { class: 'wiky-tabs' });
     entry.append(el('span', { class: 'wiky-tab is-active' }, 'Général'));
-    entry.append(el('a', { class: 'wiky-tab', href: '/settings?wiky=settings' }, 'Wiky-Traders'));
+    entry.append(el('a', { class: 'wiky-tab', href: '/settings?wiky=settings' }, 'Wiki-Traders'));
     const h1 = main.querySelector('h1');
     if (h1?.parentElement) h1.parentElement.insertBefore(entry, h1.nextSibling);
     else main.prepend(entry);
@@ -803,7 +803,7 @@ export function renderSiteUi(store: SiteUiStore, actions: SiteUiActions): void {
   if (nav) {
     if (compactNav) renderTree(nav, store, actions);
     else {
-      // Barre du site intacte ; Wiky-Traders en un seul bloc (récapitulatif et menu) au-dessus de « Paramètres ».
+      // Barre du site intacte ; Wiki-Traders en un seul bloc (récapitulatif et menu) au-dessus de « Paramètres ».
       clearTree(nav);
       delete nav.dataset.wikyTree;
       if (siteIntegration) renderWikySection(nav, store, actions);

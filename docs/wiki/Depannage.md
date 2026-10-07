@@ -5,8 +5,8 @@
 ## Rien n'apparaît sur le site
 
 1. **Recharge l'onglet WikiMasters** (Cmd/Ctrl + R). Après une installation ou une mise à jour, les onglets déjà ouverts gardent l'ancien script.
-2. Page des extensions : Wiky-Traders est **activée**, et *Loaded from* pointe bien vers ton dossier `dist/`.
-3. Une **seule** copie de Wiky-Traders est installée (supprime les anciennes).
+2. Page des extensions : Wiki-Traders est **activée**, et *Loaded from* pointe bien vers ton dossier `dist/`.
+3. Une **seule** copie de Wiki-Traders est installée (supprime les anciennes).
 4. Tu as bien lancé `npm run build` après `git pull`.
 5. L'adresse est `https://www.wiki-masters.com/…` (avec `www`).
 
@@ -28,7 +28,7 @@ Ouvre ta collection une fois (et ses différentes pages), ou active la lecture v
 
 ## Les slots ou les ventes ne sont pas à jour
 
-- Clique **↻** dans le bloc Wiky-Traders.
+- Clique **↻** dans le bloc Wiki-Traders.
 - Active la **lecture via l'API** : tes ventes en cours sont alors relues chaque minute.
 - Sinon, ouvre Marché → *Mes ventes*. Si la page n'est pas reconnue : Outils → **C'est la page de mes enchères**.
 

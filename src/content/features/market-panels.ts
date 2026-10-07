@@ -165,10 +165,10 @@ export function renderBidsPanel(ctx: FeatureContext, bar: HTMLElement, d: Market
   let panel = document.querySelector<HTMLElement>('[data-wiky="mt-bids"]');
   if (!panel) {
     panel = node('section', 'mt-bids', 'wiky-mt');
-    panel.setAttribute('aria-label', 'Mes mises (Wiky-Traders)');
+    panel.setAttribute('aria-label', 'Mes mises (Wiki-Traders)');
     const head = node('div', 'part', 'wiky-mt-head');
     const titles = node('div', 'part');
-    titles.append(node('div', 'part', 'wiky-mt-kicker', 'Wiky-Traders'), node('h2', 'part', '', 'Mes mises'));
+    titles.append(node('div', 'part', 'wiky-mt-kicker', 'Wiki-Traders'), node('h2', 'part', '', 'Mes mises'));
     const status = node('span', 'part', 'wiky-mt-status');
     status.dataset.role = 'status';
     head.append(
@@ -413,10 +413,10 @@ export function renderHistoryPanel(ctx: FeatureContext, bar: HTMLElement, d: Mar
 
 function buildHistoryPanel(): HTMLElement {
   const panel = node('section', 'mt-history', 'wiky-mt');
-  panel.setAttribute('aria-label', 'Historique de mes ventes (Wiky-Traders)');
+  panel.setAttribute('aria-label', 'Historique de mes ventes (Wiki-Traders)');
   const head = node('div', 'part', 'wiky-mt-head');
   const titles = node('div', 'part');
-  titles.append(node('div', 'part', 'wiky-mt-kicker', 'Wiky-Traders'), node('h2', 'part', '', 'Historique de mes ventes'));
+  titles.append(node('div', 'part', 'wiky-mt-kicker', 'Wiki-Traders'), node('h2', 'part', '', 'Historique de mes ventes'));
   const status = node('span', 'part', 'wiky-mt-status');
   status.dataset.role = 'status';
   const siteToggle = node('button', 'part', 'wiky-mt-chip', 'Liste du site');

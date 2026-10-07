@@ -102,14 +102,14 @@ function build(): HTMLElement {
   el.setAttribute('data-wiky', 'window');
   const root = el.attachShadow({ mode: 'open' });
   root.innerHTML = `<style>${CSS}</style>
-    <div class="win" role="dialog" aria-label="Wiky-Traders">
+    <div class="win" role="dialog" aria-label="Wiki-Traders">
       <div class="bar">
         <img src="${ext.runtime.getURL('icons/icon-32.png')}" alt="">
-        <span class="t">Wiky-Traders</span>
+        <span class="t">Wiki-Traders</span>
         <button class="minbtn" type="button">–</button>
         <button class="close" type="button" title="Fermer (rouvrir avec l'icône de l'extension)">×</button>
       </div>
-      <iframe src="${ext.runtime.getURL('popup.html?embed=1')}" title="Wiky-Traders"></iframe>
+      <iframe src="${ext.runtime.getURL('popup.html?embed=1')}" title="Wiki-Traders"></iframe>
       <div class="grip" title="Redimensionner"></div>
     </div>`;
   const win = root.querySelector<HTMLElement>('.win')!;

@@ -100,7 +100,7 @@ export function priceToast(opts: { cardName: string; price: number | null; price
   if (toast.dataset.key === key) return;
   toast.dataset.key = key;
   toast.replaceChildren();
-  toast.append(header('Wiky-Traders · prix conseillé', () => {
+  toast.append(header('Wiki-Traders · prix conseillé', () => {
     hideToast('price');
     opts.onClose();
   }));
@@ -146,7 +146,7 @@ export function progressToast(p: ProgressToast): void {
   toast.dataset.key = '';
   toast.replaceChildren();
   toast.setAttribute('role', p.error ? 'alert' : 'status');
-  toast.append(header(`Wiky-Traders · ${p.title}`, () => {
+  toast.append(header(`Wiki-Traders · ${p.title}`, () => {
     hideToast('progress');
     p.onClose?.();
   }, p.error));
@@ -183,7 +183,7 @@ export function noticeToast(text: string, opts: { title?: string; error?: boolea
   toast.dataset.key = '';
   toast.replaceChildren();
   toast.setAttribute('role', opts.error ? 'alert' : 'status');
-  toast.append(header(`Wiky-Traders · ${opts.title ?? 'Familles'}`, () => hideToast('notice'), opts.error));
+  toast.append(header(`Wiki-Traders · ${opts.title ?? 'Familles'}`, () => hideToast('notice'), opts.error));
   toast.append(el('p', 'text-xs font-semibold text-[var(--color-foreground)]/85', { margin: '0', fontSize: '12px', fontWeight: '600', whiteSpace: 'pre-line', color: opts.error ? DANGER : fg(85) }, text));
   if (opts.action) {
     const { onClick } = opts.action;

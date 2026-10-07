@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Programme d'aide aux mises à jour de Wiky-Traders (« native messaging » du navigateur).
+ * Programme d'aide aux mises à jour de Wiki-Traders (« native messaging » du navigateur).
  * Lancé par le navigateur à chaque demande de l'extension : lit un message JSON sur l'entrée standard,
  * répond un message JSON sur la sortie standard, puis s'arrête.
  *
@@ -17,7 +17,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const REPO = 'AndyB31/Wiky-Traders';
-const ZIP_URL = `https://github.com/${REPO}/releases/download/latest/wiky-traders.zip`;
+const ZIP_URL = `https://github.com/${REPO}/releases/download/latest/wiki-traders.zip`;
 const CONFIG = process.env.WIKY_UPDATER_CONFIG || join(homedir(), '.wiky-traders', 'config.json');
 
 function readMessage() {
@@ -93,7 +93,7 @@ async function updateZip(cfg) {
   const before = installedBuild(cfg)?.sha ?? null;
   const res = await fetch(ZIP_URL, { redirect: 'follow' });
   if (!res.ok) throw new Error(`téléchargement impossible (${res.status}) : ${ZIP_URL}`);
-  const file = join(mkdtempSync(join(tmpdir(), 'wiky-')), 'wiky-traders.zip');
+  const file = join(mkdtempSync(join(tmpdir(), 'wiky-')), 'wiki-traders.zip');
   writeFileSync(file, Buffer.from(await res.arrayBuffer()));
   // bsdtar (macOS, Windows 10+) lit les zip ; sous Linux, unzip.
   if (process.platform === 'linux') await run('unzip', ['-o', '-q', file, '-d', cfg.dir], cfg.dir);

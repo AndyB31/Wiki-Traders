@@ -152,7 +152,7 @@ function askPrices(key: string, ids: string[]): void {
     })
     .catch((e) => {
       pricesAsked.delete(key);
-      console.warn('[Wiky-Traders] prix des familles', e);
+      console.warn('[Wiki-Traders] prix des familles', e);
     });
 }
 
@@ -783,7 +783,7 @@ async function onClick(e: Event): Promise<void> {
       return openColorPicker(btn, FAMILY_COLORS, f.color, (color) => void updateFamily(f.id, (x) => ({ ...x, color, updatedAt: Date.now() })));
     case 'export': {
       const code = await encodeFamilyCode(f);
-      return showCodeDialog(`Exporter « ${f.name} »`, code, `${plural(f.cards.length, 'carte')}. Ce code s'importe dans Wiky-Traders (ou une autre extension qui lit les codes F0. / F1.).`);
+      return showCodeDialog(`Exporter « ${f.name} »`, code, `${plural(f.cards.length, 'carte')}. Ce code s'importe dans Wiki-Traders (ou une autre extension qui lit les codes F0. / F1.).`);
     }
     case 'delete':
       if (await confirmDialog('Supprimer la famille', `Supprimer « ${f.name} » (${plural(f.cards.length, 'carte')}) ? Tes cartes ne sont pas touchées.`, { ok: 'Supprimer', danger: true })) {

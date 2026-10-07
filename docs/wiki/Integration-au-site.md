@@ -2,13 +2,13 @@
 
 # Intégration au site
 
-Avec l'option **Intégration au site** (activée par défaut), Wiky-Traders s'installe dans l'interface de WikiMasters, aux couleurs du site, avec une touche **orange**.
+Avec l'option **Intégration au site** (activée par défaut), Wiki-Traders s'installe dans l'interface de WikiMasters, aux couleurs du site, avec une touche **orange**.
 
 ![Barre latérale](../screenshots/site-sidebar.png)
 
 ## Barre latérale
 
-Avec l'option **Barre latérale compacte** (activée par défaut), toute la barre est rangée en une seule arborescence, où les pages de Wiky-Traders sont mêlées à celles du site et reconnaissables à leur **icône orange** :
+Avec l'option **Barre latérale compacte** (activée par défaut), toute la barre est rangée en une seule arborescence, où les pages de Wiki-Traders sont mêlées à celles du site et reconnaissables à leur **icône orange** :
 
 | Place | Contenu |
 | --- | --- |
@@ -17,19 +17,19 @@ Avec l'option **Barre latérale compacte** (activée par défaut), toute la barr
 | **Marché ▸** | Parcourir · Mes ventes · Mes enchères · Historique (onglets du site, enrichis — voir [Mises et ventes](Mises-et-ventes.md)) |
 | **Social ▸** | Échanges · Guilde · Amis · Messages · Bataille |
 | **Progression ▸** | Profil · Succès · Classement |
-| En bas | Le **récapitulatif Wiky-Traders** (et « Mises en direct ») |
-| Tout en bas | **Paramètres ▸** : Paramètres du site · 🟠 Réglages Wiky-Traders · 🟠 Outils |
+| En bas | Le **récapitulatif Wiki-Traders** (et « Mises en direct ») |
+| Tout en bas | **Paramètres ▸** : Paramètres du site · 🟠 Réglages Wiki-Traders · 🟠 Outils |
 
 - Un clic sur **Collection**, **Marché** ou **Paramètres** ouvre la page et déplie le menu ; la **flèche** ne fait que déplier ou replier.
 - Le menu de la page affichée est ouvert et mis en valeur ; l'état des autres menus est mémorisé.
 - Les pastilles orange comptent les slots à remplir (*Mes ventes*) et les mises en jeu (*Mes enchères*).
 - Les liens ajoutés par d'autres extensions sont rangés au même endroit.
 
-Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans les menus, et un clic utilise la navigation normale du site. Désactiver l'option rend la barre du site intacte, avec un bloc Wiky-Traders (récapitulatif et menu) au-dessus de *Paramètres*.
+Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans les menus, et un clic utilise la navigation normale du site. Désactiver l'option rend la barre du site intacte, avec un bloc Wiki-Traders (récapitulatif et menu) au-dessus de *Paramètres*.
 
 > La barre du bas, sur mobile, n'est pas modifiée.
 
-## Le récapitulatif Wiky-Traders (toujours visible)
+## Le récapitulatif Wiki-Traders (toujours visible)
 
 Juste au-dessus de *Paramètres* :
 
@@ -54,15 +54,15 @@ Juste au-dessus de *Paramètres* :
 | Cartes & prix | page | Ta collection par famille, étiquette, catégorie ou rareté, et les enchères en cours de chaque carte |
 | Étiquettes | fenêtre (bouton à côté de « Plus chères » sur la collection) | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
 | Outils | fenêtre | Relire la page, diagnostic, journal, bilan des prix |
-| Réglages Wiky-Traders | page | L'onglet Wiky-Traders de *Paramètres* |
+| Réglages Wiki-Traders | page | L'onglet Wiki-Traders de *Paramètres* |
 
 Les **fenêtres** s'affichent par-dessus la page en cours (Échap ou clic à côté pour fermer). Les **pages** prennent la place du contenu du site (adresse `?wiky=…`), sans le quitter.
 
 ![Fenêtre Vendre](../screenshots/site-modal.png)
 
-## L'onglet Wiky-Traders dans Paramètres
+## L'onglet Wiki-Traders dans Paramètres
 
-Sur la page *Paramètres* du site, un onglet **Wiky-Traders** ouvre tous les réglages de l'extension, aux couleurs du site. L'onglet **Général** ramène aux réglages du site.
+Sur la page *Paramètres* du site, un onglet **Wiki-Traders** ouvre tous les réglages de l'extension, aux couleurs du site. L'onglet **Général** ramène aux réglages du site.
 
 ![Réglages dans Paramètres](../screenshots/site-settings.png)
 

@@ -1,6 +1,6 @@
 /**
  * Suivi de mes mises en direct (comme « Mes enchères » de « Prix moyen collection ») :
- *  - bloc « Mises en direct » sous le résumé Wiky-Traders de la barre latérale : en tête / surenchéri, temps restant
+ *  - bloc « Mises en direct » sous le résumé Wiki-Traders de la barre latérale : en tête / surenchéri, temps restant
  *    à la seconde, prix actuel ;
  *  - relecture plus fréquente quand une mise se termine dans les 10 minutes (voir `bidPollDelay`, appelé par index.ts) ;
  *  - bip sous la minute quand je suis surenchéri ;
@@ -286,8 +286,8 @@ function draw(): void {
   }
   const quick = c.flags.quickOutbid && c.apiRead;
   const nav = siteNav();
-  // Dans le récapitulatif Wiky-Traders (barre compacte : la liste remplace le simple compte « en tête / surenchéries »),
-  // sinon sous le bloc Wiky-Traders (barre du site intacte).
+  // Dans le récapitulatif Wiki-Traders (barre compacte : la liste remplace le simple compte « en tête / surenchéries »),
+  // sinon sous le bloc Wiki-Traders (barre du site intacte).
   const inside = nav?.querySelector<HTMLElement>(':scope > [data-wiky="nav-recap"] .wiky-status') ?? null;
   const anchor = inside ?? nav?.querySelector(':scope > [data-wiky="nav-wiky"]') ?? null;
   // Sans barre latérale (intégration coupée, mobile) : petit bloc flottant, seulement quand une fin approche.

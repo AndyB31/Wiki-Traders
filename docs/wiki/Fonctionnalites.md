@@ -2,7 +2,7 @@
 
 # Fonctionnalités
 
-Les outils de collection de Wiky-Traders sont pensés pour être rapides : les prix de 150 cartes arrivent en **une** requête (au lieu d'une par carte) et restent en cache 6 h, et rien n'est recalculé si rien n'a changé.
+Les outils de collection de Wiki-Traders sont pensés pour être rapides : les prix de 150 cartes arrivent en **une** requête (au lieu d'une par carte) et restent en cache 6 h, et rien n'est recalculé si rien n'a changé.
 
 > Si une autre extension WikiMasters propose les mêmes fonctions, désactive-la pour éviter les doublons (prix, « Plus chères », Familles…).
 
@@ -33,7 +33,7 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 | Fonctionnalité | Défaut | Ce qu'elle fait |
 | --- | --- | --- |
 | Prix moyen au marché (API) | oui | Sur chaque enchère du Marché : moyenne de la carte et écart (bonne affaire en vert) ; sur la page d'une enchère : historique des prix (graphique, statistiques) et autres enchères de la carte ; dans la fiche d'une carte : moyenne, ventes, min et max |
-| Suivi de mes mises (API) | oui | « Mises en direct » sous le bloc Wiky-Traders : statut, compte à rebours, bip quand tu es surenchéri à moins d'une minute de la fin ; relève toutes les 20 s quand une mise se termine bientôt |
+| Suivi de mes mises (API) | oui | « Mises en direct » sous le bloc Wiki-Traders : statut, compte à rebours, bip quand tu es surenchéri à moins d'une minute de la fin ; relève toutes les 20 s quand une mise se termine bientôt |
 
 ## Paquets
 

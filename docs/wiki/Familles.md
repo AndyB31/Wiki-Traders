@@ -8,11 +8,11 @@ Regroupe des cartes en **familles** (une série, un thème, un pays…), suis ta
 
 ## Ouvrir les familles
 
-Menu **Wiky-Traders → Familles** dans la barre latérale (page `/collection?wiky=families`). Nécessite l'option *Intégration au site*.
+Menu **Wiki-Traders → Familles** dans la barre latérale (page `/collection?wiky=families`). Nécessite l'option *Intégration au site*.
 
 ## Tes familles d'une autre extension
 
-Au premier lancement, toutes les familles enregistrées par l'autre extension sont **importées automatiquement** (cartes, couverture, une couleur chacune). Le bouton **Importer depuis une autre extension** fusionne à nouveau par nom, sans doublon. Ensuite, Wiky-Traders garde ses familles dans son propre stockage : l'autre extension peut être désactivée.
+Au premier lancement, toutes les familles enregistrées par l'autre extension sont **importées automatiquement** (cartes, couverture, une couleur chacune). Le bouton **Importer depuis une autre extension** fusionne à nouveau par nom, sans doublon. Ensuite, Wiki-Traders garde ses familles dans son propre stockage : l'autre extension peut être désactivée.
 
 ## Accueil
 

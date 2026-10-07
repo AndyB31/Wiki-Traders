@@ -183,7 +183,7 @@ export function updateOverlay(state: OverlayState): void {
   const sell = findSellDialog(state);
   if (sell) {
     const advice = sell.card ? adviceForCard(state.store, sell.card.id) : null;
-    // Carte ouverte depuis Wiky-Traders : son prix proposé (règle du slot) fait foi, pas un recalcul.
+    // Carte ouverte depuis Wiki-Traders : son prix proposé (règle du slot) fait foi, pas un recalcul.
     const pending = state.store.pendingFocus;
     const fromProposal = !!pending && (!sell.card || sell.card.id === pending.cardId);
     // V4 : à l'ouverture de la fenêtre, la mise (pré-remplie à 10 par le site) et la durée sont réglées une fois ;
