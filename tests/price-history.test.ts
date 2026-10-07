@@ -92,6 +92,8 @@ describe('page d\'une enchère : section « Historique des prix »', () => {
     expect(text).toContain('3 ventes · moyenne');
     expect(text).toContain('Taux de vente');
     expect(text).toContain('75 %');
+    // Tuiles compactes : précisions en info-bulle.
+    expect(box.querySelector('.ph-tiles [data-tip^="3 sur 4 enchères"]')).not.toBeNull();
     expect(box.querySelector('.cur')).not.toBeNull();
     expect(box.querySelector('table')!.querySelectorAll('tbody tr')).toHaveLength(4);
     // Bougies, puis ligne : le choix est mémorisé, la moyenne reste dessinée par-dessus.

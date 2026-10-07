@@ -124,7 +124,7 @@ export class PriceHistoryPanel {
   private resizeObs: ResizeObserver | null = null;
 
   /** `wiky`: valeur de `data-wiky` ; `openKey` : clé où l'état replié / déplié est mémorisé. */
-  /** `compact` : tuiles plus petites, leurs précisions en info-bulle (fenêtre de vente). */
+  /** `compact` : tuiles plus petites, leurs précisions en info-bulle. */
   constructor(wiky: string, openKey: string, extraClass = '', private readonly compact = false) {
     ensureStyle();
     const box = document.createElement('details');
@@ -477,7 +477,7 @@ registerFeature({
     if (id !== current) {
       stop();
       current = id;
-      panel = new PriceHistoryPanel('price-history', OPEN_KEY);
+      panel = new PriceHistoryPanel('price-history', OPEN_KEY, '', true);
       void load(id, panel);
     }
     paint();

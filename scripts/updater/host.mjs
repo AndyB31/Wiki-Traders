@@ -76,7 +76,14 @@ async function updateGit(cfg) {
   const branch = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], dir);
   if (branch !== 'main') throw new Error(`le dépôt est sur la branche « ${branch} » : passe sur main pour mettre à jour`);
   const before = await run('git', ['rev-parse', 'HEAD'], dir);
-  await run('git', ['pull', '--ff-only', '--autostash', 'origin', 'main'], dir);
+  // Modifications locales mises de côté le temps de la mise à jour (sans « pull --autostash » : git < 2.27 le refuse).
+  const dirty = (await run('git', ['status', '--porcelain', '--untracked-files=no'], dir)) !== '';
+  if (dirty) await run('git', ['stash', 'push', '-m', 'wiki-traders : mise à jour'], dir);
+  try {
+    await run('git', ['pull', '--ff-only', 'origin', 'main'], dir);
+  } finally {
+    if (dirty) await run('git', ['stash', 'pop'], dir);
+  }
   const after = await run('git', ['rev-parse', 'HEAD'], dir);
   if (before !== after) {
     const changed = await run('git', ['diff', '--name-only', before, after, '--', 'package.json', 'package-lock.json'], dir);

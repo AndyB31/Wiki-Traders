@@ -79,7 +79,12 @@ install: build ## Construit, copie l'extension dans le dossier choisi et expliqu
 	echo ""
 
 update: ## Récupère main, reconstruit et met à jour le dossier installé
-	@git pull --ff-only --autostash origin main
+	@# Modifications locales mises de côté le temps du pull (« pull --autostash » est refusé par git < 2.27).
+	@dirty="$$(git status --porcelain --untracked-files=no)"; \
+	if [ -n "$$dirty" ]; then git stash push -q -m "wiki-traders : mise à jour" || exit 1; fi; \
+	git pull --ff-only origin main; status=$$?; \
+	if [ -n "$$dirty" ]; then git stash pop -q || exit 1; fi; \
+	exit $$status
 	@$(MAKE) --no-print-directory build
 	@if [ -f $(TARGET_FILE) ] && [ "$$(cat $(TARGET_FILE))" != "$$PWD/dist" ]; then rsync -a --exclude build.json dist/ "$$(cat $(TARGET_FILE))/" && cp dist/build.json "$$(cat $(TARGET_FILE))/"; echo "✔ $$(cat $(TARGET_FILE)) mis à jour"; fi
 	@echo "→ Clique ↻ sur l'extension (page des extensions) puis recharge les onglets WikiMasters."
