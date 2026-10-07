@@ -47,25 +47,24 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 
 | | |
 | --- | --- |
-| **Intégré au site** | Barre latérale compacte (menus *Social* et *Progression*), bloc orange **Wiky-Traders** toujours visible : slots occupés / libres, prochaine fin, mises en tête / surenchéries, gagnées / perdues sur 24 h, dernière synchro. Fonctions en fenêtre par-dessus la page ou en page du site, onglet **Wiky-Traders** dans *Paramètres*. |
-| **Règles par étiquette** | Quota de slots, % du prix de référence, plancher / plafond, exemplaires à garder, étiquette de secours, liste noire ; les favoris ne sont jamais proposés. |
-| **Prix conseillé** | Prix du site, historique de la carte, prix saisi à la main ou médiane de la rareté, × % de l'étiquette, arrondi ; détail toujours affiché (« médiane Rare 36 × 70 % = 25 »). |
-| **Durée conseillée** | Paliers de prix → durée (10 min, 1 h, 3 h…). |
-| **Alertes** | Badge sur l'icône (slots libres), notification à chaque fin d'enchère, heures silencieuses. |
-| **Fenêtre de vente enrichie** | Toast « prix conseillé », résumé du marché de la carte (nombre d'offres, min, médiane, max) et liste de ses enchères en cours. |
-| **Mises et ventes** | Tes mises (en tête, surenchérie, gagnée, perdue) et tes ventes conclues, avec l'écart au prix de la carte. |
-| **Journal** | Ventes proposées, créées et terminées ; conseils pour ajuster tes %. |
-| **Étiquettes sur les cartes** | Pastilles aux couleurs du site sur chaque carte de la collection (libellés ou simples ronds). |
-| **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** depuis la collection ou par recherche au fil de la frappe, marché des manquantes ; les familles d'une autre extension peuvent être importées. |
-| **Outils de collection, en plus rapide** | Prix moyen sur les cartes, classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, prix au marché, récapitulatif et statistiques de paquets, valeur des échanges, son des notifications, suivi des mises en direct. Les prix de 150 cartes arrivent en une requête. |
+| **Intégré au site** | Barre latérale rangée en arborescence (Paquets en haut ; menus Collection, Marché, Social, Progression ; pages de l'extension à l'icône orange), **récapitulatif** toujours visible (slots occupés / libres, prochaine fin, gagnées / perdues sur 24 h, synchro) avec la liste des **mises en direct** relue toutes les 2 s, Paramètres tout en bas avec un onglet **Wiky-Traders**. |
+| **Vendre** | Slots par étiquette (quota, % du prix, plancher / plafond, exemplaires à garder, liste noire, favoris jamais proposés), prix et durée conseillés avec le détail du calcul. Dans Marché → **Mes ventes**, un clic sur un slot libre ouvre « Vendre » : carte proposée, autre carte, recherche ou **carte au hasard** d'une étiquette. **Mode enchère** sur la collection : un clic sur une carte ouvre sa mise en vente pré-remplie. |
+| **Marché enrichi** | Sur chaque enchère : **prix moyen de la carte et écart** (vert = bonne affaire). **Mes enchères** : tes mises, en cours ou historique. **Historique** : tes ventes, statistiques, filtres vendues / invendues, écart à la moyenne. |
+| **Page d'une enchère** | **Historique des prix** de la carte : chiffres clés (ventes, moyenne, médiane, extrêmes, tendance 30 j, taux de vente), graphique en **points, bougies ou ligne**, moyenne glissante de 2 j à 1 mois, filtre vendues / sans acheteur ; **autres enchères de la même carte**. |
+| **Prix comme le site** | « Moy. » = moyenne des ventes de la carte dans sa rareté, comme le site ; prix de 150 cartes par requête, toutes les ventes lues (pagination), cache 6 h, bouton **↻ Rafraîchir les prix**. |
+| **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** (mode « Sélectionner » du site) ou recherche au fil de la frappe, marché des manquantes ; import depuis une autre extension. |
+| **Étiquettes** | Pastilles sur les cartes ; **étiquetage automatique** par plage de prix à partir du prix moyen de chaque carte (bouton **Étiquettes** sur la collection). |
+| **Échanges** | Valeur de chaque côté et **bilan pour toi** (« −500 W : tu donnes 600 W, tu reçois 100 W »), aperçus des cartes. |
+| **Et aussi** | Classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, récapitulatif et statistiques de paquets, son des notifications, journal des ventes, notifications de fin d'enchère. |
+| **Mises à jour** | Vérification de la branche `main` (démarrage, toutes les 6 h) et **mise à jour en un clic** depuis les réglages. |
 
-| Familles | Une famille | Barre latérale |
+| Barre latérale | Historique des prix | Marché |
 | --- | --- | --- |
-| ![Familles](docs/screenshots/families.png) | ![Une famille](docs/screenshots/family-detail.png) | ![Barre latérale](docs/screenshots/site-sidebar.png) |
+| ![Barre latérale](docs/screenshots/site-sidebar.png) | ![Historique des prix](docs/screenshots/price-history.png) | ![Prix moyen et écart sur le marché](docs/screenshots/market-deals.png) |
 
-| Barre latérale | Fenêtre « Vendre » | Mode enchère |
+| Mes ventes : vendre un slot | Familles | Mode enchère |
 | --- | --- | --- |
-| ![Barre latérale](docs/screenshots/site-sidebar.png) | ![Fenêtre Vendre](docs/screenshots/site-modal.png) | ![Mode enchère](docs/screenshots/auction-mode.png) |
+| ![Vendre un slot libre](docs/screenshots/market-sales-slot.png) | ![Familles](docs/screenshots/families.png) | ![Mode enchère](docs/screenshots/auction-mode.png) |
 
 > Les pages du site visibles sur les captures sont une imitation servie par `npm run demo` (le vrai site exige d'être connecté). L'interface de l'extension est réelle.
 
@@ -127,14 +126,11 @@ Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
 ### 5. Mettre à jour
 
-```bash
-cd Wiky-Traders
-git pull
-npm install
-npm run build
-```
+**En un clic** : installe une fois le programme d'aide (`make install` le propose, sinon `make updater`). Quand `main` a des nouveautés, le récapitulatif affiche **« ↑ Mise à jour disponible »** ; Réglages → **Mises à jour** → **Mettre à jour** récupère la dernière version, reconstruit, recharge l'extension et les onglets WikiMasters.
 
-Puis, dans la page des extensions, clique sur **↻ (recharger)** sous Wiky-Traders, et **recharge les onglets WikiMasters** déjà ouverts (une extension rechargée ne remplace pas le script d'une page déjà ouverte). Tes réglages et données sont conservés.
+**À la main** : `make update` (ou `git pull && npm install && npm run build`), puis **↻** sous Wiky-Traders dans la page des extensions et **recharge les onglets WikiMasters** (une extension rechargée ne remplace pas le script d'une page déjà ouverte). Tes réglages et données sont conservés.
+
+**Sans le dépôt** : le dernier zip construit est publié à chaque mise à jour de `main` dans la release [« Dernière version »](https://github.com/AndyB31/Wiky-Traders/releases/tag/latest) : décompresse-le dans le **même dossier** qu'avant, puis ↻.
 
 ### 6. Désinstaller
 
@@ -142,7 +138,7 @@ Puis, dans la page des extensions, clique sur **↻ (recharger)** sous Wiky-Trad
 
 ## Configuration pas à pas
 
-Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou clic droit sur l'icône → *Options*). Pense à cliquer sur **Enregistrer** en bas de page.
+Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou clic droit sur l'icône → *Options*). La page commence par un **Démarrage rapide** qui coche ce qui est prêt et règle le reste en un clic ; chaque section s'explique avec un exemple. **Enregistrer** (ou Ctrl/⌘ + S) quand tu as fini.
 
 1. **Règles par étiquette** : une ligne par étiquette de ta collection. Par défaut : 1 slot « 50-100 » et 4 slots « 20-50 », à **70 %** du prix de référence, en gardant 1 exemplaire. Les étiquettes trouvées dans ta collection s'ajoutent en un clic.
 2. **Nombre de slots** : le nombre d'enchères simultanées permises par le site (lu automatiquement dans « Mes ventes (2/5) »).
@@ -152,7 +148,8 @@ Les réglages sont dans **Paramètres → onglet Wiky-Traders** sur le site (ou 
 6. **Affichage sur le site** : intégration au site, barre latérale compacte, étiquettes sur les cartes (libellés ou pastilles).
 7. **Liste noire** et **prix saisis à la main** si besoin.
 8. **Fonctionnalités** : coche celles que tu veux (prix sur les cartes, familles, classement, paquets, échanges…) — voir [Fonctionnalités](docs/wiki/Fonctionnalites.md).
-9. **Automatisations** (facultatif, désactivé par défaut, voir l'avertissement) : lecture via l'API (nécessaire aux prix, familles, mises…), pré-remplissage, étiquetage automatique.
+9. **Automatisations** (facultatif, désactivé par défaut, voir l'avertissement) : **lecture via l'API** (nécessaire aux prix, familles, mises, marché…), pré-remplissage, étiquetage automatique.
+10. **Mises à jour** : version installée, nouveautés, bouton « Mettre à jour ».
 
 Enfin, **ouvre ta collection** puis l'onglet **Historique** du Marché une fois : l'extension apprend tes cartes et les prix réels.
 
@@ -160,12 +157,12 @@ Le détail de chaque option est dans la documentation : [Premiers pas](docs/wiki
 
 ## Au quotidien
 
-- Le **bloc Wiky-Traders** de la barre latérale résume tout ; un clic ouvre **Vendre** (les slots à remplir).
-- Pour chaque slot libre : une carte, un prix et sa durée. **Ouvrir** amène sur la carte dans la collection ; **Copier le prix**, change de carte dans la liste, ou **Ignorer**.
-- Dans la fenêtre « Mettre aux enchères » du site, un **toast** rappelle le prix conseillé ; sous la fenêtre, les enchères en cours de la même carte.
-- Avec le **Mode enchère** (collection), un clic sur une carte ouvre directement sa mise en vente, prix et durée remplis.
-- L'icône de l'extension ouvre ou ferme la fenêtre **Vendre** sur le site.
-- Le **journal** (Outils → 📒) t'aide à ajuster tes pourcentages.
+- Le **récapitulatif** de la barre latérale résume tout (slots, prochaine fin, mises en direct) ; un clic ouvre **Vendre**.
+- **Marché → Mes ventes** : tes ventes et les slots libres ; clic sur un slot → carte, prix, durée → mise en vente (ou carte ouverte avec le prix pré-rempli).
+- **Marché → Parcourir** : la moyenne et l'écart sur chaque enchère montrent les bonnes affaires ; sur la page d'une enchère, l'**historique des prix** et les autres enchères de la carte.
+- Dans la fenêtre « Mettre aux enchères » du site, un **toast** rappelle le prix conseillé ; dessous, les enchères en cours de la même carte.
+- Sur la **collection** : **Mode enchère** (un clic sur une carte ouvre sa mise en vente), **Plus chères**, **Étiquettes**.
+- L'icône de l'extension ouvre ou ferme **Vendre** sur le site ; le **journal** (Outils → 📒) aide à ajuster tes pourcentages.
 
 Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises-et-ventes.md), [Intégration au site](docs/wiki/Integration-au-site.md).
 
@@ -175,7 +172,7 @@ Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises
 | --- | --- | --- |
 | Nombre de slots | 5 | Enchères simultanées (mis à jour par le site) |
 | Fenêtre du prix moyen | 7 jours | Période des ventes prises en compte |
-| Statistique | médiane | La moyenne est tirée par quelques ventes énormes |
+| Statistique du prix conseillé | médiane | Résiste aux ventes énormes ; les badges « Moy. » affichent la moyenne de la carte, comme le site |
 | Arrondi | automatique | Unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà (ou pas fixe) |
 | À doublons égaux | prix le plus haut | Ou le plus bas (écouler), ou aléatoire |
 | Étiquette de secours | aucune | Reprend le slot d'une étiquette sans carte vendable |
@@ -191,8 +188,9 @@ Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises
 | V4 – pré-remplissage (et Mode enchère) | **non** | Ouvre la vente, remplit prix et durée |
 | Étiquetage automatique / par l'API | **non** | Range les cartes par plage de prix |
 | Fonctionnalités | voir la page | Une case par fonctionnalité ; les automatisations sont désactivées par défaut |
+| Mises à jour | vérification automatique | Toutes les 6 h ; « Mettre à jour » nécessite le programme d'aide |
 
-Les réglages s'exportent et s'importent en JSON (Réglages → bas de page).
+Les réglages s'exportent et s'importent en JSON (Réglages → Avancé).
 
 ## Dépannage
 
@@ -203,6 +201,9 @@ Les réglages s'exportent et s'importent en JSON (Réglages → bas de page).
 | « Aucune carte connue » | Ouvre ta collection une fois. |
 | Slots / ventes pas à jour | Clique ↻ dans le bloc Wiky-Traders, ou active la lecture via l'API pour la relève automatique. |
 | Un slot reste vide | La fenêtre Vendre explique pourquoi (favoris, déjà en vente, « garder au moins »…). |
+| Prix « — » ou faux | « ↻ Rafraîchir les prix » (Étiquettes, Plus chères, légende de la collection) ; « Jamais vendue » = aucune vente connue. |
+| Peu de cartes étiquetées | Active la lecture via l'API : l'étiquetage utilise alors le prix moyen de chaque carte (seules les cartes jamais vendues restent sans prix). |
+| « Mettre à jour » grisé | Installe le programme d'aide (`make updater`) puis recharge l'extension. « Dépôt introuvable » : le dépôt GitHub est privé. |
 | Page « non reconnue » | Outils → **Diagnostic** exporte la structure de la page ; ajuste Réglages → Données → *Sélecteurs avancés* ou ouvre une issue avec le fichier. |
 
 Plus de cas : [Dépannage (documentation)](docs/wiki/Depannage.md).
@@ -212,39 +213,44 @@ Plus de cas : [Dépannage (documentation)](docs/wiki/Depannage.md).
 Extension **Manifest V3 sans serveur** : tout est calculé et stocké dans le navigateur (`chrome.storage.local`).
 
 ```
-page du site ─ bridge.ts (données React) ─┐
-API du site (facultatif, lecture) ────────┼─ content script ─ service worker (fusion, alarmes, badge, notifications)
-                                          └─ interface dans le site (barre latérale, fenêtres, pages, toasts) / popup
+page du site ─ bridge.ts (données React, réponses des appels du site) ─┐
+API du site (facultatif, lecture en lot, paginée) ─────────────────────┼─ content script ─ service worker (fusion, alarmes, badge,
+                                                                       │                   notifications, vérification des mises à jour)
+                                                                       └─ interface dans le site (barre latérale, Marché, pages, fenêtres, toasts) / popup
+programme d'aide (facultatif, local) ── git pull + construction, ou zip de la release ── mise à jour en un clic
 ```
 
 | Fichier | Rôle |
 | --- | --- |
 | `src/content/bridge.ts` | Script de page : lecture des données React affichées |
 | `src/content/parsers/` | Normalisation des données, lecture du texte en secours, sélecteurs (`selectors.ts`) |
-| `src/content/site-ui.ts` | Barre latérale compacte, bloc Wiky-Traders, fenêtres, pages, onglet Paramètres |
+| `src/content/site-ui.ts` | Barre latérale en arborescence, récapitulatif, fenêtres, pages, onglet Paramètres |
 | `src/content/auction-mode.ts` | Mode enchère de la collection |
 | `src/content/toast.ts`, `overlay.ts` | Toasts (prix conseillé, progression), étiquettes sur les cartes |
 | `src/content/sell-market.ts` | Résumé du marché et enchères de la carte dans la fenêtre de vente |
 | `src/content/api.ts`, `api-tags.ts` | Lecture de l'API du site ; étiquetage par l'API |
 | `src/content/catalog.ts`, `net.ts` | Catalogue et prix en lot (cache) ; réponses des appels du site relayées par `bridge.ts` |
-| `src/content/features/` | Une fonctionnalité par module (familles, prix, classement, paquets, échanges, mises…), relancés par `runtime.ts` |
+| `src/content/features/` | Une fonctionnalité par module, relancés par `runtime.ts` : familles, prix, classement, paquets, échanges, mises en direct (`bid-watch`), onglets du Marché (`market-tabs`, `market-slots`, `market-panels`), écart sur les enchères (`market-deals`), historique des prix (`price-history`), autres enchères (`auction-others`), étiquettes (`tag-tool`)… |
 | `src/lib/features.ts`, `families.ts` | Liste des fonctionnalités ; logique des familles (possession, coût, import / export) |
 | `src/content/actions.ts`, `automation.ts` | Pré-remplissage, étiquetage par l'interface |
 | `src/lib/allocation.ts`, `pricing.ts` | Slots, choix des cartes, prix de référence et prix conseillé |
 | `src/lib/journal.ts`, `autotag.ts`, `duration.ts` | Journal, plan d'étiquetage, paliers de durée |
 | `src/background/` | Fusion des relevés, alarmes, notifications, badge |
-| `src/ui/` | Popup (et ses vues intégrées au site), réglages, journal |
+| `src/ui/` | Popup (et ses vues intégrées au site), réglages (`options.ts`), panneau des mises à jour, journal |
+| `src/lib/update.ts`, `scripts/updater/` | Vérification des mises à jour (API GitHub) ; programme d'aide (native messaging) et son installation |
+| `Makefile`, `.github/workflows/release.yml` | `make install` / `make update` ; construction et zip publié à chaque push sur `main` |
 
-Permissions : `storage`, `alarms`, `notifications` ; accès limité à `https://www.wiki-masters.com/*`.
+Permissions : `storage`, `alarms`, `notifications`, `nativeMessaging` (programme d'aide aux mises à jour, facultatif) ; accès limité à `https://www.wiki-masters.com/*`.
 
 ## Développement
 
 ```bash
-npm install
-npm run dev          # build en mode watch dans dist/ (recharger l'extension après modification)
-npm run build        # build de production
-npm run typecheck    # TypeScript
-npm test             # tests unitaires (Vitest + jsdom)
+make help            # toutes les commandes
+make install         # dépendances, construction, installation dans un dossier, instructions
+make update          # git pull, construction, mise à jour du dossier installé
+make test            # TypeScript + tests unitaires (Vitest + jsdom)
+make zip             # wiky-traders.zip
+npm run dev          # construction en continu dans dist/ (recharger l'extension après modification)
 npm run demo         # parcours complet dans Chromium + captures du README
 ```
 
@@ -252,9 +258,11 @@ npm run demo         # parcours complet dans Chromium + captures du README
 
 ## Confidentialité
 
-- Aucune donnée n'est envoyée ailleurs que sur WikiMasters ; pas de serveur Wiky-Traders, pas de statistiques.
+- Aucune donnée personnelle n'est envoyée ailleurs que sur WikiMasters ; pas de serveur Wiky-Traders, pas de statistiques.
 - Sans la **lecture via l'API**, l'extension ne fait aucune requête : elle lit seulement ce que la page affiche.
 - Avec elle, l'extension interroge l'API du site (celle qu'utilise le site lui-même) **avec ta session, en lecture seule** ; l'étiquetage par l'API, s'il est activé, n'écrit que des étiquettes.
+- La vérification des mises à jour interroge l'**API publique de GitHub** (dernier commit de `main`) ; rien de personnel n'est envoyé.
+- Le programme d'aide, s'il est installé, ne fait que `git pull` et la construction (ou le téléchargement du zip de la release) sur ton ordinateur.
 - Toutes les données restent dans le stockage local du navigateur et s'effacent depuis les réglages.
 
 ## Avertissement
