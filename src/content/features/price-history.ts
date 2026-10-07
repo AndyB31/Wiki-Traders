@@ -9,6 +9,7 @@
 import { formatDuration } from '../../lib/text';
 import { auctionInfo, cardSalesHistory, type AuctionInfo, type CardSale } from '../catalog';
 import { candles, filterSales, historyStats, niceTicks, rollingMeanByTime, saleLine, type HistoryFilter, type OutcomeFilter } from './price-history-logic';
+import { bindTips, hideTip } from './dom';
 import { registerFeature } from './runtime';
 
 const AUCTION_RE = /^\/marketplace\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
@@ -75,7 +76,7 @@ const CSS = `
 .wiky-ph.ph-compact .ph-tile { padding: 5px 8px; border-radius: 10px; }
 .wiky-ph.ph-compact .ph-tile b { font-size: 13.5px; }
 .wiky-ph.ph-compact .ph-tile small { font-size: 9.5px; }
-.ph-tile[title] { cursor: help; }
+.ph-tile[data-tip] { cursor: help; }
 .ph-body details > summary { cursor: pointer; font-size: 12px; color: color-mix(in srgb, var(--color-foreground) 65%, transparent); }
 `;
 
@@ -132,6 +133,7 @@ export class PriceHistoryPanel {
     box.className = `wiky-ph ${extraClass}${compact ? ' ph-compact' : ''}`.trim();
     box.open = localStorageGet(openKey) !== '0';
     box.innerHTML = `<summary><span class="ph-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span><span>Historique des prix <span class="ph-sub"></span></span><svg class="ph-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></summary><div class="ph-body"></div>`;
+    bindTips(box);
     box.addEventListener('toggle', () => {
       localStorageSet(openKey, box.open ? '1' : '0');
       if (box.open) this.paintBody();
@@ -164,6 +166,7 @@ export class PriceHistoryPanel {
   }
 
   destroy(): void {
+    hideTip();
     this.resizeObs?.disconnect();
     this.resizeObs = null;
     this.el.remove();
@@ -189,7 +192,7 @@ export class PriceHistoryPanel {
     // Précision sous la valeur, ou en info-bulle en mode compact.
     const tile = (label: string, value: string, sub = '') =>
       this.compact
-        ? `<div class="ph-tile"${sub ? ` title="${esc(sub)}"` : ''}><small>${label}</small>${value}</div>`
+        ? `<div class="ph-tile"${sub ? ` data-tip="${esc(sub)}"` : ''}><small>${label}</small>${value}</div>`
         : `<div class="ph-tile"><small>${label}</small>${value}${sub ? `<span>${sub}</span>` : ''}</div>`;
     return [
       tile('Ventes', `<b>${s.sold}</b>`, `${s.unsold} sans acheteur${s.cancelled ? ` (dont ${s.cancelled} annulée${s.cancelled > 1 ? 's' : ''})` : ''}`),

@@ -158,3 +158,53 @@ export function formatW(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);
 }
+
+// ---------------------------------------------------------------- info-bulles
+
+let tipEl: HTMLElement | null = null;
+
+function showTip(target: HTMLElement): void {
+  const text = target.dataset.tip;
+  if (!text) return;
+  if (!tipEl?.isConnected) {
+    tipEl = document.createElement('div');
+    tipEl.setAttribute('data-wiky', 'tip');
+    tipEl.setAttribute('role', 'tooltip');
+    // Fixe, au-dessus de tout : ni coupée par une zone qui défile, ni cachée sous une fenêtre du site.
+    Object.assign(tipEl.style, {
+      position: 'fixed', zIndex: '2147483647', pointerEvents: 'none', maxWidth: '260px', padding: '6px 9px', borderRadius: '8px',
+      fontSize: '11.5px', lineHeight: '1.35', fontWeight: '500', textTransform: 'none', letterSpacing: 'normal', whiteSpace: 'normal',
+      color: 'var(--color-foreground, #f2f4f3)', background: 'var(--color-background, #0c0d0c)', border: '1px solid var(--color-border, #2e3431)',
+      boxShadow: '0 6px 20px rgba(0,0,0,.4)',
+    });
+    document.body.append(tipEl);
+  }
+  tipEl.textContent = text;
+  tipEl.hidden = false;
+  const r = target.getBoundingClientRect();
+  const w = tipEl.offsetWidth;
+  const h = tipEl.offsetHeight;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
+  // Dessous, sinon au-dessus s'il n'y a pas la place.
+  const top = r.bottom + 6 + h > innerHeight - 8 ? r.top - 6 - h : r.bottom + 6;
+  Object.assign(tipEl.style, { left: `${left}px`, top: `${Math.max(8, top)}px` });
+}
+
+export function hideTip(): void {
+  if (tipEl) tipEl.hidden = true;
+}
+
+/** Info-bulle immédiate pour les éléments `[data-tip]` de `root` (délégation : survit aux repeints du contenu). */
+export function bindTips(root: HTMLElement): void {
+  if (root.dataset.tipsBound) return;
+  root.dataset.tipsBound = '1';
+  root.addEventListener('mouseover', (e) => {
+    const t = (e.target as Element).closest<HTMLElement>('[data-tip]');
+    if (t && root.contains(t)) showTip(t);
+  });
+  root.addEventListener('mouseout', (e) => {
+    const t = (e.target as Element).closest('[data-tip]');
+    if (t && !t.contains(e.relatedTarget as Node | null)) hideTip();
+  });
+  root.addEventListener('scroll', hideTip, { capture: true, passive: true });
+}

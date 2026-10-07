@@ -126,7 +126,7 @@ describe('fenêtre de vente : marché de la carte', () => {
     const text = box.textContent!.replace(/\s+/g, ' ');
     expect(text).toContain('1 vente · moyenne 40 W · 25 % vendues');
     // Version compacte, à droite de la fenêtre : précisions des tuiles en info-bulle.
-    expect(box.querySelector('.ph-tiles [title^="1 sur 4 enchères"]')).not.toBeNull();
+    expect(box.querySelector('.ph-tiles [data-tip^="1 sur 4 enchères"]')).not.toBeNull();
     expect(document.getElementById('overlay')!.hasAttribute('data-wiky-sell-layout')).toBe(true);
     box.querySelector<HTMLButtonElement>('[data-outcome="sold"]')!.click();
     expect(modal.closed()).toBe(0);

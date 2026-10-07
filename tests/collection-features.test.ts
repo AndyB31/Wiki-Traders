@@ -285,6 +285,6 @@ describe('bandeau « Prix moyen »', () => {
     const { priceSummary } = await import('../src/content/features/marketplace-price');
     const p = { median: 30, mean: 32, count: 3, min: 20, max: 45, at: 0 };
     expect(priceSummary(p).meta).not.toContain('tdv');
-    expect(priceSummary(p, { sold: 3, total: 100, pct: 3 }).meta).toMatch(/max <b>45<\/b> · <span title="Taux de vente[^"]*">tdv<\/span> <b>3 %<\/b> \(3\/100\)$/);
+    expect(priceSummary(p, { sold: 3, total: 100, pct: 3 }).meta).toMatch(/max <b>45<\/b> · <span class="wiky-mprice-tip" data-tip="Taux de vente[^"]*">tdv<\/span> <b>3 %<\/b> \(3\/100\)$/);
   });
 });

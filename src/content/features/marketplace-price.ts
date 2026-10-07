@@ -6,7 +6,7 @@
  * le taux de vente par `cardSalesHistory`.
  */
 import { cardIdForAuction, cardIdsByTitles, cardPrices, cardSalesHistory, knownCardId, knownPrice, type CardPrice } from '../catalog';
-import { ensureStyle, formatW, isolateClicks, myCard, openCardPanels } from './dom';
+import { bindTips, ensureStyle, formatW, isolateClicks, myCard, openCardPanels } from './dom';
 import { historyStats } from './price-history-logic';
 import { registerFeature, type FeatureContext } from './runtime';
 
@@ -19,6 +19,7 @@ const CSS = `
 .wiky-mprice-meta { color: color-mix(in srgb, var(--color-foreground) 60%, transparent); font-variant-numeric: tabular-nums; }
 .wiky-mprice-meta b { color: var(--color-foreground); font-weight: 600; }
 .wiky-mprice.in-panel { margin: 10px 0 0; }
+.wiky-mprice-tip { cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
 `;
 
 const AUCTION_RE = /^\/marketplace\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
@@ -48,7 +49,7 @@ export interface SellRate {
 const rates = new Map<string, SellRate | null>();
 
 export function priceSummary(p: CardPrice | undefined, rate?: SellRate | null): { value: string; meta: string } {
-  const rateText = rate ? ` · <span title="Taux de vente : enchères conclues sur toutes les enchères terminées de la carte">tdv</span> <b>${rate.pct} %</b> (${rate.sold}/${rate.total})` : '';
+  const rateText = rate ? ` · <span class="wiky-mprice-tip" data-tip="Taux de vente : enchères conclues sur toutes les enchères terminées de la carte">tdv</span> <b>${rate.pct} %</b> (${rate.sold}/${rate.total})` : '';
   if (!p) return { value: '…', meta: 'Chargement des ventes…' };
   if (!p.count) return { value: '—', meta: `Aucune vente conclue${rateText}` };
   const range = p.min != null && p.max != null ? ` · min <b>${formatW(p.min)}</b> · max <b>${formatW(p.max)}</b>` : '';
@@ -65,12 +66,12 @@ function box(host: Element, where: 'after' | 'append', siteId: string, extraClas
   el.setAttribute('data-wiky', 'mprice');
   el.className = `wiky-mprice ${extraClass}`.trim();
   el.dataset.key = key;
-  el.innerHTML = `<span class="wiky-mprice-label">Prix moyen</span><span class="wiky-mprice-value"></span><span class="wiky-mprice-meta"></span>`;
+  el.innerHTML = `<span class="wiky-mprice-label" data-tip="Moyenne des ventes conclues de la carte (Wiki-Traders)">Prix moyen</span><span class="wiky-mprice-value"></span><span class="wiky-mprice-meta"></span>`;
   el.querySelector('.wiky-mprice-value')!.textContent = s.value;
   el.querySelector('.wiky-mprice-meta')!.innerHTML = s.meta;
-  el.title = 'Moyenne des ventes conclues ; taux de vente : enchères conclues sur toutes les enchères terminées (Wiki-Traders)';
   if (!existing) {
     isolateClicks(el);
+    bindTips(el);
     if (where === 'after') host.after(el);
     else host.append(el);
   }
