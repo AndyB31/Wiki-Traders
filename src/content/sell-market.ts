@@ -8,7 +8,7 @@
  */
 import { formatDuration, formatPrice, normalize, RARITIES } from '../lib/text';
 import type { Card, CardAuction, Rarity, Settings } from '../lib/types';
-import { fetchCardAuctions, fetchCardIdByTitle, offerStats, type OfferStats } from './api';
+import { fetchCardAuctions, fetchCardIdByTitle, fetchMyUnsoldAttempts, offerStats, type OfferStats } from './api';
 import { openSellDialog } from './automation';
 import { cardSalesHistory } from './catalog';
 import { PriceHistoryPanel } from './features/price-history';
@@ -60,7 +60,8 @@ function statsLine(s: OfferStats): string {
   return `${s.count} offre${s.count > 1 ? 's' : ''} · min ${formatPrice(s.min)} · méd. ${formatPrice(s.median)} · max ${formatPrice(s.max)}`;
 }
 
-function summaryNode(own: OfferStats | null, error?: string): HTMLElement {
+/** `attempts` : mes mises en vente de la carte restées sans acheteur (undefined : en cours de lecture ou illisible). */
+function summaryNode(own: OfferStats | null, error?: string, attempts?: number | null): HTMLElement {
   const box = document.createElement('div');
   box.setAttribute('data-wiky', 'market-summary');
   box.className = 'mt-2 space-y-0.5';
@@ -85,6 +86,7 @@ function summaryNode(own: OfferStats | null, error?: string): HTMLElement {
   if (error) box.append(line('Erreur', error));
   else if (!own) box.append(line('Cette carte', 'chargement…'));
   else box.append(line('Cette carte', statsLine(own)));
+  if (attempts != null) box.append(line('Tentatives', attempts ? `${attempts} sans acheteur` : 'aucune sans acheteur'));
   return box;
 }
 
@@ -228,11 +230,14 @@ export function enhanceSellDialog(state: SellMarketState): void {
       if (!siteId) throw new Error('carte introuvable');
       const panel = history;
       if (panel) cardSalesHistory(siteId).then((list) => panel.setSales(list), (e: Error) => panel.setError(e.message));
+      // Mes tentatives sans acheteur : facultatif, une erreur ne bloque pas le reste.
+      const attemptsJob = wantSummary ? cached(`attempts:${siteId}`, () => fetchMyUnsoldAttempts(siteId)).catch(() => null) : Promise.resolve(null);
       const result = await cached(`card:${siteId}`, () => fetchCardAuctions(siteId));
+      const attempts = await attemptsJob;
       // Les enchères « à moi » ne sont pas de la concurrence : exclues des statistiques.
       const own = offerStats(result.auctions.filter((a) => !a.mine).map((a) => a.price));
       if (current !== key) return;
-      place(wantSummary && zone ? summaryNode(own) : null, wantList ? listNode(card, result.auctions) : null);
+      place(wantSummary && zone ? summaryNode(own, undefined, attempts) : null, wantList ? listNode(card, result.auctions) : null);
     } catch (e) {
       if (current !== key) return;
       const msg = (e as Error).message;

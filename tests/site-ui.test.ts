@@ -144,6 +144,24 @@ describe('résumé Wiki-Traders toujours visible', () => {
     expect(actions.refresh).toHaveBeenCalled();
   });
 
+  it('barres des slots : prix actuel sous chaque vente, verte dès qu\'une enchère a été reçue', () => {
+    const now = Date.now();
+    const s = store({
+      cards: cardsById(card('a'), card('b')),
+      myAuctions: [
+        auction('x', 'a', { endsAt: now + 7_200_000, seenAt: now, startPrice: 20, currentPrice: 20, hasBid: false }),
+        auction('y', 'b', { endsAt: now + 3_600_000, seenAt: now, startPrice: 1000, currentPrice: 1250, hasBid: true }),
+      ],
+    });
+    renderSiteUi(s, actions);
+    const segs = [...document.querySelectorAll<HTMLElement>('[data-wiky="nav-recap"] .wiky-seg')];
+    expect(segs).toHaveLength(5);
+    // Ordre de fin : la vente qui finit le plus tôt d'abord.
+    expect(segs.slice(0, 2).map((g) => [g.querySelector('small')!.textContent, g.querySelector('i')!.className])).toEqual([['1,3k', 'on bid'], ['20', 'on']]);
+    expect(segs[0].dataset.tip).toContain('au moins une enchère');
+    expect(segs[2].querySelector('i')!.className).toBe('');
+  });
+
   it('les fonctionnalités s\'ouvrent par-dessus la page, aux couleurs du site', () => {
     renderSiteUi(store(), actions);
     openModal('bids');

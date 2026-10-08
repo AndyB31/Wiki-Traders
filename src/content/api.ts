@@ -276,7 +276,7 @@ export async function fetchMyAuctions(limit = 100): Promise<MyAuction[]> {
   const rows = await get<AuctionRow[]>(
     cfg,
     session,
-    `auctions?select=id,card_id,base_amount,current_bid,end_at,status&seller_id=eq.${session.userId}&status=eq.active&order=end_at.asc&limit=${limit}`,
+    `auctions?select=id,card_id,base_amount,current_bid,current_bidder_id,end_at,status&seller_id=eq.${session.userId}&status=eq.active&order=end_at.asc&limit=${limit}`,
   );
   // Terminée mais pas encore réglée par le site : déjà comptée comme finie par l'extension (heure de fin dépassée).
   const live = rows.filter((r) => !r.end_at || Date.parse(r.end_at) > now);
@@ -292,6 +292,7 @@ export async function fetchMyAuctions(limit = 100): Promise<MyAuction[]> {
       tag: null,
       startPrice: r.base_amount,
       currentPrice: r.current_bid ?? r.base_amount,
+      hasBid: r.current_bidder_id != null,
       endsAt: Date.parse(r.end_at) || null,
       seenAt: now,
     };
@@ -349,6 +350,22 @@ export async function fetchCardAuctions(siteCardId: string): Promise<CardAuction
     .sort((a, b) => a.price - b.price || (a.endsAt ?? 0) - (b.endsAt ?? 0));
   const prices = sales.map((s) => s.final_price).filter((p): p is number => p != null);
   return { auctions, sales: prices.length, median: median(prices) };
+}
+
+/**
+ * Mes mises en vente de cette carte terminées sans acheteur depuis ma dernière vente conclue de la carte
+ * (enchères annulées non comptées : ce n'est pas un échec de vente).
+ */
+export async function fetchMyUnsoldAttempts(siteCardId: string): Promise<number> {
+  const cfg = await discoverConfig();
+  const session = readSession(cfg);
+  const rows = await get<{ status: string }[]>(
+    cfg,
+    session,
+    `auctions?select=status,end_at&seller_id=eq.${session.userId}&card_id=eq.${encodeURIComponent(siteCardId)}&status=in.(settled_sold,settled_unsold)&order=end_at.desc&limit=200`,
+  );
+  const lastSale = rows.findIndex((r) => r.status === 'settled_sold');
+  return (lastSale < 0 ? rows : rows.slice(0, lastSale)).filter((r) => r.status === 'settled_unsold').length;
 }
 
 interface UserCardRow {

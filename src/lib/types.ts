@@ -61,6 +61,8 @@ export interface MyAuction {
   tag: string | null;
   startPrice: number | null;
   currentPrice: number | null;
+  /** Au moins une enchère reçue (lu via l'API ; absent : déduit du prix). */
+  hasBid?: boolean;
   /** Timestamp (ms) de fin, null si inconnu. */
   endsAt: number | null;
   seenAt: number;

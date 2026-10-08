@@ -32,6 +32,8 @@ function stubApi(cardAuctions: unknown[], rarityRows: unknown[] = [], historyRow
     if (url.includes('/_next/')) return new Response(`u="https://${REF}.supabase.co";k="${jwt({ role: 'anon', ref: REF })}"`);
     const q = decodeURIComponent(url);
     if (q.includes('snapshot_rarity=eq.')) return new Response(JSON.stringify(rarityRows));
+    if (q.includes('seller_id=eq.') && q.includes('status=in.(settled_sold,settled_unsold)'))
+      return new Response(JSON.stringify([{ status: 'settled_unsold' }, { status: 'settled_unsold' }, { status: 'settled_sold' }, { status: 'settled_unsold' }]));
     if (q.includes('status=in.(settled_sold')) return new Response(JSON.stringify(historyRows));
     if (q.includes('status=eq.active') && q.includes('card_id=eq.')) return new Response(JSON.stringify(cardAuctions));
     return new Response('[]');
@@ -60,6 +62,8 @@ describe('fenêtre de vente : marché de la carte', () => {
     const summary = document.querySelector('[data-wiky="market-summary"]')!;
     expect(summary.previousElementSibling!.id).toBe('zone');
     expect(summary.textContent).toContain('3 offres · min 25 · méd. 31 · max 60');
+    // Mes 2 mises en vente sans acheteur depuis ma dernière vente de la carte.
+    expect(summary.textContent).toContain('Tentatives2 sans acheteur');
 
     const list = document.querySelector('[data-wiky="market-list"]')!;
     expect(list.previousElementSibling!.id).toBe('frame');

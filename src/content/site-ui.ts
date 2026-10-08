@@ -11,7 +11,8 @@ import { allocate, type AllocationInput } from '../lib/allocation';
 import { ext } from '../lib/browser';
 import { STALE_AFTER_MS } from '../lib/defaults';
 import { featureFlags, type FeatureKey } from '../lib/features';
-import { formatDuration } from '../lib/text';
+import { formatDuration, formatPrice } from '../lib/text';
+import { bindTips, hideTip } from './features/dom';
 import type { Meta, MyBidsResult } from '../lib/types';
 
 export type SiteUiStore = AllocationInput & { bidsCache: MyBidsResult | null; meta: Meta };
@@ -183,8 +184,14 @@ nav[data-wiky-nav] > [data-wiky="nav-recap"] { margin: auto 0 4px; padding-top: 
 .wiky-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 7px; font-size: 11.5px; color: color-mix(in srgb, var(--color-foreground) 58%, transparent); }
 .wiky-row b { color: var(--color-foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
 .wiky-slots { display: flex; gap: 3px; margin-top: 5px; }
-.wiky-slots i { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--color-foreground) 14%, transparent); }
+.wiky-seg { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.wiky-seg[data-tip] { cursor: help; }
+.wiky-slots i { display: block; width: 100%; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--color-foreground) 14%, transparent); }
 .wiky-slots i.on { background: #f97316; }
+.wiky-slots i.on.bid { background: #22c55e; }
+.wiky-seg small { max-width: 100%; overflow: hidden; text-overflow: clip; white-space: nowrap; font-size: 9px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em; color: color-mix(in srgb, var(--color-foreground) 60%, transparent); }
+.wiky-seg small:empty { display: none; }
 .wiky-win { color: #4ade80 !important; }
 .wiky-lose { color: #f87171 !important; }
 .wiky-update { display: block; margin-top: 8px; padding: 5px 8px; border-radius: 8px; font-size: 11.5px; font-weight: 600; text-decoration: none;
@@ -500,7 +507,8 @@ function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions
   recap.dataset.key = recapKey;
   // Avec le suivi des mises, la liste « Mises en direct » (bid-watch.ts) remplace le compte en tête / surenchéries.
   const liveList = flags.bidWatch && store.settings.apiRead;
-  const status = el('div', { class: 'wiky-status', role: 'button', tabindex: '0', title: 'Ouvrir les slots à remplir' }, statusHtml(summary, now, false, !liveList));
+  const status = el('div', { class: 'wiky-status', role: 'button', tabindex: '0', 'aria-label': 'Ouvrir les slots à remplir' }, statusHtml(summary, now, false, !liveList));
+  bindTips(status);
   const live = recap.querySelector('[data-wiky="bid-watch"]');
   if (live) status.append(live);
   status.addEventListener('click', (e) => {
@@ -516,6 +524,7 @@ function renderTree(nav: HTMLElement, store: SiteUiStore, actions: SiteUiActions
   status.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target === status) openModal('sell');
   });
+  hideTip();
   recap.replaceChildren(status);
 }
 
@@ -542,6 +551,8 @@ export interface SiteSummary {
   won24: number;
   lost24: number;
   lastSync: number | null;
+  /** Mes ventes en cours (ordre de fin) : prix actuel et enchère reçue, pour les barres des slots. */
+  listings: { name: string; price: number | null; hasBid: boolean; endsAt: number | null }[];
 }
 
 /** Résumé affiché en permanence dans la barre latérale. */
@@ -551,7 +562,16 @@ export function siteSummary(store: SiteUiStore, now = Date.now()): SiteSummary {
   const running = bids.filter((b) => (b.status === 'leading' || b.status === 'outbid') && (b.endsAt == null || b.endsAt > now));
   const recent = bids.filter((b) => b.endsAt != null && b.endsAt <= now && now - b.endsAt < 24 * 3600_000);
   const syncs = [store.meta.lastAuctionsScan, store.bidsCache?.at ?? null].filter((t): t is number => t != null);
+  const listings = alloc.busy
+    .map(({ auction: a }) => ({
+      name: a.cardName,
+      price: a.currentPrice ?? a.startPrice,
+      hasBid: a.hasBid ?? (a.currentPrice != null && a.startPrice != null && a.currentPrice > a.startPrice),
+      endsAt: a.endsAt,
+    }))
+    .sort((a, b) => (a.endsAt ?? Infinity) - (b.endsAt ?? Infinity));
   return {
+    listings,
     slots: alloc.slots,
     occupied: alloc.busy.length,
     toSell: alloc.free.filter((s) => !s.ignored && s.proposal).length,
@@ -570,10 +590,25 @@ export function setUpdatesAvailable(n: number): void {
   updatesAvailable = n;
 }
 
+/** Prix court pour les barres des slots : 950, 1,2k, 15k. */
+function shortPrice(v: number): string {
+  if (v < 1000) return String(Math.round(v));
+  const k = v / 1000;
+  return `${k < 10 ? k.toFixed(1).replace('.', ',').replace(',0', '') : Math.round(k)}k`;
+}
+
+const escAttr = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
 function statusHtml(s: SiteSummary, now: number, toggle = true, bidsRow = true): string {
   const free = Math.max(0, s.slots - s.occupied);
   const stale = s.lastSync == null ? 'none' : now - s.lastSync > STALE_AFTER_MS ? 'stale' : '';
-  const segs = Array.from({ length: Math.min(s.slots, 12) }, (_, i) => `<i class="${i < s.occupied ? 'on' : ''}"></i>`).join('');
+  // Une barre par slot : orange = en vente, verte = au moins une enchère reçue ; prix actuel dessous.
+  const segs = Array.from({ length: Math.min(s.slots, 12) }, (_, i) => {
+    const l = s.listings[i];
+    if (!l) return `<span class="wiky-seg"><i class="${i < s.occupied ? 'on' : ''}"></i><small></small></span>`;
+    const tip = `${l.name} · ${l.price != null ? `${formatPrice(l.price)} W` : 'prix inconnu'} · ${l.hasBid ? 'au moins une enchère' : 'aucune enchère'}${l.endsAt ? ` · fin dans ${formatDuration(l.endsAt - now)}` : ''}`;
+    return `<span class="wiky-seg" data-tip="${escAttr(tip)}"><i class="on${l.hasBid ? ' bid' : ''}"></i><small>${l.price != null ? shortPrice(l.price) : '?'}</small></span>`;
+  }).join('');
   const bids = s.leading || s.outbid
     ? `${s.leading ? `<b class="wiky-win">${s.leading} en tête</b>` : ''}${s.leading && s.outbid ? ' · ' : ''}${s.outbid ? `<b class="wiky-lose">${s.outbid} surenchérie${s.outbid > 1 ? 's' : ''}</b>` : ''}`
     : '<b>aucune en cours</b>';
@@ -621,7 +656,8 @@ function renderWikySection(nav: HTMLElement, store: SiteUiStore, actions: SiteUi
   if (box.dataset.key === key) return;
   box.dataset.key = key;
 
-  const status = el('div', { class: 'wiky-status', role: 'button', tabindex: '0', title: 'Ouvrir les slots à remplir' }, statusHtml(s, now));
+  const status = el('div', { class: 'wiky-status', role: 'button', tabindex: '0', 'aria-label': 'Ouvrir les slots à remplir' }, statusHtml(s, now));
+  bindTips(status);
   status.addEventListener('click', (e) => {
     const act = (e.target as Element).closest<HTMLElement>('[data-act]')?.dataset.act;
     if (act === 'toggle') {
