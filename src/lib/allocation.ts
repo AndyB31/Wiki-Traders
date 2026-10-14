@@ -67,7 +67,7 @@ export type AllocationInput = Pick<
   'rules' | 'settings' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots'
 > & {
   /** Vrai prix moyen d'une carte (cache des prix lus via l'API), prioritaire sur la médiane de la rareté. */
-  catalogPrice?: (card: Card) => number | null;
+  catalogPrice?: (card: Card) => number | null | undefined;
 };
 
 export function isActive(a: MyAuction, now: number): boolean {

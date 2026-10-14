@@ -25,6 +25,7 @@ export function reconcileAuctions(prev: MyAuction[], next: MyAuction[], now: num
       startPrice: old?.startPrice ?? a.startPrice ?? a.currentPrice,
       endsAt: a.endsAt ?? old?.endsAt ?? null,
       tag: a.tag ?? old?.tag ?? null,
+      cardTags: a.cardTags ?? old?.cardTags,
       seenAt: now,
     });
   }

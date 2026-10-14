@@ -2,6 +2,7 @@
 #   make install            construit l'extension, demande où l'installer, explique comment la charger
 #   make install DEST=~/X   idem, sans question
 #   make update             récupère main, reconstruit et met à jour le dossier installé
+#   make android            lance l'extension dans Firefox sur un téléphone Android branché en USB
 #   make help               toutes les commandes
 
 SHELL := /bin/bash
@@ -9,8 +10,10 @@ SHELL := /bin/bash
 TARGET_FILE := .install-target
 DEFAULT_DEST := $(HOME)/Wiki-Traders
 DEST ?=
+DEVICE ?=
+FIREFOX_APK ?= org.mozilla.firefox
 
-.PHONY: help install deps build test zip update updater updater-uninstall clean
+.PHONY: help install deps build test zip update android updater updater-uninstall clean
 
 help: ## Affiche cette aide
 	@echo "Wiki-Traders — commandes :"
@@ -88,6 +91,29 @@ update: ## Récupère main, reconstruit et met à jour le dossier installé
 	@$(MAKE) --no-print-directory build
 	@if [ -f $(TARGET_FILE) ] && [ "$$(cat $(TARGET_FILE))" != "$$PWD/dist" ]; then rsync -a --exclude build.json dist/ "$$(cat $(TARGET_FILE))/" && cp dist/build.json "$$(cat $(TARGET_FILE))/"; echo "✔ $$(cat $(TARGET_FILE)) mis à jour"; fi
 	@echo "→ Clique ↻ sur l'extension (page des extensions) puis recharge les onglets WikiMasters."
+
+android: build ## Lance l'extension dans Firefox sur un téléphone Android (DEVICE=… si plusieurs)
+	@command -v adb >/dev/null || { echo "✗ adb introuvable : installe-le (macOS : brew install android-platform-tools)"; exit 1; }
+	@device="$(DEVICE)"; \
+	if [ -z "$$device" ]; then \
+	  devices="$$(adb devices | awk 'NR > 1 && $$2 == "device" { print $$1 }')"; \
+	  count="$$(printf '%s' "$$devices" | grep -c . || true)"; \
+	  if [ "$$count" = 0 ]; then \
+	    echo "✗ Aucun téléphone détecté. Vérifie :"; \
+	    echo "   1. Android : Paramètres → À propos → taper 7 fois sur « Numéro de build » (options pour les développeurs) ;"; \
+	    echo "   2. Options pour les développeurs → « Débogage USB » activé ;"; \
+	    echo "   3. Téléphone branché en USB, accepte « Autoriser le débogage USB » sur l'écran ;"; \
+	    echo "   4. Firefox Android : Paramètres → « Débogage USB à distance » activé."; \
+	    adb devices | awk 'NR > 1 && $$2 == "unauthorized" { print "   (" $$1 " attend l'\''autorisation sur le téléphone)" }'; \
+	    exit 1; \
+	  elif [ "$$count" != 1 ]; then \
+	    echo "✗ Plusieurs appareils branchés, choisis-en un : make android DEVICE=<id>"; adb devices -l | tail -n +2; exit 1; \
+	  fi; \
+	  device="$$devices"; \
+	fi; \
+	echo "→ Lancement sur $$device ($(FIREFOX_APK)). Laisse tourner : l'extension se recharge quand dist/ change"; \
+	echo "  (lance « npm run dev » dans un autre terminal pour reconstruire à chaque modification)."; \
+	npx --yes web-ext run -t firefox-android -s dist --android-device "$$device" --firefox-apk "$(FIREFOX_APK)"
 
 updater: ## Installe le programme d'aide (mise à jour en un clic)
 	@node scripts/updater/install.mjs $$( [ -f $(TARGET_FILE) ] && echo "--target $$(cat $(TARGET_FILE))" )

@@ -84,9 +84,14 @@ describe('prix moyen sur les cartes', () => {
   const titles = ['Zico', 'Colisée', 'Origami', 'Albert Einstein', 'Tour Eiffel'];
   const cards = cardsById(...titles.map((t, i) => card(t.toLowerCase().replace(/ /g, '-').normalize('NFD').replace(/[̀-ͯ]/g, ''), { name: t, siteId: `id${i}` })));
 
-  it('une seule requête pour toutes les cartes affichées, puis « Moy. N W »', async () => {
+  it('une seule requête pour toutes les cartes affichées, puis « Moy. N W » et le taux de vente', async () => {
     mount(titles);
-    stubFetch((url) => (url.includes('/auctions') ? [{ card_id: 'id0', final_price: 10 }, { card_id: 'id0', final_price: 14 }, { card_id: 'id1', final_price: 30 }] : []));
+    const unsold = (id: string, n: number) => Array.from({ length: n }, () => ({ card_id: id, final_price: null, status: 'settled_unsold' }));
+    stubFetch((url) =>
+      url.includes('/auctions')
+        ? [{ card_id: 'id0', final_price: 10, status: 'settled_sold' }, { card_id: 'id0', final_price: 14, status: 'settled_sold' }, { card_id: 'id1', final_price: 30, status: 'settled_sold' }, ...unsold('id1', 9), ...unsold('id2', 2)]
+        : [],
+    );
     runFeatures(ctxWith(['priceBadges'], cards));
     // État de chargement tout de suite.
     expect([...document.querySelectorAll('[data-wiky="avg"]')].map((b) => b.textContent)).toEqual(Array(5).fill('Prix…'));
@@ -95,14 +100,18 @@ describe('prix moyen sur les cartes', () => {
     expect(priceCalls).toHaveLength(1);
     for (let i = 0; i < 5; i++) expect(decodeURIComponent(priceCalls[0].url)).toContain(`"id${i}"`);
     const badges = [...document.querySelectorAll('[data-wiky="avg"]')].map((b) => b.textContent);
-    expect(badges).toEqual(['Moy. 12 W', 'Moy. 30 W', 'Moy. —', 'Moy. —', 'Moy. —']);
+    // Les invendues ne comptent pas dans la moyenne, seulement dans le taux de vente.
+    expect(badges).toEqual(['Moy. 12 W100 %', 'Moy. 30 W10 %', 'Moy. —0 %', 'Moy. —', 'Moy. —']);
+    const rates = [...document.querySelectorAll('[data-wiky="avg"] .wiky-rate')].map((r) => r.className);
+    expect(rates).toEqual(['wiky-rate is-high', 'wiky-rate is-low', 'wiky-rate is-low']);
+    expect(decodeURIComponent(priceCalls[0].url)).toContain('status=in.(settled_sold,settled_unsold,cancelled)');
     // Badge juste sous le titre.
     expect(document.querySelector('h3')!.nextElementSibling!.getAttribute('data-wiky')).toBe('avg');
   });
 
   it('deuxième rendu : aucune mutation du DOM, aucune requête', async () => {
     mount(titles);
-    stubFetch(() => [{ card_id: 'id0', final_price: 10 }]);
+    stubFetch(() => [{ card_id: 'id0', final_price: 10, status: 'settled_sold' }]);
     const ctx = ctxWith(['priceBadges', 'wikipediaButtons', 'compactMode', 'ranking', 'premiumCards', 'hideCardStats', 'missingImages', 'copyCardImage', 'marketplacePrice'], cards);
     runFeatures(ctx);
     await flush();
@@ -121,13 +130,13 @@ describe('prix moyen sur les cartes', () => {
 
   it('le prix en cache s\'affiche aussitôt après un nouveau rendu du site', async () => {
     mount(titles);
-    stubFetch(() => [{ card_id: 'id0', final_price: 10 }]);
+    stubFetch(() => [{ card_id: 'id0', final_price: 10, status: 'settled_sold' }]);
     const ctx = ctxWith(['priceBadges'], cards);
     runFeatures(ctx);
     await flush();
     mount(titles); // React redessine la grille
     runFeatures(ctx);
-    expect(document.querySelector('[data-wiky="avg"]')!.textContent).toBe('Moy. 10 W');
+    expect(document.querySelector('[data-wiky="avg"]')!.textContent).toBe('Moy. 10 W100 %');
   });
 });
 
@@ -274,9 +283,10 @@ describe('prix affiché : comme le « Prix moyen » du site', () => {
     expect(displayPrice(p, 'R')).toBe(32);
     expect(displayCount(p, 'R')).toBe(3);
     expect(displayPrice(p, 'SR')).toBe(400);
-    // Rareté inconnue ou jamais vendue dans cette rareté : moyenne toutes raretés.
+    // Rareté inconnue : moyenne toutes raretés ; jamais vendue dans cette rareté : aucun prix (pas celui des autres raretés).
     expect(displayPrice(p, null)).toBe(124);
-    expect(displayPrice(p, 'UR')).toBe(124);
+    expect(displayPrice(p, 'UR')).toBeNull();
+    expect(displayCount(p, 'UR')).toBe(0);
   });
 });
 

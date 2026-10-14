@@ -780,6 +780,7 @@ function automationSection() {
       riskyToggle('apiWrite', 'Étiquetage par l\'API (plus fiable)', 'Écrit directement les étiquettes, comme le site, au lieu de cliquer dans la fiche de chaque carte. Écritures limitées aux étiquettes ; favoris revérifiés avant chaque écriture.'),
       settingToggle('autoTagRemoveOthers', 'Retirer les autres étiquettes gérées', 'Ex. une carte passée à 60 W perd « 20-50 » et reçoit « 50-100 ».'),
       settingToggle('autoTagClearUnpriced', 'Retirer les étiquettes des cartes sans prix connu', 'Défait les classements faits sans prix propre (par ex. à partir de la médiane de la rareté).'),
+      settingToggle('retagUnsold', 'Remettre les étiquettes des invendues', 'Le site retire les étiquettes d\'une carte mise en vente : si l\'enchère se termine sans acheteur, la carte retrouve celles qu\'elle avait. Nécessite l\'étiquetage par l\'API et un onglet du site ouvert.'),
     ),
     featureGroup('automation', 'Fonctionnalités automatisées'),
   );

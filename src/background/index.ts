@@ -2,6 +2,7 @@ import { freeSlotCount, isActive, makeContext, ruleForAuction } from '../lib/all
 import { ext } from '../lib/browser';
 import { JOURNAL_MAX, PRICE_OBS_MAX, PRICE_OBS_MAX_AGE_MS, SITE_ORIGIN } from '../lib/defaults';
 import { expireAuctions, journalEntry, reconcileAuctions } from '../lib/journal';
+import { queueRetags, tagsToRestore } from '../lib/retag';
 import type { ScanMessage, ScannedCard, ToBackground } from '../lib/messages';
 import { reliableBase } from '../lib/pricing';
 import { load, loadAll, onStoreChange, save } from '../lib/storage';
@@ -58,6 +59,14 @@ function mergeObs(obs: PriceObs[], incoming: PriceObs[], now: number): PriceObs[
   return list.slice(-PRICE_OBS_MAX);
 }
 
+/** Invendues à réétiqueter (option « retagUnsold ») ; null si l'option est coupée ou rien ne change. */
+function retagPatch(store: StoreShape, finished: MyAuction[], now: number): Pick<StoreShape, 'pendingRetags'> | null {
+  if (!store.settings.retagUnsold || !finished.length) return null;
+  const ctx = makeContext(store, now);
+  const pendingRetags = queueRetags(store.pendingRetags, finished, (a) => tagsToRestore(a, store.journal, ruleForAuction(a, store.rules, ctx)?.tag ?? null), now);
+  return pendingRetags.length === store.pendingRetags.length ? null : { pendingRetags };
+}
+
 function finishedEntries(store: StoreShape, finished: MyAuction[], now: number): JournalEntry[] {
   const ctx = makeContext(store, now);
   return finished.map((a) => {
@@ -93,6 +102,9 @@ async function handleScan(msg: ScanMessage): Promise<void> {
   if (msg.myAuctions) {
     const merged = { ...store, ...patch } as StoreShape;
     const { auctions, created, finished } = reconcileAuctions(store.myAuctions, msg.myAuctions, now);
+    // Étiquettes de la carte à la mise en vente : le site les retire, on les remet si elle ne se vend pas.
+    const createdIds = new Set(created.map((a) => a.id));
+    for (const a of auctions) if (!a.cardTags && createdIds.has(a.id)) a.cardTags = merged.cards[a.cardId]?.tags ?? [];
     const ctx = makeContext(merged, now);
     const entries: JournalEntry[] = [
       ...created.map((a) =>
@@ -117,6 +129,7 @@ async function handleScan(msg: ScanMessage): Promise<void> {
 
     patch.myAuctions = auctions;
     patch.journal = [...store.journal, ...entries].slice(-JOURNAL_MAX);
+    Object.assign(patch, retagPatch(merged, finished, now));
     patch.meta!.lastAuctionsScan = now;
     if (created.length) {
       // Une nouvelle enchère : les choix manuels et slots ignorés repartent de zéro (et nouveau tirage aléatoire).
@@ -176,6 +189,7 @@ async function onAuctionEnd(auctionId: string): Promise<void> {
   await save({
     myAuctions: kept,
     journal: [...store.journal, ...finishedEntries(store, expired, now)].slice(-JOURNAL_MAX),
+    ...retagPatch(store, expired, now),
   });
   await updateBadge();
 
@@ -294,6 +308,11 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
     msg.type === 'scan' ? () => handleScan(msg) :
     msg.type === 'proposed' ? () => handleProposed(msg) :
     msg.type === 'refreshBadge' ? updateBadge :
+    msg.type === 'retagsDone' ? async () => {
+      const { pendingRetags } = await load('pendingRetags');
+      const done = new Set(msg.auctionIds);
+      await save({ pendingRetags: pendingRetags.filter((p) => !done.has(p.auctionId)) });
+    } :
     msg.type === 'collection' ? async () => {
       // Relevé complet : il remplace la collection (les cartes vendues ou défaussées disparaissent).
       const { cards, meta } = await load('cards', 'meta');
@@ -370,7 +389,7 @@ async function init(): Promise<void> {
     const now = Date.now();
     const { kept, expired } = expireAuctions(store.myAuctions, now);
     if (expired.length) {
-      await save({ myAuctions: kept, journal: [...store.journal, ...finishedEntries(store, expired, now)].slice(-JOURNAL_MAX) });
+      await save({ myAuctions: kept, journal: [...store.journal, ...finishedEntries(store, expired, now)].slice(-JOURNAL_MAX), ...retagPatch(store, expired, now) });
     }
   });
   await syncAlarms();

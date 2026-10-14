@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diagnoseAutoTags, planAutoTags, ruleForPrice } from '../src/lib/autotag';
+import { catalogPriceOf, diagnoseAutoTags, planAutoTags, ruleForPrice } from '../src/lib/autotag';
 import { NOW, card, cardsById, input, sales } from './helpers';
 
 describe('ruleForPrice', () => {
@@ -56,6 +56,14 @@ describe('étiquetage auto : prix propre à la carte uniquement', () => {
     const base = input({ cards: cardsById(card('sans-prix', { rarity: 'C' })), priceObs: rarityObs });
     base.rules = [rule20100];
     expect(planAutoTags(base, { removeOthers: true }, NOW)).toEqual([]);
+  });
+
+  it('Commune jamais vendue en Commune (vendue 1343 en Légendaire) : aucun prix, même avec un vieux prix de tuile', () => {
+    const base = input({ cards: cardsById(card('fuji', { rarity: 'C', siteId: 's-fuji', sitePrice: 1343, tags: ['20-100'] })) });
+    base.rules = [rule20100];
+    const cache = { 's-fuji': { mean: 1343, count: 1, byRarity: { L: { mean: 1343, count: 1 } } } };
+    const plan = planAutoTags({ ...base, catalogPrice: catalogPriceOf(cache) }, { removeOthers: true, clearUnpriced: true, extraPrice: catalogPriceOf(cache) }, NOW);
+    expect(plan.map((c) => [c.cardId, c.base, c.target, c.remove])).toEqual([['fuji', null, '', ['20-100']]]);
   });
 
   it('prix propre hors de toutes les plages (6, 134) : l\'étiquette de plage est retirée', () => {

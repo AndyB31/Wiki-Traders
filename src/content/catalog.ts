@@ -194,11 +194,15 @@ export interface CardPrice {
   /** Vente la plus basse / la plus haute (absentes des anciennes entrées du cache). */
   min?: number | null;
   max?: number | null;
+  /** Taux de vente : enchères conclues sur toutes les enchères terminées de la carte (vendues, sans acheteur, annulées). */
+  rate?: { sold: number; total: number };
   at: number;
 }
 
-// v3 : ventes lues en entier (pagination) ; les entrées des versions précédentes, parfois tronquées, sont ignorées.
+// v5 : avec le taux de vente ; v4 : moyenne sur les 200 dernières ventes, comme le site. Les entrées des versions précédentes sont ignorées.
 const PRICE_KEY = CARD_PRICES_KEY;
+/** Le site fait sa moyenne sur les 200 ventes conclues les plus récentes de la carte (vérifié sur son API). */
+const SITE_SALES_WINDOW = 200;
 const PRICE_TTL = 6 * 3600_000;
 const prices = new Map<string, CardPrice>();
 let loaded: Promise<void> | null = null;
@@ -244,21 +248,40 @@ export function knownPrice(siteId: string): CardPrice | undefined {
   return prices.get(siteId);
 }
 
-/** Vrai prix moyen d'une carte de ma collection d'après le cache (pour le prix conseillé) ; lit le cache stocké au besoin. */
-export function knownCardPrice(card: Card): number | null {
+/**
+ * Vrai prix moyen d'un exemplaire de ma collection d'après le cache (dans sa rareté) ; lit le cache stocké au besoin.
+ * undefined : pas encore lu ; null : jamais vendue dans cette rareté.
+ */
+export function knownCardPrice(card: Card): number | null | undefined {
   void loadPrices();
-  return card.siteId ? catalogPrice(knownPrice(card.siteId), card.rarity) : null;
+  return card.siteId ? catalogPrice(knownPrice(card.siteId), card.rarity) : undefined;
 }
 
 async function fetchPrices(ids: string[]): Promise<void> {
   const { cfg, session } = await api();
   // Toutes les ventes du lot, page par page : le serveur plafonne chaque réponse (1 000 lignes), et un lot de cartes
   // courantes en dépasse vite le total — sans pagination, des cartes apparaîtraient sans vente (« — »).
-  const rows = await getAll<{ card_id: string; final_price: number | null; snapshot_rarity: string | null }>(
+  // Les invendues et annulées viennent avec : elles donnent le taux de vente sans requête de plus.
+  const ended = await getAll<{ card_id: string; final_price: number | null; snapshot_rarity: string | null; settled_at: string | null; end_at: string | null; status: string }>(
     cfg,
     session,
-    `auctions?select=card_id,final_price,snapshot_rarity&status=eq.settled_sold&card_id=${inList(ids)}`,
+    `auctions?select=card_id,final_price,snapshot_rarity,settled_at,end_at,status&status=in.(settled_sold,settled_unsold,cancelled)&card_id=${inList(ids)}`,
   );
+  const isSold = (r: (typeof ended)[number]) => r.status === 'settled_sold' && r.final_price != null;
+  const all = ended.filter(isSold);
+  const rate = new Map<string, { sold: number; total: number }>();
+  for (const r of ended) {
+    const x = rate.get(r.card_id) ?? { sold: 0, total: 0 };
+    x.total++;
+    if (isSold(r)) x.sold++;
+    rate.set(r.card_id, x);
+  }
+  // Comme le site (« Marché · rareté » de la fenêtre de vente, /api/marketplace/cards/<id>/sales?scope=summary) :
+  // les SITE_SALES_WINDOW ventes conclues les plus récentes de chaque carte, puis la moyenne par rareté.
+  const at = (r: (typeof all)[number]) => Date.parse(r.settled_at ?? r.end_at ?? '') || 0;
+  const perCard = new Map<string, typeof all>();
+  for (const r of all) perCard.set(r.card_id, [...(perCard.get(r.card_id) ?? []), r]);
+  const rows = [...perCard.values()].flatMap((list) => list.sort((a, b) => at(b) - at(a)).slice(0, SITE_SALES_WINDOW));
   const byCard = new Map<string, number[]>();
   const byCardRarity = new Map<string, Map<Rarity, number[]>>();
   for (const r of rows) {
@@ -283,6 +306,7 @@ async function fetchPrices(ids: string[]): Promise<void> {
       count: list.length,
       min: list.length ? Math.min(...list) : null,
       max: list.length ? Math.max(...list) : null,
+      rate: rate.get(id) ?? { sold: 0, total: 0 },
       at: now,
     });
   }
@@ -318,15 +342,20 @@ export async function cardPrices(ids: string[], force = false): Promise<Map<stri
 
 /** Prix affiché : moyenne des ventes, dans la rareté de la carte si elle est connue (comme le site). */
 export function displayPrice(p: CardPrice | undefined, rarity?: Rarity | null): number | null {
-  if (!p) return null;
-  // Comme le « Prix moyen » du site : la moyenne des ventes de la carte dans sa rareté, à défaut toutes raretés.
-  return (rarity ? p.byRarity?.[rarity]?.mean : undefined) ?? p.mean ?? null;
+  return catalogPrice(p, rarity ?? null) ?? null;
+}
+
+/** Taux de vente en % (null : aucune enchère terminée, ou entrée du cache sans taux). */
+export function sellRateOf(p: CardPrice | undefined): { pct: number; sold: number; total: number } | null {
+  if (!p?.rate?.total) return null;
+  return { ...p.rate, pct: Math.round((p.rate.sold / p.rate.total) * 100) };
 }
 
 /** Nombre de ventes derrière le prix affiché (même rareté si connue). */
 export function displayCount(p: CardPrice | undefined, rarity?: Rarity | null): number {
   if (!p) return 0;
-  return (rarity ? p.byRarity?.[rarity]?.count : undefined) ?? p.count;
+  // Même rareté que le prix affiché (0 si jamais vendue dans cette rareté).
+  return rarity && p.byRarity && Object.keys(p.byRarity).length ? p.byRarity[rarity]?.count ?? 0 : p.count;
 }
 
 // ---------------------------------------------------------------- titre → identifiant, enchère → carte

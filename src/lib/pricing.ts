@@ -28,8 +28,11 @@ export interface PricingContext {
   obsByCard: Map<string, PriceObs[]>;
   manualPrices: Record<string, number>;
   now: number;
-  /** Vrai prix moyen de la carte (ventes lues via l'API du site), s'il est connu. */
-  catalogPrice?: (card: Card) => number | null;
+  /**
+   * Vrai prix moyen de la carte dans sa rareté (ventes lues via l'API du site). Fait foi dès qu'il est lu :
+   * undefined = pas encore lu ; null = jamais vendue dans cette rareté (ni prix de tuile ni relevés ne s'y substituent).
+   */
+  catalogPrice?: (card: Card) => number | null | undefined;
   /** Cache des prix de référence par rareté (rempli à la demande). */
   rarityCache?: Map<string, BasePrice | null>;
 }
@@ -98,10 +101,11 @@ function stat(values: number[], settings: Settings): number | null {
 /** Prix moyen fiable (site ou historique suffisant), sans estimation. */
 export function reliableBase(card: Card, ctx: PricingContext): BasePrice {
   // Un prix moyen de 0 (ou négatif) affiché par le site n'a pas de sens : on l'ignore.
-  if (card.sitePrice != null && card.sitePrice > 0) return { value: card.sitePrice, source: 'site', samples: 0 };
-  // Vrai prix moyen de la carte lu via l'API (prioritaire sur nos relevés et sur toute médiane de rareté).
+  // Vrai prix moyen de la carte lu via l'API : fait foi (prioritaire sur le prix lu sur la tuile, nos relevés et la rareté).
   const api = ctx.catalogPrice?.(card);
   if (api != null && api > 0) return { value: api, source: 'site', samples: 0 };
+  if (api === null) return { value: null, source: 'none', samples: 0 };
+  if (card.sitePrice != null && card.sitePrice > 0) return { value: card.sitePrice, source: 'site', samples: 0 };
   const samples = windowSamples(card.id, ctx);
   if (samples.length >= MIN_SALES) return { value: stat(samples, ctx.settings), source: 'history', samples: samples.length };
   return { value: null, source: 'none', samples: samples.length };
@@ -135,9 +139,11 @@ export function rarityBase(rarity: Card['rarity'], shiny: boolean, ctx: PricingC
  * toutes dans la même plage.
  */
 export function ownPrice(card: Card, ctx: PricingContext): number | null {
-  if (card.sitePrice != null && card.sitePrice > 0) return card.sitePrice;
   const api = ctx.catalogPrice?.(card);
   if (api != null && api > 0) return api;
+  // Jamais vendue dans sa rareté d'après le site : seul un prix saisi compte.
+  if (api === null) return ctx.manualPrices[card.id] ?? null;
+  if (card.sitePrice != null && card.sitePrice > 0) return card.sitePrice;
   const samples = windowSamples(card.id, ctx);
   if (samples.length) return stat(samples, ctx.settings);
   return ctx.manualPrices[card.id] ?? null;
@@ -177,7 +183,8 @@ export function basePrice(card: Card, ctx: PricingContext, peers: Card[] = []): 
   }
   if (byRarity) return byRarity;
 
-  const few = windowSamples(card.id, ctx);
+  // Relevés de la carte (peut-être d'une autre rareté) : ignorés si le site dit qu'elle n'a jamais été vendue dans la sienne.
+  const few = ctx.catalogPrice?.(card) === null ? [] : windowSamples(card.id, ctx);
   if (few.length) return { value: stat(few, ctx.settings), source: 'estimate', samples: few.length };
 
   return { value: null, source: 'none', samples: 0 };
