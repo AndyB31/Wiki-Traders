@@ -66,6 +66,18 @@ export interface MyAuction {
   /** Timestamp (ms) de fin, null si inconnu. */
   endsAt: number | null;
   seenAt: number;
+  /** Étiquettes de la carte au moment de la mise en vente (remises si l'enchère se termine sans acheteur). */
+  cardTags?: string[];
+}
+
+/** Enchère terminée sans mise, dont les étiquettes sont à remettre sur la carte revenue en collection. */
+export interface PendingRetag {
+  auctionId: string;
+  cardId: string;
+  cardName: string;
+  tags: string[];
+  /** Mise en file (ms). */
+  at: number;
 }
 
 /** Palier de durée : prix de départ entre `from` et `to` (inclus) → durée en minutes. */
@@ -122,6 +134,8 @@ export interface Settings {
   autoTagRemoveOthers: boolean;
   /** Retirer les étiquettes de plage des cartes sans prix propre connu. */
   autoTagClearUnpriced: boolean;
+  /** Remettre ses étiquettes à une carte dont l'enchère se termine sans acheteur (par l'API, nécessite apiWrite). */
+  retagUnsold: boolean;
   /** Surcharges des sélecteurs CSS (voir content/parsers/selectors.ts). */
   selectorOverrides: Record<string, string>;
   /** Intégration au site : résumé et menu Wiki-Traders dans la barre latérale, fenêtres et pages, onglet dans Paramètres. */
@@ -324,4 +338,6 @@ export interface StoreShape {
   myFamilies: CardFamily[];
   /** Import des familles de « Prix moyen collection » : date (null = jamais). */
   familiesImportedAt: number | null;
+  /** Invendues dont les étiquettes restent à remettre (traitées par un onglet du site ouvert). */
+  pendingRetags: PendingRetag[];
 }

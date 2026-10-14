@@ -92,9 +92,9 @@ describe('réponse d\'ouverture de paquet', () => {
       calls.push(url);
       if (url.includes('/_next/')) return new Response(`u="https://${REF}.supabase.co";k="${ANON}"`);
       return new Response(JSON.stringify([
-        { card_id: 'c1', final_price: 100 },
-        { card_id: 'c1', final_price: 140 },
-        { card_id: 'c2', final_price: 8 },
+        { card_id: 'c1', final_price: 100, status: 'settled_sold' },
+        { card_id: 'c1', final_price: 140, status: 'settled_sold' },
+        { card_id: 'c2', final_price: 8, status: 'settled_sold' },
       ]));
     });
     const cards = mapPackCards(PACK);

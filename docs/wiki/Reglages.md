@@ -63,6 +63,7 @@ Toutes désactivées par défaut, avec confirmation à l'activation. Voir [Autom
 | Étiquetage par l'API | L'étiquetage automatique écrit les étiquettes directement (plus fiable) |
 | Étiquetage automatique sur le site | Range les cartes par plage de prix |
 | Retirer les autres étiquettes gérées | Une seule plage par carte |
+| Remettre les étiquettes des invendues | Une carte dont l'enchère se termine sans acheteur retrouve ses étiquettes (nécessite l'étiquetage par l'API) |
 
 ## Prix saisis à la main
 

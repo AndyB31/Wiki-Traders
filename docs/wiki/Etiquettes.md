@@ -41,3 +41,11 @@ Range chaque carte dans l'étiquette dont la plage **plancher – plafond** cont
 5. Un toast affiche la progression avec un bouton **Arrêter**. Les favoris sont revérifiés avant chaque écriture ; l'étiquetage s'arrête seul si l'interface n'est pas reconnue.
 
 ![Étiquetage](../screenshots/autotag.png)
+
+## Étiquettes des invendues
+
+Le site retire les étiquettes d'une carte mise en vente : si l'enchère se termine **sans acheteur**, la carte revenait en collection sans étiquette. Avec l'option **Remettre les étiquettes des invendues** (Réglages → Automatisations, désactivée par défaut, nécessite *Étiquetage par l'API*) :
+
+1. à la mise en vente, l'extension note les étiquettes de la carte (à défaut, l'étiquette de sa règle ou du slot proposé) ;
+2. à la fin d'une enchère sans mise, la carte entre dans une file ;
+3. un onglet du site ouvert vérifie le statut réel de l'enchère (toutes les 30 s) : invendue ou annulée → les étiquettes sont remises et un toast le signale ; vendue → rien. Une carte pas encore revenue est réessayée pendant 24 h.

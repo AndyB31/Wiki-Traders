@@ -142,6 +142,13 @@ describe('prix de référence par rareté', () => {
     expect(r.detail).toContain('moyenne site 400');
   });
 
+  it('jamais vendue dans sa rareté d\'après le site : ni prix de tuile, ni relevés, ni autres raretés', () => {
+    const c = card('a', { rarity: 'C', sitePrice: 1343 });
+    const r = computePrice(c, { ...rule, floor: null, ceiling: null }, ctx(sales('a', [1343, 1343, 1343]), { catalogPrice: () => null }));
+    expect(r.base.source).not.toBe('site');
+    expect(r.base.value).not.toBe(1343);
+  });
+
   it('l\'historique de la carte reste prioritaire', () => {
     const r = computePrice(card('a', { rarity: 'SR' }), { ...rule, ceiling: null }, ctx([...soldOf('SR', [10, 10, 10, 10, 10]), ...sales('a', [200, 200, 200])]));
     expect(r.base.source).toBe('history');

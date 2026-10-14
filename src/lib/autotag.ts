@@ -10,15 +10,21 @@ export interface CatalogPriceEntry {
   byRarity?: Partial<Record<Rarity, { mean: number; count: number }>>;
 }
 
-/** Moyenne des ventes de la carte dans sa rareté (comme le site), à défaut toutes raretés ; null si jamais vendue. */
-export function catalogPrice(entry: CatalogPriceEntry | undefined, rarity: Rarity | null): number | null {
-  if (!entry || !entry.count) return null;
-  return (rarity ? entry.byRarity?.[rarity]?.mean : undefined) ?? entry.mean ?? null;
+/**
+ * Moyenne des ventes de la carte dans la rareté de l'exemplaire, comme le « Prix moyen » du site. Jamais la moyenne
+ * toutes raretés quand la rareté est connue : une Commune ne prend pas le prix des ventes de la carte en Légendaire.
+ * undefined : prix inconnu (pas encore lu) ; null : lu, jamais vendue dans cette rareté.
+ */
+export function catalogPrice(entry: CatalogPriceEntry | undefined, rarity: Rarity | null): number | null | undefined {
+  if (!entry) return undefined;
+  // Ventes dont la rareté est connue : seule celle de l'exemplaire compte.
+  if (rarity && entry.byRarity && Object.keys(entry.byRarity).length) return entry.byRarity[rarity]?.mean ?? null;
+  return entry.count ? entry.mean ?? null : null;
 }
 
-/** Fonction de prix « catalogue » pour l'étiquetage, à partir du cache des prix (clé : identifiant du site). */
-export function catalogPriceOf(cache: Record<string, CatalogPriceEntry> | null | undefined): (card: Card) => number | null {
-  return (card) => (card.siteId && cache ? catalogPrice(cache[card.siteId], card.rarity) : null);
+/** Fonction de prix « catalogue », à partir du cache des prix (clé : identifiant du site). */
+export function catalogPriceOf(cache: Record<string, CatalogPriceEntry> | null | undefined): (card: Card) => number | null | undefined {
+  return (card) => (card.siteId && cache ? catalogPrice(cache[card.siteId], card.rarity) : undefined);
 }
 
 export interface TagChange {
@@ -50,7 +56,7 @@ export interface AutoTagOptions {
    * Prix de secours : moyenne de toutes les ventes de la carte sur le site (badge « Moy. »). Sans lui, seules les
    * cartes vendues au moins 3 fois sur les 7 derniers jours (ou au prix affiché par le site) étaient classées.
    */
-  extraPrice?: (card: Card) => number | null;
+  extraPrice?: (card: Card) => number | null | undefined;
 }
 
 /**
@@ -98,7 +104,7 @@ export interface AutoTagDiagnosis {
 }
 
 /** Pourquoi le plan d'étiquetage est vide. */
-export function diagnoseAutoTags(input: AllocationInput, now = Date.now(), extraPrice?: (card: Card) => number | null): AutoTagDiagnosis {
+export function diagnoseAutoTags(input: AllocationInput, now = Date.now(), extraPrice?: (card: Card) => number | null | undefined): AutoTagDiagnosis {
   const ctx = makeContext(input, now);
   const cards = Object.values(input.cards).filter((c) => c.quantity >= 1 && !c.favorite);
   const priced = cards.filter((c) => (ownPrice(c, ctx) ?? extraPrice?.(c) ?? null) != null).length;

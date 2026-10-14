@@ -1,14 +1,16 @@
 import { ext } from '../lib/browser';
 import { catalogPrice, planAutoTags, type TagChange } from '../lib/autotag';
 import { cardPrices, flushPrices, knownCardPrice, knownPrice } from './catalog';
-import type { DiagnosticResult, ScanMessage, ScannedCard, ToContent } from '../lib/messages';
+import type { DiagnosticResult, ScanMessage, ScannedCard, ToBackground, ToContent } from '../lib/messages';
 // Seules les cartes de la collection sont envoyées comme « possédées » : jamais celles du marché.
 import { load, onStoreChange, save } from '../lib/storage';
 import type { Card, MyAuction, PageKind, PageStatus, PriceObs, StoreShape } from '../lib/types';
 import type { BridgeItem } from './bridge';
 import { ActionError, findByText, pause, realClick, waitFor } from './actions';
-import { fetchCardAuctions, fetchMarketSales, fetchMyAuctions, fetchMyBids, fetchMyCollection, fetchMySales, refreshBidStates } from './api';
-import { applyTagsViaApi } from './api-tags';
+import { fetchAuctionStatuses, fetchCardAuctions, fetchMarketSales, fetchMyAuctions, fetchMyBids, fetchMyCollection, fetchMySales, refreshBidStates } from './api';
+import { applyTagsViaApi, NOT_IN_COLLECTION } from './api-tags';
+import { splitRetags } from '../lib/retag';
+import { noticeToast } from './toast';
 import { readFamilies } from './families';
 import { applyTags, prefillSale, searchCollection } from './automation';
 import { domOutline } from './diagnostic';
@@ -33,7 +35,7 @@ import { re, resolveSelectors, type SelectorConfig } from './parsers/selectors';
 
 type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta' | 'bidsCache' | 'myFamilies' | 'familiesImportedAt'> & {
   /** Vrai prix moyen des cartes (cache des prix lus via l'API) : prioritaire sur la médiane de la rareté. */
-  catalogPrice: (card: Card) => number | null;
+  catalogPrice: (card: Card) => number | null | undefined;
 };
 
 let store: Store | null = null;
@@ -536,6 +538,47 @@ async function runAutoTagApi(plan: TagChange[]): Promise<void> {
   }
 }
 
+let retagBusy = false;
+
+/**
+ * Option « retagUnsold » : remet ses étiquettes à chaque carte dont l'enchère s'est terminée sans acheteur
+ * (file remplie par le service worker). Le statut est vérifié sur le site avant d'écrire ; une carte pas encore
+ * revenue en collection reste en file pour l'essai suivant.
+ */
+async function processRetags(): Promise<void> {
+  if (retagBusy || automating || !store?.settings.retagUnsold || !store.settings.apiWrite) return;
+  const { pendingRetags } = await load('pendingRetags');
+  if (!pendingRetags.length) return;
+  retagBusy = true;
+  try {
+    const now = Date.now();
+    const { apply, drop } = splitRetags(pendingRetags, await fetchAuctionStatuses(pendingRetags.map((p) => p.auctionId)), now);
+    const done = drop.map((p) => p.auctionId);
+    const restored: string[] = [];
+    if (apply.length) {
+      const plan: TagChange[] = apply.map((p) => ({ cardId: p.cardId, cardName: p.cardName, base: null, target: p.tags[0], add: p.tags, remove: [] }));
+      const results = await applyTagsViaApi(plan, () => {}, () => false);
+      for (const p of apply) {
+        const r = results.find((x) => x.cardName === p.cardName);
+        if (r?.skipped === NOT_IN_COLLECTION) continue;
+        done.push(p.auctionId);
+        if (r?.ok) restored.push(`${p.cardName} → ${p.tags.join(', ')}`);
+        log(`[invendue] ${p.cardName} : ${r?.ok ? `étiquettes remises (${p.tags.join(', ')})` : r?.skipped ?? r?.error ?? 'échec'}`);
+      }
+    }
+    if (done.length) await ext.runtime.sendMessage({ type: 'retagsDone', auctionIds: done } satisfies ToBackground);
+    if (restored.length) {
+      noticeToast(restored.join('\n'), { title: `Invendue${restored.length > 1 ? 's' : ''} : étiquettes remises` });
+      lastApiCollection = 0;
+      await runApi('collection').catch(() => {});
+    }
+  } catch (e) {
+    log(`[invendue] ${(e as Error).message}`);
+  } finally {
+    retagBusy = false;
+  }
+}
+
 async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: number }> {
   if (!store || automating) return { ok: 0, failed: 0 };
   automating = true;
@@ -796,6 +839,10 @@ async function main(): Promise<void> {
   });
   void refreshMyAuctions();
   setInterval(() => void refreshMyAuctions(), 15_000);
+  // Invendues à réétiqueter : dès qu'une entre en file, puis toutes les 30 s (le site règle l'enchère après sa fin).
+  onStoreChange(['pendingRetags'], () => void processRetags());
+  void processRetags();
+  setInterval(() => void processRetags(), 30_000);
   document.addEventListener('visibilitychange', () => void refreshMyAuctions());
   setInterval(() => void refreshBidsFast(), 5_000);
   setInterval(() => void refreshLiveBids(), LIVE_BIDS_MS);
@@ -822,7 +869,7 @@ async function main(): Promise<void> {
           removeOthers: store!.settings.autoTagRemoveOthers,
           clearUnpriced: store!.settings.autoTagClearUnpriced,
           // Prix moyen de toutes les ventes de la carte (comme le badge « Moy. »), déjà chargé par la popup.
-          extraPrice: (card) => (card.siteId ? catalogPrice(knownPrice(card.siteId), card.rarity) : null),
+          extraPrice: (card) => (card.siteId ? catalogPrice(knownPrice(card.siteId), card.rarity) : undefined),
         });
         void (store!.settings.apiWrite ? runAutoTagApi(plan) : runAutoTag(plan));
         sendResponse({ ok: true });

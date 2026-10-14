@@ -48,13 +48,27 @@ describe('pagination de l\'API (plafond de 1 000 lignes par réponse)', () => {
     document.head.innerHTML = '<script src="https://www.wiki-masters.com/_next/static/chunks/app.js"></script>';
     // 1 200 ventes de la carte A, puis 300 de la carte B : B n'apparaît qu'en deuxième page.
     const sales = [
-      ...Array.from({ length: 1200 }, () => ({ card_id: 'A', final_price: 10, snapshot_rarity: 'C' })),
-      ...Array.from({ length: 300 }, () => ({ card_id: 'B', final_price: 40, snapshot_rarity: 'R' })),
+      ...Array.from({ length: 1200 }, () => ({ card_id: 'A', final_price: 10, status: 'settled_sold', snapshot_rarity: 'C' })),
+      ...Array.from({ length: 300 }, () => ({ card_id: 'B', final_price: 40, status: 'settled_sold', snapshot_rarity: 'R' })),
     ];
     server(sales);
     const prices = await cardPrices(['A', 'B']);
-    expect(prices.get('A')!.count).toBe(1200);
-    expect(prices.get('B')!.count).toBe(300);
+    // Toutes les lignes lues, mais la moyenne porte sur les 200 ventes les plus récentes (comme le site).
+    expect(prices.get('A')!.count).toBe(200);
+    expect(prices.get('B')!.count).toBe(200);
     expect(prices.get('B')!.byRarity!.R!.mean).toBe(40);
+  });
+
+  it('prix moyen comme le site : moyenne des 200 ventes conclues les plus récentes, dans la rareté de la carte', async () => {
+    resetCatalog();
+    const day = (n: number) => new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString();
+    // 50 vieilles ventes à 1 000, puis 200 récentes à 100 : le site affiche 100.
+    server([
+      ...Array.from({ length: 50 }, (_, i) => ({ card_id: 'Y', final_price: 1000, status: 'settled_sold', snapshot_rarity: 'UR', settled_at: day(i) })),
+      ...Array.from({ length: 200 }, (_, i) => ({ card_id: 'Y', final_price: 100, status: 'settled_sold', snapshot_rarity: 'UR', settled_at: day(100 + i) })),
+    ]);
+    const p = (await cardPrices(['Y'])).get('Y')!;
+    expect(p.mean).toBe(100);
+    expect(p.byRarity!.UR).toEqual({ mean: 100, count: 200 });
   });
 });

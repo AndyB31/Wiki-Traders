@@ -299,6 +299,19 @@ export async function fetchMyAuctions(limit = 100): Promise<MyAuction[]> {
   });
 }
 
+/** Statut de mes enchères (`active`, `settled_sold`, `settled_unsold`, `cancelled`), par identifiant. */
+export async function fetchAuctionStatuses(ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!ids.length) return out;
+  const cfg = await discoverConfig();
+  const session = readSession(cfg);
+  for (let i = 0; i < ids.length; i += 100) {
+    const rows = await get<{ id: string; status: string }[]>(cfg, session, `auctions?select=id,status&seller_id=eq.${session.userId}&id=${inList(ids.slice(i, i + 100))}`);
+    for (const r of rows) out.set(r.id, r.status);
+  }
+  return out;
+}
+
 /** Ventes conclues récentes du marché (toutes cartes), pour les prix de référence par rareté. */
 export async function fetchMarketSales(days = 7, limit = 1000): Promise<PriceObs[]> {
   const cfg = await discoverConfig();

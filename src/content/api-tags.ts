@@ -14,6 +14,8 @@ const WRITABLE = new Set(['user_card_tags', 'tags']);
 const TAG_COLORS = ['#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ef4444', '#14b8a6', '#ec4899'];
 
 const BATCH = 100;
+/** Raison d'un saut : la carte n'est pas (ou plus, ou pas encore) dans ma collection. */
+export const NOT_IN_COLLECTION = 'carte absente de la collection';
 
 async function write(cfg: ApiConfig, session: Session, method: 'POST' | 'DELETE', path: string, body?: unknown, prefer = 'return=minimal'): Promise<Response> {
   const table = path.split('?')[0];
@@ -81,7 +83,7 @@ export async function applyTagsViaApi(
   const cardsOfRow = new Map<string, string>();
   for (const change of plan) {
     const mine = rowsByCard.get(change.cardId) ?? [];
-    if (!mine.length) results.set(change.cardId, { cardName: change.cardName, ok: false, skipped: 'carte absente de la collection' });
+    if (!mine.length) results.set(change.cardId, { cardName: change.cardName, ok: false, skipped: NOT_IN_COLLECTION });
     else if (mine.some((r) => r.starred)) results.set(change.cardId, { cardName: change.cardName, ok: false, skipped: 'favori, ignorée' });
     else {
       results.set(change.cardId, { cardName: change.cardName, ok: true });

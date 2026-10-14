@@ -1,10 +1,11 @@
 /**
- * « Moy. 12 W » sous le titre de chaque carte de la collection (et de la collection globale).
+ * « Moy. 12 W · 85 % » sous le titre de chaque carte de la collection (et de la collection globale) : prix moyen et
+ * taux de vente (rouge à 15 % ou moins, vert à 70 % ou plus).
  * Contrairement à « Prix moyen collection » (une requête par carte), les prix de toutes les cartes affichées
  * sont demandés en une fois à `cardPrices` (lots de 150, cache 6 h) ; les prix déjà connus s'affichent
  * immédiatement à chaque nouveau rendu du site.
  */
-import { cardIdsByTitles, cardPrices, displayCount, displayPrice, knownCardId, knownPrice } from '../catalog';
+import { cardIdsByTitles, cardPrices, displayCount, displayPrice, knownCardId, knownPrice, sellRateOf } from '../catalog';
 import { cardRarity, cardTitle, ensureStyle, formatW, isCollection, isGlobalCollection, myCard, nativeCards } from './dom';
 import { registerFeature, type FeatureContext } from './runtime';
 import type { Rarity } from '../../lib/types';
@@ -26,7 +27,15 @@ const CSS = `
 .wiky-avg-refresh:hover { color: var(--color-foreground); border-color: rgba(249,115,22,.4); }
 .wiky-avg-refresh:disabled { opacity: .6; cursor: default; }
 .wiky-avg-legend .wiky-avg { position: static; margin: 0; }
+.wiky-avg .wiky-rate { color: #e7e5e4; font-weight: 800; }
+.wiky-avg .wiky-rate::before { content: '·'; margin-right: 3px; color: #a8a29e; }
+.wiky-avg .wiky-rate.is-low { color: #f87171; }
+.wiky-avg .wiky-rate.is-high { color: #4ade80; }
 `;
+
+/** Taux de vente « difficile à vendre » / « part toute seule ». */
+export const RATE_LOW = 15;
+export const RATE_HIGH = 70;
 
 type State = 'loading' | 'value' | 'empty' | 'error';
 
@@ -46,19 +55,30 @@ function siteIdOf(ctx: FeatureContext, title: string): string | null | undefined
   return myCard(ctx, title)?.siteId ?? knownCardId(title);
 }
 
-function stateOf(siteId: string, rarity: Rarity | null, now: number): { state: State; text: string; title: string } {
+interface BadgeState {
+  state: State;
+  text: string;
+  title: string;
+  /** Taux de vente en %, s'il est connu. */
+  rate?: number;
+}
+
+function stateOf(siteId: string, rarity: Rarity | null, now: number): BadgeState {
   const p = knownPrice(siteId);
   if (p) {
+    const r = sellRateOf(p);
+    const rateTitle = r ? `\nTaux de vente ${r.pct} % : ${r.sold} vendue${r.sold > 1 ? 's' : ''} sur ${r.total} enchère${r.total > 1 ? 's' : ''} terminée${r.total > 1 ? 's' : ''}` : '';
     // Même calcul que le « Prix moyen » du site : moyenne des ventes de la carte dans sa rareté.
     const v = displayPrice(p, rarity);
-    if (v == null) return { state: 'empty', text: 'Moy. —', title: 'Aucune vente conclue pour cette carte' };
+    if (v == null) return { state: 'empty', text: 'Moy. —', title: `Aucune vente conclue pour cette carte${rateTitle}`, rate: r?.pct };
     const n = displayCount(p, rarity);
     const sameRarity = !!rarity && !!p.byRarity?.[rarity];
     const median = p.median != null ? ` · médiane ${formatW(p.median)} W` : '';
     return {
       state: 'value',
       text: `Moy. ${formatW(v)} W`,
-      title: `Moyenne de ${n} vente${n > 1 ? 's' : ''} conclue${n > 1 ? 's' : ''}${sameRarity ? ` en ${rarity}` : ''}${median} (Wiki-Traders)`,
+      title: `Moyenne de ${n} vente${n > 1 ? 's' : ''} conclue${n > 1 ? 's' : ''}${sameRarity ? ` en ${rarity}` : ''}${median} (Wiki-Traders)${rateTitle}`,
+      rate: r?.pct,
     };
   }
   if (now - (failedAt.get(siteId) ?? 0) < RETRY_MS) return { state: 'error', text: 'Prix indispo.', title: 'Erreur temporaire, nouvel essai dans une minute' };
@@ -70,7 +90,7 @@ function paintBadge(card: HTMLElement, siteId: string, now: number): State {
   const h3 = card.querySelector('h3');
   if (!h3) return 'loading';
   const s = stateOf(siteId, cardRarity(card), now);
-  const key = `${siteId}|${s.text}`;
+  const key = `${siteId}|${s.text}|${s.rate ?? ''}`;
   let badge = card.querySelector<HTMLElement>('[data-wiky="avg"]');
   if (badge?.dataset.key === key && badge.previousElementSibling === h3) return s.state;
   if (!badge) {
@@ -80,6 +100,12 @@ function paintBadge(card: HTMLElement, siteId: string, now: number): State {
   badge.dataset.key = key;
   badge.className = `wiky-avg${s.state === 'value' ? '' : ` is-${s.state}`}`;
   badge.textContent = s.text;
+  if (s.rate != null) {
+    const rate = document.createElement('i');
+    rate.className = `wiky-rate${s.rate <= RATE_LOW ? ' is-low' : s.rate >= RATE_HIGH ? ' is-high' : ''}`;
+    rate.textContent = `${s.rate} %`;
+    badge.append(rate);
+  }
   badge.title = s.title;
   if (badge.previousElementSibling !== h3) h3.after(badge);
   return s.state;
@@ -99,6 +125,7 @@ function renderLegend(ctx: FeatureContext): void {
   legend.className = 'wiky-avg-legend';
   legend.innerHTML =
     '<span><b class="wiky-avg">Moy. 12 W</b>moyenne des ventes (rareté de la carte)</span>' +
+    `<span><b class="wiky-avg">Moy. 12 W<i class="wiky-rate is-high">85 %</i></b>taux de vente (rouge ≤ ${RATE_LOW} %, vert ≥ ${RATE_HIGH} %)</span>` +
     '<span><b class="wiky-avg is-empty">Moy. —</b>jamais vendue</span>' +
     '<span><b class="wiky-avg is-loading">Prix…</b>chargement</span>';
   const refresh = document.createElement('button');

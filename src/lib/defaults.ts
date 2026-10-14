@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTag: false,
   autoTagRemoveOthers: true,
   autoTagClearUnpriced: false,
+  retagUnsold: false,
   selectorOverrides: {},
   siteIntegration: true,
   compactNav: true,
@@ -63,10 +64,11 @@ export const DEFAULT_STORE: StoreShape = {
   families: null,
   myFamilies: [],
   familiesImportedAt: null,
+  pendingRetags: [],
 };
 
 /** Cache des prix moyens par carte (catalog.ts), lu aussi par la popup pour l'étiquetage. */
-export const CARD_PRICES_KEY = 'cardPrices3';
+export const CARD_PRICES_KEY = 'cardPrices5';
 
 /** Au-delà, la popup demande de rouvrir la page des enchères. */
 export const STALE_AFTER_MS = 30 * 60 * 1000;

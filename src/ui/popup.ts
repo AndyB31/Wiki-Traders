@@ -868,8 +868,8 @@ function autoTagBlock(onCollection: boolean) {
   // Prix de toutes les cartes de la collection : chargés une fois à l'ouverture (puis bouton « Rafraîchir les prix »).
   if (pricesState === 'idle') void loadCollectionPrices();
   const extraPrice = catalogPriceOf(catalogPrices);
-  const plan = planAutoTags(store, { removeOthers: store.settings.autoTagRemoveOthers, clearUnpriced: store.settings.autoTagClearUnpriced, extraPrice });
-  const diag = diagnoseAutoTags(store, Date.now(), extraPrice);
+  const plan = planAutoTags(pricingInput(), { removeOthers: store.settings.autoTagRemoveOthers, clearUnpriced: store.settings.autoTagClearUnpriced, extraPrice });
+  const diag = diagnoseAutoTags(pricingInput(), Date.now(), extraPrice);
   const pricesLine = h(
     'div',
     { class: 'small muted row' },
