@@ -51,9 +51,9 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 | **Vendre** | Slots par étiquette (quota, % du prix, plancher / plafond, exemplaires à garder, liste noire, favoris jamais proposés), prix et durée conseillés avec le détail du calcul. Dans Marché → **Mes ventes**, un clic sur un slot libre ouvre « Vendre » : carte proposée, autre carte, recherche ou **carte au hasard** d'une étiquette. **Mode enchère** sur la collection : un clic sur une carte ouvre sa mise en vente pré-remplie. |
 | **Marché enrichi** | Sur chaque enchère : **prix moyen de la carte et écart** (vert = bonne affaire). **Mes enchères** : tes mises, en cours ou historique. **Historique** : tes ventes, statistiques, filtres vendues / invendues, écart à la moyenne. |
 | **Page d'une enchère** | **Historique des prix** de la carte : chiffres clés (ventes, moyenne, médiane, extrêmes, tendance 30 j, taux de vente), graphique en **points, bougies ou ligne**, moyenne glissante de 2 j à 1 mois, filtre vendues / sans acheteur ; **autres enchères de la même carte**. |
-| **Prix comme le site** | « Moy. » = moyenne des ventes de la carte dans sa rareté, comme le site ; prix de 150 cartes par requête, toutes les ventes lues (pagination), cache 6 h, bouton **↻ Rafraîchir les prix**. |
+| **Prix comme le site** | « Moy. » = moyenne des 200 dernières ventes de la carte dans sa rareté, comme le site, suivie du **taux de vente** (rouge ≤ 15 %, vert ≥ 70 %) ; prix de 150 cartes par requête, toutes les ventes lues (pagination), cache 6 h, bouton **↻ Rafraîchir les prix**. |
 | **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** (mode « Sélectionner » du site) ou recherche au fil de la frappe, marché des manquantes ; import depuis une autre extension. |
-| **Étiquettes** | Pastilles sur les cartes ; **étiquetage automatique** par plage de prix à partir du prix moyen de chaque carte (bouton **Étiquettes** sur la collection). |
+| **Étiquettes** | Pastilles sur les cartes ; **étiquetage automatique** par plage de prix à partir du prix moyen de chaque carte (bouton **Étiquettes** sur la collection) ; option pour **remettre les étiquettes des invendues**. |
 | **Échanges** | Valeur de chaque côté et **bilan pour toi** (« −500 W : tu donnes 600 W, tu reçois 100 W »), aperçus des cartes. |
 | **Et aussi** | Classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, récapitulatif et statistiques de paquets, son des notifications, journal des ventes, notifications de fin d'enchère. |
 | **Mises à jour** | Vérification de la branche `main` (démarrage, toutes les 6 h) et **mise à jour en un clic** depuis les réglages. |
@@ -187,6 +187,7 @@ Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises
 | Lecture via l'API | **non** | Mises, ventes conclues, marché, ventes en cours relues chaque minute |
 | V4 – pré-remplissage (et Mode enchère) | **non** | Ouvre la vente, remplit prix et durée |
 | Étiquetage automatique / par l'API | **non** | Range les cartes par plage de prix |
+| Remettre les étiquettes des invendues | **non** | Nécessite l'étiquetage par l'API et un onglet du site ouvert |
 | Fonctionnalités | voir la page | Une case par fonctionnalité ; les automatisations sont désactivées par défaut |
 | Mises à jour | vérification automatique | Toutes les 6 h ; « Mettre à jour » nécessite le programme d'aide |
 
