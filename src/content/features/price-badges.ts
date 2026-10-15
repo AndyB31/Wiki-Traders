@@ -1,6 +1,6 @@
 /**
  * « Moy. 12 W · 85 % » sous le titre de chaque carte de la collection (et de la collection globale) : prix moyen et
- * taux de vente (rouge à 15 % ou moins, vert à 70 % ou plus).
+ * taux de vente (rouge à 15 % ou moins, vert à 70 % ou plus) suivi du nombre d'enchères terminées sur lequel il porte.
  * Contrairement à « Prix moyen collection » (une requête par carte), les prix de toutes les cartes affichées
  * sont demandés en une fois à `cardPrices` (lots de 150, cache 6 h) ; les prix déjà connus s'affichent
  * immédiatement à chaque nouveau rendu du site.
@@ -31,6 +31,7 @@ const CSS = `
 .wiky-avg .wiky-rate::before { content: '·'; margin-right: 3px; color: #a8a29e; }
 .wiky-avg .wiky-rate.is-low { color: #f87171; }
 .wiky-avg .wiky-rate.is-high { color: #4ade80; }
+.wiky-avg .wiky-rate small { margin-left: 2px; font-size: inherit; font-weight: 600; color: #a8a29e; }
 `;
 
 /** Taux de vente « difficile à vendre » / « part toute seule ». */
@@ -55,12 +56,19 @@ function siteIdOf(ctx: FeatureContext, title: string): string | null | undefined
   return myCard(ctx, title)?.siteId ?? knownCardId(title);
 }
 
+/** 950 → « 950 », 1 234 → « 1,2k », 12 000 → « 12k » (le badge est étroit). */
+export function shortCount(n: number): string {
+  if (n < 1000) return String(n);
+  const k = n / 1000;
+  return `${k < 10 ? k.toFixed(1).replace(/\.0$/, '').replace('.', ',') : Math.round(k)}k`;
+}
+
 interface BadgeState {
   state: State;
   text: string;
   title: string;
-  /** Taux de vente en %, s'il est connu. */
-  rate?: number;
+  /** Taux de vente en % et nombre d'enchères terminées, s'il est connu. */
+  rate?: { pct: number; total: number };
 }
 
 function stateOf(siteId: string, rarity: Rarity | null, now: number): BadgeState {
@@ -70,7 +78,7 @@ function stateOf(siteId: string, rarity: Rarity | null, now: number): BadgeState
     const rateTitle = r ? `\nTaux de vente ${r.pct} % : ${r.sold} vendue${r.sold > 1 ? 's' : ''} sur ${r.total} enchère${r.total > 1 ? 's' : ''} terminée${r.total > 1 ? 's' : ''}` : '';
     // Même calcul que le « Prix moyen » du site : moyenne des ventes de la carte dans sa rareté.
     const v = displayPrice(p, rarity);
-    if (v == null) return { state: 'empty', text: 'Moy. —', title: `Aucune vente conclue pour cette carte${rateTitle}`, rate: r?.pct };
+    if (v == null) return { state: 'empty', text: 'Moy. —', title: `Aucune vente conclue pour cette carte${rateTitle}`, rate: r ?? undefined };
     const n = displayCount(p, rarity);
     const sameRarity = !!rarity && !!p.byRarity?.[rarity];
     const median = p.median != null ? ` · médiane ${formatW(p.median)} W` : '';
@@ -78,7 +86,7 @@ function stateOf(siteId: string, rarity: Rarity | null, now: number): BadgeState
       state: 'value',
       text: `Moy. ${formatW(v)} W`,
       title: `Moyenne de ${n} vente${n > 1 ? 's' : ''} conclue${n > 1 ? 's' : ''}${sameRarity ? ` en ${rarity}` : ''}${median} (Wiki-Traders)${rateTitle}`,
-      rate: r?.pct,
+      rate: r ?? undefined,
     };
   }
   if (now - (failedAt.get(siteId) ?? 0) < RETRY_MS) return { state: 'error', text: 'Prix indispo.', title: 'Erreur temporaire, nouvel essai dans une minute' };
@@ -90,7 +98,7 @@ function paintBadge(card: HTMLElement, siteId: string, now: number): State {
   const h3 = card.querySelector('h3');
   if (!h3) return 'loading';
   const s = stateOf(siteId, cardRarity(card), now);
-  const key = `${siteId}|${s.text}|${s.rate ?? ''}`;
+  const key = `${siteId}|${s.text}|${s.rate ? `${s.rate.pct}/${s.rate.total}` : ''}`;
   let badge = card.querySelector<HTMLElement>('[data-wiky="avg"]');
   if (badge?.dataset.key === key && badge.previousElementSibling === h3) return s.state;
   if (!badge) {
@@ -102,8 +110,11 @@ function paintBadge(card: HTMLElement, siteId: string, now: number): State {
   badge.textContent = s.text;
   if (s.rate != null) {
     const rate = document.createElement('i');
-    rate.className = `wiky-rate${s.rate <= RATE_LOW ? ' is-low' : s.rate >= RATE_HIGH ? ' is-high' : ''}`;
-    rate.textContent = `${s.rate} %`;
+    rate.className = `wiky-rate${s.rate.pct <= RATE_LOW ? ' is-low' : s.rate.pct >= RATE_HIGH ? ' is-high' : ''}`;
+    // 90 % sur 4 enchères ou sur 1 000 ne disent pas la même chose : le nombre suit le taux.
+    const count = document.createElement('small');
+    count.textContent = `(${shortCount(s.rate.total)})`;
+    rate.append(`${s.rate.pct} %`, count);
     badge.append(rate);
   }
   badge.title = s.title;
@@ -125,7 +136,7 @@ function renderLegend(ctx: FeatureContext): void {
   legend.className = 'wiky-avg-legend';
   legend.innerHTML =
     '<span><b class="wiky-avg">Moy. 12 W</b>moyenne des ventes (rareté de la carte)</span>' +
-    `<span><b class="wiky-avg">Moy. 12 W<i class="wiky-rate is-high">85 %</i></b>taux de vente (rouge ≤ ${RATE_LOW} %, vert ≥ ${RATE_HIGH} %)</span>` +
+    `<span><b class="wiky-avg">Moy. 12 W<i class="wiky-rate is-high">85 %<small>(20)</small></i></b>taux de vente (rouge ≤ ${RATE_LOW} %, vert ≥ ${RATE_HIGH} %) et nombre d'enchères terminées</span>` +
     '<span><b class="wiky-avg is-empty">Moy. —</b>jamais vendue</span>' +
     '<span><b class="wiky-avg is-loading">Prix…</b>chargement</span>';
   const refresh = document.createElement('button');

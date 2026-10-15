@@ -14,7 +14,7 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 | --- | --- | --- |
 | [Familles](Familles.md) (API) | oui | Familles de cartes, progression, ajout par sélection multiple, marché des manquantes |
 | Familles sur les cartes | oui | Pastilles de famille sur les cartes |
-| Prix moyen sur les cartes (API) | oui | « Moy. 12 W · 85 % » sous le titre de chaque carte de la collection et de « Toutes les cartes » : prix moyen et taux de vente (rouge ≤ 15 %, vert ≥ 70 %), avec légende |
+| Prix moyen sur les cartes (API) | oui | « Moy. 12 W · 85 % (20) » sous le titre de chaque carte de la collection et de « Toutes les cartes » : prix moyen, taux de vente (rouge ≤ 15 %, vert ≥ 70 %) et nombre d'enchères terminées sur lequel il porte, avec légende |
 | Classement « Plus chères » (API) | oui | Bouton à côté du titre de la collection : ta collection triée par prix, filtres (recherche, rareté, étiquette, favoris), valeur totale |
 | Mode compact | oui | Bouton « Compact » : cartes plus petites, plus de cartes à l'écran |
 

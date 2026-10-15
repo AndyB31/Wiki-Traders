@@ -21,7 +21,7 @@ vi.mock('../src/content/api', async (orig) => ({
 const { makeContext, runFeatures } = await import('../src/content/features/runtime');
 await import('../src/content/features');
 const { resetCatalog } = await import('../src/content/catalog');
-const { resetPriceBadges } = await import('../src/content/features/price-badges');
+const { resetPriceBadges, shortCount } = await import('../src/content/features/price-badges');
 const { rankCards, rankTotals, openRanking, closeRanking, EMPTY_FILTER } = await import('../src/content/features/ranking');
 const { createListing, pickCopy, SellError } = await import('../src/content/features/market-sell');
 const { resolveImages, resetWikiImages } = await import('../src/content/wiki-images');
@@ -101,7 +101,7 @@ describe('prix moyen sur les cartes', () => {
     for (let i = 0; i < 5; i++) expect(decodeURIComponent(priceCalls[0].url)).toContain(`"id${i}"`);
     const badges = [...document.querySelectorAll('[data-wiky="avg"]')].map((b) => b.textContent);
     // Les invendues ne comptent pas dans la moyenne, seulement dans le taux de vente.
-    expect(badges).toEqual(['Moy. 12 W100 %', 'Moy. 30 W10 %', 'Moy. —0 %', 'Moy. —', 'Moy. —']);
+    expect(badges).toEqual(['Moy. 12 W100 %(2)', 'Moy. 30 W10 %(10)', 'Moy. —0 %(2)', 'Moy. —', 'Moy. —']);
     const rates = [...document.querySelectorAll('[data-wiky="avg"] .wiky-rate')].map((r) => r.className);
     expect(rates).toEqual(['wiky-rate is-high', 'wiky-rate is-low', 'wiky-rate is-low']);
     expect(decodeURIComponent(priceCalls[0].url)).toContain('status=in.(settled_sold,settled_unsold,cancelled)');
@@ -128,6 +128,10 @@ describe('prix moyen sur les cartes', () => {
     expect(calls.length).toBe(n);
   });
 
+  it('nombre d\'enchères du taux de vente en abrégé', () => {
+    expect([4, 999, 1000, 1234, 9960, 12_400].map(shortCount)).toEqual(['4', '999', '1k', '1,2k', '10k', '12k']);
+  });
+
   it('le prix en cache s\'affiche aussitôt après un nouveau rendu du site', async () => {
     mount(titles);
     stubFetch(() => [{ card_id: 'id0', final_price: 10, status: 'settled_sold' }]);
@@ -136,7 +140,7 @@ describe('prix moyen sur les cartes', () => {
     await flush();
     mount(titles); // React redessine la grille
     runFeatures(ctx);
-    expect(document.querySelector('[data-wiky="avg"]')!.textContent).toBe('Moy. 10 W100 %');
+    expect(document.querySelector('[data-wiky="avg"]')!.textContent).toBe('Moy. 10 W100 %(1)');
   });
 });
 
