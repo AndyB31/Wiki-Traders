@@ -23,6 +23,31 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-19b',
+    title: 'Corrections',
+    sections: [
+      {
+        title: 'Vendre',
+        items: [
+          {
+            title: '« Suivant » en mode meilleures cartes',
+            text: 'Suivant, Précédent et ⏮ changent maintenant les cartes proposées à chaque clic (la fenêtre ne se mettait pas toujours à jour). L\'onglet « Mes ventes » du site suit la même page, et après une mise en vente on revient aux meilleures cartes.',
+            where: 'Fenêtre Vendre, avec la répartition « meilleures cartes, toutes étiquettes ».',
+          },
+        ],
+      },
+      {
+        title: 'Nouveautés',
+        items: [
+          {
+            title: 'Après une mise à jour en arrière-plan',
+            text: 'Si l\'onglet WikiMasters était en arrière-plan pendant la mise à jour, cette fenêtre s\'ouvre dès que tu y reviens.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-19',
     title: 'Taux de vente, ventes plus fines, étiquettes automatiques',
     intro:
