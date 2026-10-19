@@ -1,12 +1,19 @@
 import { computePrice, indexObs, referencePrice, reliableBase, type PriceResult, type PricingContext } from './pricing';
+import { hasRange, ruleStatus } from './conditions';
+import { durationFor } from './duration';
+import { familyIndex, RARITY_ORDER } from './families';
+import { evalFormula } from './formula';
+import { reliableRate, type SellRate } from './sellrate';
 import { normalize, sameTag } from './text';
-import type { Card, MyAuction, StoreShape, TagRule } from './types';
+import type { Card, CardFamily, MyAuction, StoreShape, TagRule } from './types';
 
 export interface Candidate {
   card: Card;
   pricing: PriceResult;
   /** Exemplaires vendables (quantité − garderMin − déjà en vente). */
   sellable: number;
+  /** Score de la formule de l'étiquette (ordre « score »). */
+  score?: number | null;
 }
 
 export interface FreeSlot {
@@ -29,12 +36,22 @@ export interface Exclusions {
   onSale: number;
   /** Bloquées par « garder au moins ». */
   keep: number;
+  /** Taux de vente sous le minimum réglé. */
+  lowRate: number;
+}
+
+/** Tdv fiable sous le minimum (de l'étiquette, sinon global) : la carte n'est pas proposée (elle reste vendable à la main). */
+export function belowMinRate(card: Card, ctx: PricingContext, rule?: TagRule): boolean {
+  const min = rule?.sale ? rule.sale.minSellRate : ctx.settings.minSellRate;
+  if (min == null) return false;
+  const rate = reliableRate(ctx.sellRate?.(card));
+  return !!rate && rate.pct < min;
 }
 
 /** Compte les cartes d'une règle écartées, par motif. */
 export function exclusions(rule: TagRule, ctx: PricingContext, onSale: Map<string, number>): Exclusions {
   const blacklist = new Set(ctx.settings.blacklist.map(normalize));
-  const out: Exclusions = { total: 0, favorite: 0, blacklist: 0, onSale: 0, keep: 0 };
+  const out: Exclusions = { total: 0, favorite: 0, blacklist: 0, onSale: 0, keep: 0, lowRate: 0 };
   for (const card of Object.values(ctx.cards)) {
     if (!cardMatchesRule(card, rule, ctx)) continue;
     out.total++;
@@ -42,6 +59,7 @@ export function exclusions(rule: TagRule, ctx: PricingContext, onSale: Map<strin
     else if (blacklist.has(normalize(card.id)) || blacklist.has(normalize(card.name))) out.blacklist++;
     else if ((onSale.get(card.id) ?? 0) > 0 && !ctx.settings.allowDuplicateListing) out.onSale++;
     else if (card.quantity - rule.keepMin <= 0) out.keep++;
+    else if (belowMinRate(card, ctx, rule)) out.lowRate++;
   }
   return out;
 }
@@ -68,6 +86,10 @@ export type AllocationInput = Pick<
 > & {
   /** Vrai prix moyen d'une carte (cache des prix lus via l'API), prioritaire sur la médiane de la rareté. */
   catalogPrice?: (card: Card) => number | null | undefined;
+  /** Taux de vente d'une carte (même cache) : tdv minimum et paliers de prix. */
+  sellRate?: (card: Card) => SellRate | null | undefined;
+  /** Mes familles (conditions « famille » des règles). */
+  myFamilies?: CardFamily[];
 };
 
 export function isActive(a: MyAuction, now: number): boolean {
@@ -81,6 +103,8 @@ export function makeContext(input: AllocationInput, now: number): PricingContext
     obsByCard: indexObs(input.priceObs),
     manualPrices: input.manualPrices,
     catalogPrice: input.catalogPrice,
+    sellRate: input.sellRate,
+    families: input.myFamilies?.length ? familyIndex(input.myFamilies) : undefined,
     now,
   };
 }
@@ -88,9 +112,8 @@ export function makeContext(input: AllocationInput, now: number): PricingContext
 /** Une carte relève-t-elle de cette règle ? */
 export function cardMatchesRule(card: Card, rule: TagRule, ctx: PricingContext): boolean {
   if (rule.match === 'price') {
-    const v = referencePrice(card, ctx);
-    if (v == null) return false;
-    return (rule.floor == null || v >= rule.floor) && (rule.ceiling == null || v <= rule.ceiling);
+    // Plage de prix et conditions (texte, famille, taux de vente) ; sans plage, le prix n'est pas nécessaire.
+    return ruleStatus(card, rule, hasRange(rule) ? referencePrice(card, ctx) : null, ctx) === 'yes';
   }
   return card.tags.some((t) => sameTag(t, rule.tag));
 }
@@ -133,14 +156,24 @@ export function rankCandidates(
     if (listed > 0 && !settings.allowDuplicateListing) continue;
     const sellable = card.quantity - rule.keepMin - listed;
     if (sellable <= 0) continue;
+    if (belowMinRate(card, ctx, rule)) continue;
     out.push({ card, sellable, pricing: computePrice(card, rule, ctx, peers) });
   }
-  const dir = settings.sortPrice === 'asc' ? 1 : -1;
+  const sort = rule.sale?.sort ?? settings.sortPrice;
+  if (sort === 'score') {
+    // Formule de l'étiquette : le score le plus haut d'abord (score invalide en dernier).
+    for (const c of out) c.score = evalFormula(rule.sale!.score, scoreVars(c, ctx));
+    return out.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity) || a.card.name.localeCompare(b.card.name));
+  }
+  const rateOfCard = (c: Candidate) => reliableRate(ctx.sellRate?.(c.card))?.pct ?? -1;
+  const dir = sort === 'asc' ? 1 : -1;
   out.sort((a, b) => {
     const dup = b.card.quantity - a.card.quantity;
     if (dup) return dup;
     // « Aléatoire » : tirage stable tant que la graine ne change pas (pas de clignotement à chaque rendu).
-    if (settings.sortPrice === 'random') return shuffleRank(a.card.id, settings.randomSeed) - shuffleRank(b.card.id, settings.randomSeed);
+    if (sort === 'random') return shuffleRank(a.card.id, settings.randomSeed) - shuffleRank(b.card.id, settings.randomSeed);
+    // « Meilleur taux de vente » : tdv fiable le plus haut d'abord, puis la plus chère.
+    if (sort === 'rate' && rateOfCard(a) !== rateOfCard(b)) return rateOfCard(b) - rateOfCard(a);
     const pa = a.pricing.price;
     const pb = b.pricing.price;
     if (pa == null && pb == null) return a.card.name.localeCompare(b.card.name);
@@ -149,6 +182,23 @@ export function rankCandidates(
     return (pa - pb) * dir || a.card.name.localeCompare(b.card.name);
   });
   return out;
+}
+
+/** Variables d'une carte pour la formule de score (voir lib/formula.ts). */
+export function scoreVars(c: Candidate, ctx: PricingContext): Record<string, number | null> {
+  const rate = ctx.sellRate?.(c.card) ?? null;
+  return {
+    prix: c.pricing.base.value,
+    prix_conseille: c.pricing.price,
+    tdv: rate?.pct ?? 0,
+    ventes: rate?.sold ?? 0,
+    encheres: rate?.total ?? 0,
+    quantite: c.card.quantity,
+    doublons: Math.max(0, c.card.quantity - 1),
+    vendables: c.sellable,
+    rarete: c.card.rarity ? RARITY_ORDER[c.card.rarity] + 1 : 0,
+    brillante: c.card.shiny ? 1 : 0,
+  };
 }
 
 /** F1–F3 – répartition des slots libres entre les étiquettes. */
@@ -217,15 +267,17 @@ export function adviceForCard(input: AllocationInput, cardId: string, now = Date
  * Prix à proposer pour mettre une carte aux enchères depuis la collection (mode enchère) : le prix de sa règle
  * d'étiquette, ou à défaut son prix moyen (ventes ou prix du site).
  */
-export function sellAdvice(input: AllocationInput, cardId: string, now = Date.now()): { price: number | null; detail: string } {
+export function sellAdvice(input: AllocationInput, cardId: string, now = Date.now()): { price: number | null; detail: string; durationMin: number | null } {
   const advice = adviceForCard(input, cardId, now);
-  if (advice?.pricing.price != null) return { price: advice.pricing.price, detail: `${advice.pricing.detail} · étiquette ${advice.rule.tag}` };
+  if (advice?.pricing.price != null) {
+    return { price: advice.pricing.price, detail: `${advice.pricing.detail} · étiquette ${advice.rule.tag}`, durationMin: advice.pricing.durationMin ?? null };
+  }
   const ctx = makeContext(input, now);
   const card = ctx.cards[cardId];
   const base = card ? reliableBase(card, ctx).value : null;
-  if (base == null) return { price: null, detail: 'Aucun prix connu pour cette carte : saisis-le.' };
+  if (base == null) return { price: null, detail: 'Aucun prix connu pour cette carte : saisis-le.', durationMin: null };
   const price = Math.max(1, Math.round(base));
-  return { price, detail: `prix moyen ${price} (aucune règle d'étiquette pour cette carte)` };
+  return { price, detail: `prix moyen ${price} (aucune règle d'étiquette pour cette carte)`, durationMin: durationFor(price, input.settings.durationRules) };
 }
 
 /** Cartes vendables selon les règles (pour les pastilles sur la collection). */

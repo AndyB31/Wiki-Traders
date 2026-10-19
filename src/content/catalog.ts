@@ -11,6 +11,7 @@ import { catalogPrice } from '../lib/autotag';
 import { ext } from '../lib/browser';
 import { CARD_PRICES_KEY } from '../lib/defaults';
 import { median } from '../lib/pricing';
+import { rateOf, type SellRate } from '../lib/sellrate';
 import type { Card, CatalogCard, Rarity } from '../lib/types';
 import { discoverConfig, get, getAll, inList, readSession } from './api';
 
@@ -346,9 +347,14 @@ export function displayPrice(p: CardPrice | undefined, rarity?: Rarity | null): 
 }
 
 /** Taux de vente en % (null : aucune enchère terminée, ou entrée du cache sans taux). */
-export function sellRateOf(p: CardPrice | undefined): { pct: number; sold: number; total: number } | null {
-  if (!p?.rate?.total) return null;
-  return { ...p.rate, pct: Math.round((p.rate.sold / p.rate.total) * 100) };
+export function sellRateOf(p: CardPrice | undefined): SellRate | null {
+  return rateOf(p);
+}
+
+/** Taux de vente d'une carte de ma collection d'après le cache des prix (null : pas encore lu, ou aucune enchère terminée). */
+export function knownCardRate(card: Card): SellRate | null {
+  void loadPrices();
+  return card.siteId ? rateOf(knownPrice(card.siteId)) : null;
 }
 
 /** Nombre de ventes derrière le prix affiché (même rareté si connue). */

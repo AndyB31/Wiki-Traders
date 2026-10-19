@@ -3,7 +3,8 @@ import './popup.css';
 import { allocate, makeContext, type FreeSlot } from '../lib/allocation';
 import { rarityBase } from '../lib/pricing';
 import { catalogPriceOf, diagnoseAutoTags, planAutoTags, type CatalogPriceEntry } from '../lib/autotag';
-import { durationFor, durationLabel } from '../lib/duration';
+import { sellRateOfCache, type RateEntry } from '../lib/sellrate';
+import { durationLabel } from '../lib/duration';
 import { ext } from '../lib/browser';
 import { CARD_PRICES_KEY, SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
 import type { DiagnosticResult, ToBackground, ToContent } from '../lib/messages';
@@ -63,7 +64,7 @@ async function openProposal(slot: FreeSlot): Promise<void> {
     detail: p.pricing.detail,
     at: Date.now(),
     autoOpen: store.settings.prefill,
-    durationMin: durationFor(p.pricing.price, store.settings.durationRules),
+    durationMin: p.pricing.durationMin ?? null,
   };
   // L'onglet cible est mémorisé : seul lui navigue vers la collection et pré-remplit la vente (V4).
   const tab = await siteTab();
@@ -181,6 +182,7 @@ function whyEmpty(slot: FreeSlot) {
     e.onSale ? `${e.onSale} déjà en vente` : '',
     e.favorite ? `${e.favorite} en favori` : '',
     e.blacklist ? `${e.blacklist} en liste noire` : '',
+    e.lowRate ? `${e.lowRate} sous le taux de vente minimum (${store.settings.minSellRate} %)` : '',
   ].filter(Boolean);
   return h(
     'div',
@@ -259,9 +261,7 @@ function freeSlotView(slot: FreeSlot) {
       'div',
       { class: 'muted small detail' },
       p.pricing.detail,
-      durationFor(p.pricing.price, store.settings.durationRules) != null
-        ? h('span', { class: 'duration' }, ` · durée ${durationLabel(durationFor(p.pricing.price, store.settings.durationRules)!)}`)
-        : null,
+      p.pricing.durationMin != null ? h('span', { class: 'duration' }, ` · durée ${durationLabel(p.pricing.durationMin)}`) : null,
     ),
     p.pricing.base.source === 'rarity' || p.pricing.base.source === 'estimate'
       ? h('div', { class: 'small muted' }, `Prix déduit de la rareté : cette carte n'a pas de vente connue (toutes les cartes ${p.card.rarity ? RARITIES[p.card.rarity].label : ''} sans historique ont ce prix).`)
@@ -821,18 +821,18 @@ async function openAuction(id: string): Promise<void> {
 
 /** Étiquetage automatique : activation, aperçu du plan et lancement sur l'onglet de la collection. */
 /** Prix moyens par carte (cache du content script) : servent à l'étiquetage et au prix conseillé. */
-let catalogPrices: Record<string, CatalogPriceEntry> | null = null;
+let catalogPrices: Record<string, CatalogPriceEntry & RateEntry> | null = null;
 
 /** Entrée du calcul des prix : le stockage, plus le vrai prix moyen des cartes lu via l'API. */
 function pricingInput() {
-  return { ...store, catalogPrice: catalogPriceOf(catalogPrices) };
+  return { ...store, catalogPrice: catalogPriceOf(catalogPrices), sellRate: sellRateOfCache(catalogPrices) };
 }
 let pricesState: 'idle' | 'loading' | 'done' | 'error' = 'idle';
 let pricesError = '';
 
 async function readCatalogPrices(): Promise<void> {
   try {
-    catalogPrices = ((await ext.storage.local.get(CARD_PRICES_KEY))[CARD_PRICES_KEY] as Record<string, CatalogPriceEntry> | undefined) ?? null;
+    catalogPrices = ((await ext.storage.local.get(CARD_PRICES_KEY))[CARD_PRICES_KEY] as Record<string, CatalogPriceEntry & RateEntry> | undefined) ?? null;
   } catch {
     catalogPrices = null;
   }
@@ -862,7 +862,7 @@ function autoTagBlock(onCollection: boolean) {
       'div',
       { class: 'card autotag' },
       h('div', { class: 'row' }, h('strong', { class: 'grow' }, 'Étiquetage auto : désactivé'), h('button', { onclick: enable }, 'Activer…')),
-      h('div', { class: 'small muted' }, 'Range tes cartes dans l\'étiquette dont la plage de prix (plancher–plafond) contient leur prix propre (moyenne du site, ventes de la carte ou prix saisi).'),
+      h('div', { class: 'small muted' }, 'Range tes cartes dans l\'étiquette dont la plage de prix contient leur prix propre (moyenne du site, ventes de la carte ou prix saisi), et ajoute les étiquettes dont les conditions sont remplies (texte dans le nom, famille, taux de vente).'),
     );
   }
   // Prix de toutes les cartes de la collection : chargés une fois à l'ouverture (puis bouton « Rafraîchir les prix »).
@@ -906,7 +906,7 @@ function autoTagBlock(onCollection: boolean) {
   const why = () => {
     const d = diag;
     if (!d.cards) return 'Aucune carte connue : ouvre ta collection.';
-    if (!d.rulesWithRange) return 'Aucune règle n\'a de plage de prix : renseigne un plancher et/ou un plafond dans les réglages (ex. « Mettre au Enchère » : 20 à 1000).';
+    if (!d.rulesWithRange) return 'Aucune règle d\'étiquetage : renseigne une plage de prix (ex. « Mettre au Enchère » : 20 à 1000) ou des conditions (texte, famille, taux de vente) dans les réglages.';
     if (!d.pricedCards) return store.settings.apiRead ? 'Aucune carte n\'a encore de prix : patiente pendant le chargement, ou clique « Rafraîchir les prix ».' : 'Aucune carte n\'a de prix : active la lecture via l\'API (Réglages → Automatisations).';
     return `Les ${d.pricedCards} carte(s) au prix connu sont déjà dans la bonne étiquette.`;
   };

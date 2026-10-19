@@ -193,15 +193,15 @@ function choiceFrom(c: Candidate, tag: string | null, settings: Settings): SaleC
     card: c.card,
     price: c.pricing.price,
     detail: c.pricing.detail,
-    durationMin: durationFor(c.pricing.price, settings.durationRules) ?? 60,
+    durationMin: c.pricing.durationMin ?? durationFor(c.pricing.price, settings.durationRules) ?? 60,
     tag,
     avgPrice: c.pricing.base.value,
   };
 }
 
 function choiceForCard(input: AllocationInput, card: Card, tag: string | null): SaleChoice {
-  const { price, detail } = sellAdvice(input, card.id);
-  return { card, price, detail, durationMin: durationFor(price, input.settings.durationRules) ?? 60, tag, avgPrice: null };
+  const { price, detail, durationMin } = sellAdvice(input, card.id);
+  return { card, price, detail, durationMin: durationMin ?? 60, tag, avgPrice: null };
 }
 
 export interface SaleDeps {

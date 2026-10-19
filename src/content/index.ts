@@ -1,6 +1,7 @@
 import { ext } from '../lib/browser';
 import { catalogPrice, planAutoTags, type TagChange } from '../lib/autotag';
-import { cardPrices, flushPrices, knownCardPrice, knownPrice } from './catalog';
+import { cardPrices, flushPrices, knownCardPrice, knownCardRate, knownPrice } from './catalog';
+import type { SellRate } from '../lib/sellrate';
 import type { DiagnosticResult, ScanMessage, ScannedCard, ToBackground, ToContent } from '../lib/messages';
 // Seules les cartes de la collection sont envoyées comme « possédées » : jamais celles du marché.
 import { load, onStoreChange, save } from '../lib/storage';
@@ -25,7 +26,6 @@ import './features';
 import { bidPollDelay, quickOutbidWithToast } from './features/bid-watch';
 import { featureFlags } from '../lib/features';
 import { sellAdvice } from '../lib/allocation';
-import { durationFor } from '../lib/duration';
 import { auctionIdFromHref, hasEmptyState, parseAuctionDetail, parseAuctionList, type ParsedAuction } from './parsers/auctions';
 import { collectionTiles, parseCollection } from './parsers/collection';
 import { isFavorite, labeledNumber, leafTexts } from './parsers/dom';
@@ -36,6 +36,7 @@ import { re, resolveSelectors, type SelectorConfig } from './parsers/selectors';
 type Store = Pick<StoreShape, 'settings' | 'rules' | 'cards' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots' | 'pendingFocus' | 'intent' | 'families' | 'meta' | 'bidsCache' | 'myFamilies' | 'familiesImportedAt'> & {
   /** Vrai prix moyen des cartes (cache des prix lus via l'API) : prioritaire sur la médiane de la rareté. */
   catalogPrice: (card: Card) => number | null | undefined;
+  sellRate: (card: Card) => SellRate | null;
 };
 
 let store: Store | null = null;
@@ -60,7 +61,7 @@ function log(step: string): void {
 
 async function refreshStore(): Promise<void> {
   const loaded = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'pendingFocus', 'intent', 'families', 'meta', 'bidsCache', 'myFamilies', 'familiesImportedAt');
-  store = { ...loaded, catalogPrice: knownCardPrice };
+  store = { ...loaded, catalogPrice: knownCardPrice, sellRate: knownCardRate };
 }
 
 function toObs(a: ParsedAuction, now: number): PriceObs | null {
@@ -720,8 +721,7 @@ async function sellFromCollection(cardId: string, tile: Element): Promise<void> 
   if (!store || automating) return;
   const cfg = resolveSelectors(store.settings.selectorOverrides);
   const name = store.cards[cardId]?.name ?? tile.querySelector('h3')?.textContent?.trim() ?? cardId;
-  const { price, detail } = sellAdvice(store, cardId);
-  const durationMin = durationFor(price, store.settings.durationRules);
+  const { price, detail, durationMin } = sellAdvice(store, cardId);
   const now = Date.now();
   automating = true;
   // Le toast « prix conseillé » et la fenêtre de vente reprennent ce prix, comme pour une proposition de Wiki-Traders.

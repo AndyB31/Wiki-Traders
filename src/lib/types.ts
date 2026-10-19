@@ -1,6 +1,30 @@
 export type Rarity = 'C' | 'PC' | 'R' | 'SR' | 'UR' | 'L';
 
 /** F1 – règle de répartition pour une étiquette. */
+/** Conditions d'une règle (étiquetage automatique, appartenance « prix dans la plage ») : toutes celles remplies comptent. */
+export interface RuleConditions {
+  /** Mots séparés par des virgules : le nom ou la catégorie de la carte en contient au moins un (sans accents ni majuscules). */
+  text: string;
+  /** Nom d'une de mes familles : la carte doit en faire partie. */
+  family: string;
+  /** Taux de vente (en %) entre ces bornes, à partir de SELL_RATE_MIN_SAMPLES enchères terminées. */
+  rateMin: number | null;
+  rateMax: number | null;
+}
+
+/** Ordre de choix des cartes d'une étiquette. `rate` : meilleur taux de vente d'abord ; `score` : formule. */
+export type CandidateSort = 'desc' | 'asc' | 'random' | 'rate' | 'score';
+
+/** Réglages de vente propres à une étiquette (remplacent les réglages globaux). */
+export interface RuleSale {
+  minSellRate: number | null;
+  sellRateRules: SellRateRule[];
+  durationRules: DurationRule[];
+  sort: CandidateSort;
+  /** Formule de score (ordre `score`) : la plus haute d'abord. */
+  score: string;
+}
+
 export interface TagRule {
   id: string;
   /** Nom de l'étiquette tel qu'affiché sur le site (ex. « 20-50 »). */
@@ -20,6 +44,10 @@ export interface TagRule {
    * (utile si les étiquettes ne sont pas lisibles dans la page).
    */
   match: 'tag' | 'price';
+  /** Conditions en plus de la plage de prix (absentes = aucune). */
+  when?: RuleConditions;
+  /** Réglages de vente propres (absents = réglages globaux). */
+  sale?: RuleSale;
 }
 
 export interface Card {
@@ -87,6 +115,13 @@ export interface DurationRule {
   minutes: number;
 }
 
+/** Palier de taux de vente : tdv entre `from` et `to` % (inclus) → prix conseillé ajusté de `adjust` % (−50 = moitié prix). */
+export interface SellRateRule {
+  from: number | null;
+  to: number | null;
+  adjust: number;
+}
+
 export interface Settings {
   slots: number;
   windowDays: number;
@@ -112,6 +147,10 @@ export interface Settings {
   sellPath: string;
   /** Durée de l'enchère selon le prix de départ (vide = durée par défaut du site). */
   durationRules: DurationRule[];
+  /** Ne pas proposer une carte dont le taux de vente est sous ce % (null = pas de minimum). */
+  minSellRate: number | null;
+  /** Ajustement du prix conseillé selon le taux de vente (vide = aucun). */
+  sellRateRules: SellRateRule[];
   /** Pastilles d'étiquettes sur les cartes de la collection. */
   showTagOverlay: boolean;
   /** `label` : nom de l'étiquette ; `dot` : simple pastille de couleur (nom au survol). */

@@ -1,4 +1,7 @@
 import { MIN_RARITY_SAMPLES, MIN_SALES } from './defaults';
+import { durationFor } from './duration';
+import type { FamilyIndex } from './families';
+import { adjustLabel, rateRuleFor, reliableRate, type SellRate } from './sellrate';
 import { RARITIES } from './text';
 import type { Card, PriceObs, Settings, TagRule } from './types';
 
@@ -16,6 +19,10 @@ export interface BasePrice {
 export interface PriceResult {
   price: number | null;
   base: BasePrice;
+  /** Durée conseillée (minutes) selon les paliers de durée de l'étiquette ou globaux ; null = durée du site. */
+  durationMin?: number | null;
+  /** Ajustement appliqué selon le taux de vente (palier de tdv), en %. */
+  rateAdjust?: { pct: number; adjust: number };
   /** Détail lisible du calcul : « moyenne 86 × 70 % = 60 ». */
   detail: string;
   estimate: boolean;
@@ -33,6 +40,10 @@ export interface PricingContext {
    * undefined = pas encore lu ; null = jamais vendue dans cette rareté (ni prix de tuile ni relevés ne s'y substituent).
    */
   catalogPrice?: (card: Card) => number | null | undefined;
+  /** Taux de vente de la carte (même cache que `catalogPrice`) ; null ou absent : inconnu. */
+  sellRate?: (card: Card) => SellRate | null | undefined;
+  /** Mes familles, indexées (conditions « famille » des règles). */
+  families?: FamilyIndex;
   /** Cache des prix de référence par rareté (rempli à la demande). */
   rarityCache?: Map<string, BasePrice | null>;
 }
@@ -200,14 +211,14 @@ const SOURCE_LABEL: Record<PriceSource, string> = {
 };
 
 /**
- * prix = arrondi(prix de référence × %).
+ * prix = arrondi(prix de référence × % × (1 + ajustement du palier de tdv)).
  * Le plancher et le plafond d'une règle ne bornent PAS ce prix : ils ne servent qu'à classer les cartes
  * (étiquetage automatique, règles « plage de prix »).
  */
 export function computePrice(card: Card, rule: TagRule, ctx: PricingContext, peers: Card[] = []): PriceResult {
   const base = basePrice(card, ctx, peers);
   if (base.value == null) {
-    return { price: null, base, detail: 'aucune donnée de prix : saisis un prix', estimate: false };
+    return { price: null, base, detail: 'aucune donnée de prix : saisis un prix', estimate: false, durationMin: null };
   }
   const statLabel = ctx.settings.stat === 'median' ? 'médiane' : 'moyenne';
   const label =
@@ -215,8 +226,15 @@ export function computePrice(card: Card, rule: TagRule, ctx: PricingContext, pee
     base.source === 'history' ? statLabel :
     base.source === 'estimate' && base.group ? `estimation ${base.group}` :
     SOURCE_LABEL[base.source];
-  const price = roundTo((base.value * rule.pct) / 100, ctx.settings.rounding);
+  // Palier de taux de vente : seulement si le tdv porte sur assez d'enchères (sinon 1 vente sur 1 = 100 %).
+  const tiers = rule.sale?.sellRateRules ?? ctx.settings.sellRateRules;
+  const rate = tiers.length ? reliableRate(ctx.sellRate?.(card)) : null;
+  const tier = rate ? rateRuleFor(rate.pct, tiers) : null;
+  const adjust = tier?.adjust ?? 0;
+  const price = roundTo(((base.value * rule.pct) / 100) * (1 + adjust / 100), ctx.settings.rounding);
   const samples = base.source === 'history' || base.source === 'rarity' ? ` (${base.samples} ventes)` : base.group ? ` (${base.samples})` : '';
-  const detail = `${label} ${Math.round(base.value)}${samples} × ${rule.pct} % = ${price}`;
-  return { price, base, detail, estimate: base.source === 'estimate' };
+  const rateText = rate && adjust ? ` ${adjustLabel(adjust)} (tdv ${rate.pct} %)` : '';
+  const detail = `${label} ${Math.round(base.value)}${samples} × ${rule.pct} %${rateText} = ${price}`;
+  const durationMin = durationFor(price, rule.sale?.durationRules ?? ctx.settings.durationRules);
+  return { price, base, detail, estimate: base.source === 'estimate', durationMin, ...(rate && adjust ? { rateAdjust: { pct: rate.pct, adjust } } : {}) };
 }

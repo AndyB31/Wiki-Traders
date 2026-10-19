@@ -1,4 +1,5 @@
 import { makeContext, type AllocationInput } from './allocation';
+import { hasConditions, isAutoTagRule, ruleStatus, type Tri } from './conditions';
 import { ownPrice } from './pricing';
 import { sameTag } from './text';
 import type { Card, Rarity, TagRule } from './types';
@@ -32,16 +33,19 @@ export interface TagChange {
   cardName: string;
   /** Prix propre à la carte ayant servi au classement (null : carte sans prix connu). */
   base: number | null;
-  /** Étiquette visée ; '' = aucune (prix hors de toutes les plages, ou carte sans prix connu). */
+  /** Étiquettes visées, séparées par des virgules ; '' = aucune (prix hors de toutes les plages, aucune condition remplie). */
   target: string;
   add: string[];
   remove: string[];
 }
 
-/** Règle dont la plage plancher–plafond contient le prix moyen (la plus étroite si plusieurs). */
+/**
+ * Règle de plage de prix seule (sans condition) qui contient le prix moyen, la plus étroite si plusieurs :
+ * une carte n'a qu'une plage de prix.
+ */
 export function ruleForPrice(rules: TagRule[], price: number): TagRule | null {
   const fits = rules.filter(
-    (r) => r.active && (r.floor != null || r.ceiling != null) && (r.floor == null || price >= r.floor) && (r.ceiling == null || price <= r.ceiling),
+    (r) => r.active && !hasConditions(r) && (r.floor != null || r.ceiling != null) && (r.floor == null || price >= r.floor) && (r.ceiling == null || price <= r.ceiling),
   );
   const width = (r: TagRule) => (r.ceiling ?? Infinity) - (r.floor ?? 0);
   return fits.sort((a, b) => width(a) - width(b))[0] ?? null;
@@ -60,42 +64,46 @@ export interface AutoTagOptions {
 }
 
 /**
- * Étiquetage automatique : chaque carte au prix PROPRE connu (moyenne du site, ses ventes, prix saisi)
- * reçoit l'étiquette dont la plage contient ce prix. La médiane de la rareté n'est jamais utilisée
- * (sinon toute une rareté tomberait dans la même plage). Les favoris sont ignorés.
+ * Étiquetage automatique. Deux sortes de règles :
+ *  - plage de prix seule : la carte reçoit l'étiquette dont la plage contient son prix PROPRE (moyenne du site, ses
+ *    ventes, prix saisi), une seule (la plus étroite) ; la médiane de la rareté n'est jamais utilisée ;
+ *  - avec des conditions (texte dans le nom, famille, taux de vente, et la plage si elle est remplie) : chaque règle
+ *    remplie ajoute son étiquette, indépendamment des autres (« Pays », « Films »…).
+ * Une étiquette n'est retirée que si sa règle répond non (jamais sur un prix ou un taux de vente inconnu, sauf
+ * l'option « cartes sans prix »). Les favoris sont ignorés.
  */
 export function planAutoTags(input: AllocationInput, opts: AutoTagOptions | boolean, now = Date.now()): TagChange[] {
   const { removeOthers, clearUnpriced = false, extraPrice } = typeof opts === 'boolean' ? { removeOthers: opts } : opts;
   const ctx = makeContext(input, now);
-  const ruleTags = input.rules.filter((r) => r.active && (r.floor != null || r.ceiling != null)).map((r) => r.tag);
-  const managed = (card: { tags: string[] }) => ruleTags.filter((t) => card.tags.some((c) => sameTag(c, t)));
+  const autoRules = input.rules.filter(isAutoTagRule);
+  const priceOnly = autoRules.filter((r) => !hasConditions(r));
+  const withConditions = autoRules.filter(hasConditions);
   const out: TagChange[] = [];
   for (const card of Object.values(input.cards)) {
     // Les favoris ne sont jamais réétiquetés.
     if (card.quantity < 1 || card.favorite) continue;
     const base = ownPrice(card, ctx) ?? extraPrice?.(card) ?? null;
-    if (base == null) {
-      const remove = clearUnpriced ? managed(card) : [];
-      if (remove.length) out.push({ cardId: card.id, cardName: card.name, base: null, target: '', add: [], remove });
-      continue;
-    }
-    const rule = ruleForPrice(input.rules, base);
-    if (!rule) {
-      // Prix hors de toutes les plages : on retire les étiquettes de plage restantes.
-      const remove = removeOthers ? managed(card) : [];
-      if (remove.length) out.push({ cardId: card.id, cardName: card.name, base, target: '', add: [], remove });
-      continue;
-    }
-    const add = card.tags.some((t) => sameTag(t, rule.tag)) ? [] : [rule.tag];
-    const remove = removeOthers ? managed(card).filter((t) => !sameTag(t, rule.tag)) : [];
-    if (add.length || remove.length) out.push({ cardId: card.id, cardName: card.name, base, target: rule.tag, add, remove });
+    const winner = base != null ? ruleForPrice(priceOnly, base) : null;
+    const status = new Map<TagRule, Tri>();
+    for (const r of priceOnly) status.set(r, base == null ? 'unknown' : r === winner ? 'yes' : 'no');
+    for (const r of withConditions) status.set(r, ruleStatus(card, r, base, ctx));
+    const targets = autoRules.filter((r) => status.get(r) === 'yes').map((r) => r.tag);
+    const add = targets.filter((t) => !card.tags.some((c) => sameTag(c, t)));
+    const remove = autoRules
+      .filter((r) => {
+        const s = status.get(r);
+        return (removeOthers && s === 'no') || (clearUnpriced && s === 'unknown' && base == null);
+      })
+      .map((r) => r.tag)
+      .filter((t) => card.tags.some((c) => sameTag(c, t)) && !targets.some((x) => sameTag(x, t)));
+    if (add.length || remove.length) out.push({ cardId: card.id, cardName: card.name, base, target: targets.join(', '), add, remove });
   }
   return out.sort((a, b) => a.cardName.localeCompare(b.cardName));
 }
 
 export interface AutoTagDiagnosis {
   cards: number;
-  /** Règles actives avec un plancher et/ou un plafond. */
+  /** Règles actives d'étiquetage automatique (plage de prix ou conditions). */
   rulesWithRange: number;
   /** Cartes dont le prix de référence est connu. */
   pricedCards: number;
@@ -110,7 +118,7 @@ export function diagnoseAutoTags(input: AllocationInput, now = Date.now(), extra
   const priced = cards.filter((c) => (ownPrice(c, ctx) ?? extraPrice?.(c) ?? null) != null).length;
   return {
     cards: Object.keys(input.cards).length,
-    rulesWithRange: input.rules.filter((r) => r.active && (r.floor != null || r.ceiling != null)).length,
+    rulesWithRange: input.rules.filter(isAutoTagRule).length,
     pricedCards: priced,
     unpricedCards: cards.length - priced,
   };

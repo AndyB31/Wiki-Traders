@@ -39,7 +39,9 @@ function nativeCard(title: string, rarity = 'r', img = `/_next/image?url=%2Fcard
     <img alt="" src="/rare.png"><div class="absolute inset-0 bg-gradient-to-b"></div>
     <div class="absolute top-0 left-0 right-0 h-[45%] z-20"><div class="relative h-full w-full"><img alt="${title}" src="${img}"></div></div>
     <div class="absolute top-2 left-2">${rarity.toUpperCase()}</div>
-    <div class="absolute top-[45%] left-0 right-0 bottom-0 flex flex-col p-3"><h3>${title}</h3><p>catégorie</p></div>
+    <div class="absolute top-[45%] left-0 right-0 bottom-0 flex flex-col p-3"><h3>${title}</h3><p>catégorie</p>
+      <div class="mt-auto flex w-full flex-col items-start gap-0.5 pt-1"><div class="flex w-full shrink-0 flex-wrap gap-0.5 pb-0.5"><span class="inline-block rounded-full border px-2">Collection</span></div>
+      <div class="flex w-full items-center border-t"><div class="text-[10px] flex"><svg class="lucide lucide-swords"></svg><span>9</span></div><div class="text-[10px] flex"><svg class="lucide lucide-shield"></svg><span>6</span></div></div></div></div>
   </div></div>`;
 }
 
@@ -101,7 +103,11 @@ describe('prix moyen sur les cartes', () => {
     for (let i = 0; i < 5; i++) expect(decodeURIComponent(priceCalls[0].url)).toContain(`"id${i}"`);
     const badges = [...document.querySelectorAll('[data-wiky="avg"]')].map((b) => b.textContent);
     // Les invendues ne comptent pas dans la moyenne, seulement dans le taux de vente.
-    expect(badges).toEqual(['Moy. 12 W100 %(2)', 'Moy. 30 W10 %(10)', 'Moy. —0 %(2)', 'Moy. —', 'Moy. —']);
+    expect(badges).toEqual(['Moy. 12 W100 %', 'Moy. 30 W10 %', 'Moy. —0 %', 'Moy. —', 'Moy. —']);
+    // Ventes / enchères terminées en bas de la carte, au-dessus des étiquettes du site.
+    const counts = [...document.querySelectorAll('[data-wiky="avg-count"]')];
+    expect(counts.map((c) => c.textContent)).toEqual(['2 / 2 vendues', '1 / 10 vendue', '0 / 2 vendue']);
+    expect(counts.every((c) => c.parentElement!.classList.contains('mt-auto') && c.parentElement!.firstElementChild === c)).toBe(true);
     const rates = [...document.querySelectorAll('[data-wiky="avg"] .wiky-rate')].map((r) => r.className);
     expect(rates).toEqual(['wiky-rate is-high', 'wiky-rate is-low', 'wiky-rate is-low']);
     expect(decodeURIComponent(priceCalls[0].url)).toContain('status=in.(settled_sold,settled_unsold,cancelled)');
@@ -128,6 +134,19 @@ describe('prix moyen sur les cartes', () => {
     expect(calls.length).toBe(n);
   });
 
+  it('« Masquer les étiquettes du site » cache la ligne des étiquettes, pas ATK / DEF', () => {
+    mount(titles);
+    runFeatures(ctxWith(['hideCardTags'], cards));
+    expect(document.documentElement.hasAttribute('data-wiky-hide-tags')).toBe(true);
+    const css = document.getElementById('wiky-hide-tags-style')!.textContent!;
+    const selector = css.slice(0, css.indexOf('{')).trim().replace('html[data-wiky-hide-tags] ', '');
+    const hidden = [...document.querySelectorAll(selector)];
+    expect(hidden).toHaveLength(titles.length);
+    expect(hidden.every((el) => el.textContent === 'Collection')).toBe(true);
+    runFeatures(ctxWith([], cards));
+    expect(document.documentElement.hasAttribute('data-wiky-hide-tags')).toBe(false);
+  });
+
   it('nombre d\'enchères du taux de vente en abrégé', () => {
     expect([4, 999, 1000, 1234, 9960, 12_400].map(shortCount)).toEqual(['4', '999', '1k', '1,2k', '10k', '12k']);
   });
@@ -140,7 +159,8 @@ describe('prix moyen sur les cartes', () => {
     await flush();
     mount(titles); // React redessine la grille
     runFeatures(ctx);
-    expect(document.querySelector('[data-wiky="avg"]')!.textContent).toBe('Moy. 10 W100 %(1)');
+    expect(document.querySelector('[data-wiky="avg"]')!.textContent).toBe('Moy. 10 W100 %');
+    expect(document.querySelector('[data-wiky="avg-count"]')!.textContent).toBe('1 / 1 vendue');
   });
 });
 

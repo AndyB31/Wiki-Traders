@@ -3,8 +3,10 @@
 # Prix conseillé
 
 ```
-prix conseillé = arrondi(prix de référence × % de l'étiquette)
+prix conseillé = arrondi(prix de référence × % de l'étiquette × ajustement selon le taux de vente)
 ```
+
+L'ajustement selon le taux de vente est facultatif : sans palier réglé, il vaut 1 (voir [Le taux de vente](#le-taux-de-vente)).
 
 ## Le prix de référence
 
@@ -30,6 +32,42 @@ Le bilan (ventes par rareté, dernier chargement) est dans **Outils**.
 ## Le pourcentage
 
 Chaque règle d'étiquette a son % (70 % par défaut). Vendre un peu sous la référence part plus vite ; le [journal](Mises-et-ventes.md#journal) montre la part des ventes parties au prix de départ et conseille d'ajuster.
+
+## Le taux de vente
+
+Le **taux de vente (tdv)** d'une carte est la part de ses enchères terminées qui ont trouvé un acheteur (vendues ÷ vendues + sans acheteur + annulées). Il s'affiche sur les cartes de la collection, à côté du prix : « Moy. 12 W · 85 % », avec en bas de la carte « 17 / 20 vendues ». Il ne sert au calcul qu'à partir de **5 enchères terminées**.
+
+Réglages → **Taux de vente** :
+
+- **Taux de vente minimum** : une carte sous ce taux n'est plus proposée pour remplir un slot (le slot vide l'indique). Tu peux toujours la vendre à la main.
+- **Prix selon le taux de vente** : des paliers qui ajustent le prix conseillé. Par exemple, la proposition par défaut donne :
+
+| Tdv | Prix |
+| --- | --- |
+| 80 % et + | +30 % |
+| 50–79 % | inchangé |
+| 20–49 % | −20 % |
+| moins de 20 % | −50 % |
+
+Le détail du prix l'indique : « moyenne 40 × 70 % −50 % (tdv 10 %) = 14 ».
+
+## Réglages par étiquette et formule de score
+
+Dans le panneau **Conditions et vente** d'une règle, la case **Réglages de vente propres à cette étiquette** remplace, pour elle seule, le taux de vente minimum, les paliers de prix selon le tdv, les paliers de durée et l'**ordre de choix** des cartes :
+
+| Ordre | Carte proposée en premier |
+| --- | --- |
+| la plus chère / la moins chère / au hasard | après les doublons, comme le réglage global |
+| meilleur taux de vente | après les doublons, le tdv le plus haut (fiable) |
+| formule de score | le score le plus haut |
+
+La **formule de score** utilise des variables entre accolades : `{prix}`, `{prix_conseille}`, `{tdv}` (0 si inconnu), `{ventes}`, `{encheres}`, `{quantite}`, `{doublons}`, `{vendables}`, `{rarete}` (1 à 6), `{brillante}` (0 ou 1). Opérations `+ − * / % ^`, comparaisons (vrai = 1), `&& || !`, fonctions `min`, `max`, `abs`, `arrondi`, `plancher`, `plafond`, `racine`, `log`, `si(condition, alors, sinon)`.
+
+```
+si({tdv} < 20, 0, {prix} * {tdv} / 100 + {doublons} * 10)
+```
+
+La formule est vérifiée pendant la saisie ; une formule invalide bloque l'enregistrement.
 
 ## L'arrondi
 

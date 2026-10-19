@@ -5,7 +5,9 @@
 import { quotaSum } from '../lib/allocation';
 import { durationLabel, overlappingDurations } from '../lib/duration';
 import { roundTo } from '../lib/pricing';
-import type { DurationRule, Settings, TagRule } from '../lib/types';
+import { formulaError } from '../lib/formula';
+import { overlappingRateRules } from '../lib/sellrate';
+import type { DurationRule, SellRateRule, Settings, TagRule } from '../lib/types';
 
 /** Prix moyen pris pour illustrer le % d'une étiquette. */
 export const EXAMPLE_PRICE = 40;
@@ -122,13 +124,71 @@ export function nextTier(rules: DurationRule[]): DurationRule {
 // Validation
 // ---------------------------------------------------------------------------
 
-export type OptionsSection = 'rules' | 'pricing' | 'durations' | 'advanced';
+export type OptionsSection = 'rules' | 'pricing' | 'durations' | 'sellRate' | 'advanced';
 
 export interface ValidationError {
   section: OptionsSection;
   /** Champs concernés : « slots », « rule:<id>:tag », « dur:<i>:from »… */
   keys: string[];
   message: string;
+}
+
+/** Paliers de durée : « de » > « à », chevauchements. `prefix` : préfixe des champs (« » global, « rule:<id>: » par étiquette). */
+function durationErrors(rows: DurationRule[], section: OptionsSection, prefix: string, label: string): ValidationError[] {
+  const errors: ValidationError[] = [];
+  for (const [i, d] of rows.entries()) {
+    if (d.from != null && d.to != null && d.from > d.to) {
+      errors.push({ section, keys: [`${prefix}dur:${i}:from`, `${prefix}dur:${i}:to`], message: `${label}Palier de durée ${i + 1} : « de » dépasse « à ».` });
+    }
+  }
+  const overlap = overlappingDurations(rows);
+  if (overlap) {
+    errors.push({ section, keys: overlap.flatMap((i) => [`${prefix}dur:${i}:from`, `${prefix}dur:${i}:to`]), message: `${label}Les paliers de durée ${overlap[0] + 1} et ${overlap[1] + 1} se chevauchent.` });
+  }
+  return errors;
+}
+
+/** Paliers de taux de vente et tdv minimum. */
+function rateErrors(min: number | null, rows: SellRateRule[], section: OptionsSection, prefix: string, label: string): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (min != null && (min < 0 || min > 100)) errors.push({ section, keys: [`${prefix}minSellRate`], message: `${label}Le taux de vente minimum doit être entre 0 et 100 %.` });
+  for (const [i, r] of rows.entries()) {
+    if (r.from != null && r.to != null && r.from > r.to) {
+      errors.push({ section, keys: [`${prefix}tdv:${i}:from`, `${prefix}tdv:${i}:to`], message: `${label}Palier de taux de vente ${i + 1} : « de » dépasse « à ».` });
+    }
+    if (!(r.adjust > -100)) errors.push({ section, keys: [`${prefix}tdv:${i}:adjust`], message: `${label}Palier de taux de vente ${i + 1} : l'ajustement doit être au-dessus de −100 %.` });
+  }
+  const overlap = overlappingRateRules(rows);
+  if (overlap) {
+    errors.push({ section, keys: overlap.flatMap((i) => [`${prefix}tdv:${i}:from`, `${prefix}tdv:${i}:to`]), message: `${label}Les paliers de taux de vente ${overlap[0] + 1} et ${overlap[1] + 1} se chevauchent.` });
+  }
+  return errors;
+}
+
+/** Conditions et réglages de vente propres à une étiquette. */
+function ruleExtraErrors(r: TagRule): ValidationError[] {
+  const label = `« ${r.tag.trim() || 'sans nom'} » : `;
+  const prefix = `rule:${r.id}:`;
+  const errors: ValidationError[] = [];
+  const w = r.when;
+  if (w) {
+    for (const k of ['rateMin', 'rateMax'] as const) {
+      const v = w[k];
+      if (v != null && (v < 0 || v > 100)) errors.push({ section: 'rules', keys: [`${prefix}${k}`], message: `${label}le taux de vente des conditions doit être entre 0 et 100 %.` });
+    }
+    if (w.rateMin != null && w.rateMax != null && w.rateMin > w.rateMax) {
+      errors.push({ section: 'rules', keys: [`${prefix}rateMin`, `${prefix}rateMax`], message: `${label}taux de vente : « de » dépasse « à ».` });
+    }
+  }
+  const s = r.sale;
+  if (s) {
+    errors.push(...rateErrors(s.minSellRate, s.sellRateRules, 'rules', prefix, label), ...durationErrors(s.durationRules, 'rules', prefix, label));
+    if (s.sort === 'score') {
+      const err = s.score.trim() ? formulaError(s.score) : 'formule vide';
+      if (err) errors.push({ section: 'rules', keys: [`${prefix}score`], message: `${label}formule de score : ${err}.` });
+    }
+  }
+  return errors;
 }
 
 /** Toutes les erreurs (l'enregistrement est bloqué tant qu'il en reste). */
@@ -158,20 +218,10 @@ export function validateOptions(rules: TagRule[], settings: Settings, extra: { s
       errors.push({ section: 'rules', keys: [`rule:${r.id}:floor`, `rule:${r.id}:ceiling`], message: `« ${r.tag} » : le plancher dépasse le plafond.` });
     }
     if (!(r.pct > 0)) errors.push({ section: 'rules', keys: [`rule:${r.id}:pct`], message: `« ${r.tag} » : le % doit être positif.` });
+    errors.push(...ruleExtraErrors(r));
   }
-  for (const [i, d] of settings.durationRules.entries()) {
-    if (d.from != null && d.to != null && d.from > d.to) {
-      errors.push({ section: 'durations', keys: [`dur:${i}:from`, `dur:${i}:to`], message: `Palier de durée ${i + 1} : « de » dépasse « à ».` });
-    }
-  }
-  const overlap = overlappingDurations(settings.durationRules);
-  if (overlap) {
-    errors.push({
-      section: 'durations',
-      keys: overlap.flatMap((i) => [`dur:${i}:from`, `dur:${i}:to`]),
-      message: `Les paliers de durée ${overlap[0] + 1} et ${overlap[1] + 1} se chevauchent.`,
-    });
-  }
+  errors.push(...durationErrors(settings.durationRules, 'durations', '', ''));
+  errors.push(...rateErrors(settings.minSellRate, settings.sellRateRules, 'sellRate', '', ''));
   if (extra.selectorsInvalid) errors.push({ section: 'advanced', keys: ['selectors'], message: 'JSON des sélecteurs invalide.' });
   return errors;
 }

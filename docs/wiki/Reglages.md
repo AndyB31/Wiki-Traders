@@ -15,6 +15,7 @@ Réglages : **Paramètres → onglet Wiki-Traders** sur le site, ou page d'optio
 | Garder | 1 | Exemplaires jamais proposés |
 | Appartenance | étiquette du site | Ou plage de prix moyen |
 | Active | oui | |
+| Conditions et vente | aucune / réglages globaux | Panneau sous la règle : conditions d'étiquetage (texte, famille, taux de vente) et réglages de vente propres (tdv minimum, ordre de choix ou formule de score, paliers de prix et de durée). Voir [Étiquettes](Etiquettes.md#conditions-et-vente-par-étiquette) |
 
 ## Prix et notifications
 
@@ -44,6 +45,15 @@ Une case par fonctionnalité, par groupe (collection et familles, affichage des 
 ## Durée des enchères
 
 Paliers **De – À → Durée** (10 min, 30 min, 1 h, 3 h, 6 h, 12 h). Le premier palier qui contient le prix l'emporte ; sans palier, la durée du site (1 h). Les paliers qui se chevauchent sont signalés.
+
+## Taux de vente
+
+| Réglage | Par défaut | Effet |
+| --- | --- | --- |
+| Taux de vente minimum | aucun | Une carte sous ce % n'est plus proposée pour un slot (à partir de 5 enchères terminées) |
+| Prix selon le taux de vente | aucun palier | Paliers **Tdv de – à % → prix ± %** ; « Proposition par défaut » : 80 %+ → +30 %, 50–79 → inchangé, 20–49 → −20 %, < 20 → −50 % |
+
+Voir [Prix conseillé](Prix-conseille.md#le-taux-de-vente).
 
 ## Liste noire
 

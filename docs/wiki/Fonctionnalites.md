@@ -14,7 +14,7 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 | --- | --- | --- |
 | [Familles](Familles.md) (API) | oui | Familles de cartes, progression, ajout par sélection multiple, marché des manquantes |
 | Familles sur les cartes | oui | Pastilles de famille sur les cartes |
-| Prix moyen sur les cartes (API) | oui | « Moy. 12 W · 85 % (20) » sous le titre de chaque carte de la collection et de « Toutes les cartes » : prix moyen, taux de vente (rouge ≤ 15 %, vert ≥ 70 %) et nombre d'enchères terminées sur lequel il porte, avec légende |
+| Prix moyen sur les cartes (API) | oui | « Moy. 12 W · 85 % » sous le titre de chaque carte de la collection et de « Toutes les cartes » (prix moyen, taux de vente rouge ≤ 15 %, vert ≥ 70 %), et « 17 / 20 vendues » en bas de la carte, au-dessus des étiquettes du site ; avec légende |
 | Classement « Plus chères » (API) | oui | Bouton à côté du titre de la collection : ta collection triée par prix, filtres (recherche, rareté, étiquette, favoris), valeur totale |
 | Mode compact | oui | Bouton « Compact » : cartes plus petites, plus de cartes à l'écran |
 
@@ -26,6 +26,7 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 | Bouton Wikipédia | oui | « W » sur chaque carte vers son article |
 | Images manquantes | oui | Image trouvée sur Wikipédia (50 cartes par requête) ou Wikidata, mise en cache |
 | Masquer ATK / DEF | non | Cache les statistiques des cartes |
+| Masquer les étiquettes du site | non | Cache les étiquettes en bas des cartes ; celles de Wiki-Traders restent en haut de l'image (option *Étiquettes visibles sur les cartes*) |
 | Copier la carte en image | oui | Bouton « Copier » dans la fiche d'une carte (PNG ; téléchargé si le presse-papiers refuse) |
 
 ## Marché et enchères
