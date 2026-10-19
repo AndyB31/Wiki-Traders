@@ -1,6 +1,6 @@
 /**
- * Mise aux enchères d'une carte par l'API du site (fonctionnalité « Vendre depuis le classement », risquée,
- * désactivée par défaut). Même requête que la fenêtre « Mettre aux enchères » du site et que « Prix moyen collection » :
+ * Mise aux enchères d'une carte par l'API du site (fonctionnalités « Vendre depuis le classement » et « Vendre depuis
+ * les ventes conseillées », risquées, désactivées par défaut). Même requête que la fenêtre « Mettre aux enchères » du site et que « Prix moyen collection » :
  *   POST /api/marketplace { card_id: <exemplaire possédé>, base_amount, duration_minutes }
  * `card_id` est l'identifiant de MON exemplaire (user_cards.id), pas celui de la carte du catalogue :
  * on prend un exemplaire qui n'est pas déjà en vente, en gardant les favoris pour la fin.
@@ -61,9 +61,18 @@ export interface ListingRequest {
   allowStarred?: boolean;
 }
 
-/** Envoie la mise en vente. Refuse tout si la fonctionnalité n'est pas activée. */
-export async function createListing(flags: Pick<FeatureFlags, 'rankingSell'>, req: ListingRequest): Promise<unknown> {
-  if (!flags.rankingSell) throw new SellError('La vente depuis le classement est désactivée (Réglages → Fonctionnalités).', 'DISABLED');
+const SELL_FEATURES = {
+  rankingSell: 'La vente depuis le classement',
+  popupSell: 'La vente depuis les ventes conseillées',
+} as const;
+
+/** Envoie la mise en vente. Refuse tout si la fonctionnalité d'où vient la demande n'est pas activée. */
+export async function createListing(
+  flags: Partial<Pick<FeatureFlags, keyof typeof SELL_FEATURES>>,
+  req: ListingRequest,
+  via: keyof typeof SELL_FEATURES = 'rankingSell',
+): Promise<unknown> {
+  if (!flags[via]) throw new SellError(`${SELL_FEATURES[via]} est désactivée (Réglages → Fonctionnalités).`, 'DISABLED');
   const amount = Math.round(Number(req.amount));
   const duration = Math.round(Number(req.durationMinutes));
   if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(duration) || duration <= 0) throw new SellError('Prix ou durée invalide.', 'INVALID');

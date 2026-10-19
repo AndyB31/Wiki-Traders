@@ -8,7 +8,8 @@ import { formatPrice, RARITIES } from '../lib/text';
 import { conditionsSummary, EMPTY_CONDITIONS } from '../lib/conditions';
 import { FORMULA_VARS, formulaError } from '../lib/formula';
 import { adjustLabel, DEFAULT_RATE_TIERS, SELL_RATE_MIN_SAMPLES } from '../lib/sellrate';
-import type { CandidateSort, DurationRule, SellRateRule, Settings, StoreShape, TagRule } from '../lib/types';
+import { DEFAULT_CRITERIA, SORT_KEYS } from '../lib/sorting';
+import type { CandidateSort, DurationRule, SellRateRule, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { updatePanel } from './update-panel';
@@ -59,6 +60,7 @@ const ui = {
   rules: null as unknown as HTMLElement,
   durations: null as unknown as HTMLElement,
   rateTiers: null as unknown as HTMLElement,
+  criteria: null as unknown as HTMLElement,
   tiers: null as unknown as HTMLElement,
   manual: null as unknown as HTMLElement,
   rounding: null as unknown as HTMLElement,
@@ -344,8 +346,59 @@ const SORT_LABELS: Record<CandidateSort, string> = {
   asc: 'doublons, puis la moins chère (écouler)',
   random: 'doublons, puis au hasard',
   rate: 'doublons, puis meilleur taux de vente',
+  custom: 'selon mes critères (tri multi-critères)',
   score: 'formule de score (avancé)',
 };
+
+/**
+ * Éditeur de critères de tri : chaque ligne départage les égalités de la précédente (ex. prix ↓, puis tdv ↓,
+ * puis nombre de ventes ↓). `prefix` : préfixe des champs pour les erreurs.
+ */
+function criteriaEditor(list: SortCriterion[], prefix: string): HTMLElement {
+  const box = h('div', { class: 'criteria' });
+  const draw = () =>
+    mount(
+      box,
+      h(
+        'ol',
+        { class: 'tiers' },
+        list.map((c, i) =>
+          h(
+            'li',
+            { class: 'row tier' },
+            h('span', { class: 'muted small tier-num' }, i === 0 ? 'D\'abord' : 'puis'),
+            reg(
+              `${prefix}sort:${i}:key`,
+              h(
+                'select',
+                { 'aria-label': `Critère ${i + 1}`, onchange: (e: Event) => ((list[i] = { ...list[i], key: (e.target as HTMLSelectElement).value as SortKey }), draw(), onEdit()) },
+                SORT_KEYS.map((k) => h('option', { value: k.key, selected: k.key === c.key, title: k.help }, k.label)),
+              ),
+            ),
+            c.key === 'hasard'
+              ? null
+              : h(
+                  'select',
+                  { 'aria-label': `Sens du critère ${i + 1}`, onchange: (e: Event) => ((list[i] = { ...list[i], dir: (e.target as HTMLSelectElement).value as SortCriterion['dir'] }), onEdit()) },
+                  h('option', { value: 'desc', selected: c.dir === 'desc' }, 'le plus haut d\'abord ↓'),
+                  h('option', { value: 'asc', selected: c.dir === 'asc' }, 'le plus bas d\'abord ↑'),
+                ),
+            h('button', { type: 'button', class: 'small', title: 'Monter', disabled: i === 0, onclick: () => (list.splice(i - 1, 0, ...list.splice(i, 1)), draw(), onEdit()) }, '▲'),
+            h('button', { type: 'button', class: 'small', title: 'Descendre', disabled: i === list.length - 1, onclick: () => (list.splice(i + 1, 0, ...list.splice(i, 1)), draw(), onEdit()) }, '▼'),
+            h('button', { type: 'button', class: 'danger', title: 'Retirer ce critère', disabled: list.length === 1, onclick: () => (list.splice(i, 1), draw(), onEdit()) }, '✕'),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        { class: 'row wrap', style: 'margin-top:8px' },
+        h('button', { type: 'button', onclick: () => (list.push({ key: SORT_KEYS.find((k) => !list.some((c) => c.key === k.key))?.key ?? 'prix', dir: 'desc' }), draw(), onEdit()) }, '+ Ajouter un critère'),
+        h('span', { class: 'muted small' }, 'Une valeur inconnue (taux de vente pas encore lu, moins de 5 enchères) passe toujours en dernier.'),
+      ),
+    );
+  draw();
+  return box;
+}
 
 /** Réglages de vente propres à une étiquette (activés par la case, copiés des réglages globaux). */
 function ruleSaleBox(rule: TagRule): HTMLElement {
@@ -363,6 +416,7 @@ function ruleSaleBox(rule: TagRule): HTMLElement {
             sellRateRules: settings.sellRateRules.map((t) => ({ ...t })),
             durationRules: settings.durationRules.map((t) => ({ ...t })),
             sort: settings.sortPrice,
+            sortCriteria: (settings.sortCriteria.length ? settings.sortCriteria : DEFAULT_CRITERIA).map((c) => ({ ...c })),
             score: '{prix} * {tdv} / 100 + {doublons} * 10',
           };
         } else delete rule.sale;
@@ -427,6 +481,7 @@ function ruleSaleBox(rule: TagRule): HTMLElement {
           'Quelle carte de l\'étiquette est proposée en premier pour un slot libre.',
         ),
       ),
+      s.sort === 'custom' ? criteriaEditor((s.sortCriteria ??= DEFAULT_CRITERIA.map((c) => ({ ...c }))), prefix) : null,
       s.sort === 'score'
         ? h(
             'div',
@@ -604,6 +659,11 @@ function renderRules(): void {
 }
 
 function refreshQuota(): void {
+  if (settings.allocationMode === 'pool') {
+    ui.quota.className = 'quota-summary ok';
+    mount(ui.quota, h('strong', null, 'Mode « meilleures cartes »'), h('span', null, ` — les ${settings.slots} slots reçoivent les meilleures cartes de toutes tes étiquettes actives ; la colonne Slots est ignorée (Réglages → Prix conseillé).`));
+    return;
+  }
   const q = quotaSummary(rules, settings.slots);
   ui.quota.className = `quota-summary ${q.status}`;
   mount(ui.quota, h('strong', null, q.text), h('span', null, ` — ${q.status === 'ok' ? '✓ ' : '⚠ '}${q.message}`));
@@ -642,6 +702,11 @@ function refreshFallback(): void {
   );
 }
 
+/** Critères de tri globaux, affichés seulement pour l'ordre « selon mes critères ». */
+function renderCriteria(): void {
+  mount(ui.criteria, settings.sortPrice === 'custom' ? [h('h3', null, 'Critères de tri'), criteriaEditor(settings.sortCriteria, '')] : null);
+}
+
 function pricingSection() {
   const s = settings;
   const set = <K extends keyof Settings>(key: K, parse: (v: string) => Settings[K]) => (e: Event) => {
@@ -649,6 +714,8 @@ function pricingSection() {
     onEdit();
   };
   ui.rounding = h('span', { class: 'muted small' });
+  ui.criteria = h('div');
+  renderCriteria();
   ui.fallback = h('select', { onchange: set('fallbackTag', (v) => v || null) });
   ui.fallbackKey = '';
   refreshFallback();
@@ -686,24 +753,44 @@ function pricingSection() {
         'Pas d\'arrondi de la mise conseillée. Automatique : à l\'unité sous 20 W, à 5 sous 100, à 10 sous 1 000.',
       ),
       field(
-        'Entre deux cartes aussi doublonnées, proposer',
+        'Répartition des slots',
+        h(
+          'select',
+          {
+            onchange: (e: Event) => {
+              s.allocationMode = (e.target as HTMLSelectElement).value as Settings['allocationMode'];
+              refreshQuota();
+              onEdit();
+            },
+          },
+          h('option', { value: 'quota', selected: s.allocationMode === 'quota' }, 'par étiquette (colonne Slots)'),
+          h('option', { value: 'pool', selected: s.allocationMode === 'pool' }, 'meilleures cartes, toutes étiquettes'),
+        ),
+        'Meilleures cartes : pas de slots réservés par étiquette ; les slots libres reçoivent les meilleures cartes de toutes tes étiquettes actives, et « Suivant » passe aux suivantes.',
+      ),
+      field(
+        'Ordre des cartes proposées',
         h(
           'select',
           {
             onchange: (e: Event) => {
               s.sortPrice = (e.target as HTMLSelectElement).value as Settings['sortPrice'];
               if (s.sortPrice === 'random') s.randomSeed = Date.now() % 2_147_483_647;
+              if (s.sortPrice === 'custom' && !s.sortCriteria.length) s.sortCriteria = DEFAULT_CRITERIA.map((c) => ({ ...c }));
+              renderCriteria();
               onEdit();
             },
           },
-          h('option', { value: 'desc', selected: s.sortPrice === 'desc' }, 'la plus chère d\'abord'),
-          h('option', { value: 'asc', selected: s.sortPrice === 'asc' }, 'la moins chère d\'abord (écouler)'),
-          h('option', { value: 'random', selected: s.sortPrice === 'random' }, 'au hasard'),
+          h('option', { value: 'desc', selected: s.sortPrice === 'desc' }, 'doublons, puis la plus chère'),
+          h('option', { value: 'asc', selected: s.sortPrice === 'asc' }, 'doublons, puis la moins chère (écouler)'),
+          h('option', { value: 'random', selected: s.sortPrice === 'random' }, 'doublons, puis au hasard'),
+          h('option', { value: 'custom', selected: s.sortPrice === 'custom' }, 'selon mes critères (tri multi-critères)'),
         ),
-        'Les cartes en plus d\'exemplaires passent en premier ; ce choix départage les égalités.',
+        'Quelle carte est proposée en premier. Une étiquette peut avoir son propre ordre (Conditions et vente).',
       ),
       field('Étiquette de secours', ui.fallback, 'Quand une étiquette n\'a plus aucune carte à vendre, son slot reçoit une carte de cette étiquette-ci.'),
     ),
+    ui.criteria,
     h(
       'div',
       { class: 'toggles' },

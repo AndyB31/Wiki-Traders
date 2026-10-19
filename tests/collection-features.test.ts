@@ -254,6 +254,16 @@ describe('vente depuis le classement', () => {
     expect(decodeURIComponent(calls.find((c) => c.url.includes('/user_cards'))!.url)).toContain('card_id=eq.card-1');
   });
 
+  it('vente depuis les ventes conseillées : sa propre option, indépendante du classement', async () => {
+    stubFetch((url) => (url.includes('/user_cards') ? [{ id: 'uc-1', starred: false }] : url === '/api/marketplace/mine' ? '{}' : { id: 'a' }));
+    const req = { siteCardId: 'card-1', amount: 25, durationMinutes: 60 };
+    await expect(createListing({ rankingSell: true, popupSell: false }, req, 'popupSell')).rejects.toThrow(/ventes conseillées est désactivée/);
+    await expect(createListing({ rankingSell: false, popupSell: true }, req)).rejects.toMatchObject({ code: 'DISABLED' });
+    expect(calls).toHaveLength(0);
+    await createListing({ popupSell: true }, req, 'popupSell');
+    expect(JSON.parse(calls.find((c) => c.init?.method === 'POST')!.init!.body as string)).toEqual({ card_id: 'uc-1', base_amount: 25, duration_minutes: 60 });
+  });
+
   it('choix de l\'exemplaire : jamais un exemplaire déjà en vente, favori seulement si autorisé', () => {
     expect(() => pickCopy([], '', false)).toThrow(SellError);
     expect(() => pickCopy([{ id: 'x', starred: false }], '"x"', false)).toThrow(/déjà en vente/);

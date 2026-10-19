@@ -5,7 +5,8 @@ import { familyIndex, RARITY_ORDER } from './families';
 import { evalFormula } from './formula';
 import { reliableRate, type SellRate } from './sellrate';
 import { normalize, sameTag } from './text';
-import type { Card, CardFamily, MyAuction, StoreShape, TagRule } from './types';
+import { DEFAULT_CRITERIA } from './sorting';
+import type { CandidateSort, Card, CardFamily, MyAuction, SortCriterion, StoreShape, TagRule } from './types';
 
 export interface Candidate {
   card: Card;
@@ -26,6 +27,8 @@ export interface FreeSlot {
   ignored: boolean;
   /** Pourquoi aucune carte n'est proposée (si `proposal` est vide). */
   excluded: Exclusions | null;
+  /** Mode « meilleures cartes » : slot rempli par la liste commune à toutes les étiquettes. */
+  pool?: boolean;
 }
 
 export interface Exclusions {
@@ -78,6 +81,8 @@ export interface AllocationResult {
   /** Prochaine fin d'enchère (ms), null si aucune. */
   nextEnd: number | null;
   ctx: PricingContext;
+  /** Mode « meilleures cartes » : nombre de cartes vendables et rang de la première proposée. */
+  pool?: { size: number; offset: number };
 }
 
 export type AllocationInput = Pick<
@@ -90,6 +95,8 @@ export type AllocationInput = Pick<
   sellRate?: (card: Card) => SellRate | null | undefined;
   /** Mes familles (conditions « famille » des règles). */
   myFamilies?: CardFamily[];
+  /** Mode « meilleures cartes » : rang de la première carte proposée. */
+  poolOffset?: number;
 };
 
 export function isActive(a: MyAuction, now: number): boolean {
@@ -160,10 +167,63 @@ export function rankCandidates(
     out.push({ card, sellable, pricing: computePrice(card, rule, ctx, peers) });
   }
   const sort = rule.sale?.sort ?? settings.sortPrice;
+  const criteria = rule.sale ? rule.sale.sortCriteria ?? [] : settings.sortCriteria;
+  return sortCandidates(out, sort, ctx, { criteria, score: rule.sale?.score ?? '' });
+}
+
+/** Valeur d'un critère de tri pour une carte (null : inconnue, toujours en dernier). */
+export function criterionValue(c: Candidate, key: SortCriterion['key'], ctx: PricingContext): number | null {
+  const rate = ctx.sellRate?.(c.card) ?? null;
+  switch (key) {
+    case 'prix':
+      return c.pricing.price;
+    case 'prix_moyen':
+      return c.pricing.base.value;
+    case 'tdv':
+      return reliableRate(rate)?.pct ?? null;
+    case 'ventes':
+      return rate?.sold ?? null;
+    case 'encheres':
+      return rate?.total ?? null;
+    case 'doublons':
+      return Math.max(0, c.card.quantity - 1);
+    case 'rarete':
+      return c.card.rarity ? RARITY_ORDER[c.card.rarity] + 1 : null;
+    case 'hasard':
+      return shuffleRank(c.card.id, ctx.settings.randomSeed);
+  }
+}
+
+/** Trie des cartes candidates selon un ordre (global ou d'une étiquette). */
+export function sortCandidates(
+  out: Candidate[],
+  sort: CandidateSort,
+  ctx: PricingContext,
+  opts: { criteria?: SortCriterion[]; score?: string } = {},
+): Candidate[] {
+  const { settings } = ctx;
   if (sort === 'score') {
     // Formule de l'étiquette : le score le plus haut d'abord (score invalide en dernier).
-    for (const c of out) c.score = evalFormula(rule.sale!.score, scoreVars(c, ctx));
+    for (const c of out) c.score = evalFormula(opts.score ?? '', scoreVars(c, ctx));
     return out.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity) || a.card.name.localeCompare(b.card.name));
+  }
+  if (sort === 'custom') {
+    // Critères dans l'ordre ; une valeur inconnue passe après les connues, quel que soit le sens.
+    const criteria = opts.criteria?.length ? opts.criteria : DEFAULT_CRITERIA;
+    const values = new Map(out.map((c) => [c, criteria.map((k) => criterionValue(c, k.key, ctx))]));
+    return out.sort((a, b) => {
+      const va = values.get(a)!;
+      const vb = values.get(b)!;
+      for (const [i, k] of criteria.entries()) {
+        const x = va[i];
+        const y = vb[i];
+        if (x === y) continue;
+        if (x == null) return 1;
+        if (y == null) return -1;
+        return (x - y) * (k.dir === 'asc' ? 1 : -1);
+      }
+      return a.card.name.localeCompare(b.card.name);
+    });
   }
   const rateOfCard = (c: Candidate) => reliableRate(ctx.sellRate?.(c.card))?.pct ?? -1;
   const dir = sort === 'asc' ? 1 : -1;
@@ -217,6 +277,20 @@ export function allocate(input: AllocationInput, now = Date.now()): AllocationRe
   const ignored = new Set(input.ignoredSlots);
   const fallback = settings.fallbackTag ? rules.find((r) => r.active && sameTag(r.tag, settings.fallbackTag)) ?? null : null;
 
+  if (settings.allocationMode === 'pool') {
+    const pool = poolSlots(input, ctx, onSale, freeCount, ignored);
+    const ends = active.map((a) => a.endsAt).filter((e): e is number => e != null);
+    return {
+      slots: settings.slots,
+      busy,
+      free: pool.free,
+      unassigned: freeCount - pool.free.length,
+      nextEnd: ends.length ? Math.min(...ends) : null,
+      ctx,
+      pool: { size: pool.size, offset: pool.offset },
+    };
+  }
+
   const ordered = rules.filter((r) => r.active && r.quota > 0).sort((a, b) => b.quota - a.quota);
   for (const rule of ordered) {
     const current = busy.filter((b) => b.rule?.id === rule.id).length;
@@ -249,6 +323,40 @@ export function allocate(input: AllocationInput, now = Date.now()): AllocationRe
     nextEnd: ends.length ? Math.min(...ends) : null,
     ctx,
   };
+}
+
+/**
+ * Mode « meilleures cartes » : sans quota par étiquette, toutes les cartes vendables des règles actives (une carte
+ * prend le prix de la première règle qui la couvre) forment une seule liste, triée par l'ordre global ; les slots
+ * libres reçoivent les cartes à partir du rang `poolOffset` (« Suivant » avance d'une page, en boucle).
+ */
+function poolSlots(input: AllocationInput, ctx: PricingContext, onSale: Map<string, number>, freeCount: number, ignored: Set<string>) {
+  const rules = input.rules.filter((r) => r.active);
+  const all: Candidate[] = [];
+  const ruleOf = new Map<string, TagRule>();
+  for (const rule of rules) {
+    for (const c of rankCandidates(rule, ctx, onSale, new Map())) {
+      if (ruleOf.has(c.card.id)) continue;
+      ruleOf.set(c.card.id, rule);
+      all.push(c);
+    }
+  }
+  const { settings } = ctx;
+  // La formule de score est propre à une étiquette : la liste commune suit l'ordre global.
+  sortCandidates(all, settings.sortPrice, ctx, { criteria: settings.sortCriteria });
+  const offset = all.length ? ((input.poolOffset ?? 0) % all.length + all.length) % all.length : 0;
+  const page = [...all.slice(offset), ...all.slice(0, offset)];
+  const taken = new Set<string>();
+  const free: FreeSlot[] = [];
+  if (!rules.length) return { free, size: 0, offset: 0 };
+  for (let i = 0; i < freeCount; i++) {
+    const key = `pool:${i}`;
+    const overrideId = input.slotOverrides[key];
+    const proposal = page.find((c) => c.card.id === overrideId && !taken.has(c.card.id)) ?? page.find((c) => !taken.has(c.card.id)) ?? null;
+    if (proposal) taken.add(proposal.card.id);
+    free.push({ key, rule: proposal ? ruleOf.get(proposal.card.id)! : rules[0], fromRule: null, proposal, candidates: page, ignored: ignored.has(key), excluded: null, pool: true });
+  }
+  return { free, size: all.length, offset };
 }
 
 /** Prix conseillé pour une carte donnée, avec la première règle active qui la couvre. */

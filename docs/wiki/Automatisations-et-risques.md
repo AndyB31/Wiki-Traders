@@ -17,6 +17,7 @@ Par défaut, Wiki-Traders ne fait que **lire** ce que la page affiche et **conse
 | Étiquettes des invendues | **Écrit** à nouveau les étiquettes d'une carte revenue d'une enchère sans acheteur | Écriture |
 | Surenchère en un clic | **Mise** à ta place (montant minimal, après confirmation) | Action |
 | Vendre depuis le classement | **Met aux enchères** à ta place (après deux clics de confirmation) | Action |
+| Vendre depuis les ventes conseillées | **Met aux enchères** à ta place, en un clic dans la fenêtre « Vendre… » d'une vente conseillée | Action |
 | Ouvrir tous les paquets / ouverture automatique | **Ouvre** tes paquets à ta place | Action |
 
 Ce que l'extension ne fait **jamais** : acheter, échanger, défausser, ou agir sans que l'option correspondante soit activée. Mise, mise en vente et ouverture de paquets ne se font qu'avec les options ci-dessus, après confirmation.

@@ -25,6 +25,7 @@ export type FeatureKey =
   | 'bidWatch'
   | 'quickOutbid'
   | 'rankingSell'
+  | 'popupSell'
   | 'openAllPacks'
   | 'autoOpenPacks';
 
@@ -73,6 +74,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'notificationSound', group: 'social', label: 'Son des notifications', help: 'Petit son quand une nouvelle notification arrive.', default: false },
   { key: 'quickOutbid', group: 'automation', label: 'Surenchère en un clic', help: 'Bouton pour remiser au minimum dans le suivi de mes mises. Mise à ta place : contraire aux règles du site.', default: false, risky: true, api: true },
   { key: 'rankingSell', group: 'automation', label: 'Vendre depuis le classement', help: 'Met une carte aux enchères directement depuis le classement, sans passer par sa fiche. Contraire aux règles du site.', default: false, risky: true, api: true },
+  { key: 'popupSell', group: 'automation', label: 'Vendre depuis les ventes conseillées', help: 'Bouton « Vendre… » sur chaque vente conseillée (fenêtre Vendre) : infos de la carte, prix et durée modifiables, mise aux enchères en un clic. Contraire aux règles du site.', default: false, risky: true, api: true },
   { key: 'openAllPacks', group: 'automation', label: 'Ouvrir tous les paquets', help: 'Ouvre tous tes paquets d\'un coup, sans animation. Contraire aux règles du site.', default: false, risky: true },
   { key: 'autoOpenPacks', group: 'automation', label: 'Ouverture automatique', help: 'Ouvre tes paquets à intervalle aléatoire pendant que l\'onglet est ouvert. Contraire aux règles du site.', default: false, risky: true },
 ];

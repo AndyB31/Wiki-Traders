@@ -25,7 +25,8 @@ Réglages : **Paramètres → onglet Wiki-Traders** sur le site, ou page d'optio
 | Fenêtre du prix moyen (jours) | 7 | Ventes prises en compte |
 | Statistique | médiane | Ou moyenne |
 | Arrondi | 0 (automatique) | Ou pas fixe |
-| À doublons égaux | prix le plus haut | Le plus bas (écouler) ou aléatoire |
+| Répartition des slots | par étiquette | Ou « meilleures cartes, toutes étiquettes » (quotas ignorés, bouton Suivant) |
+| Ordre des cartes proposées | doublons, puis la plus chère | La moins chère, au hasard, ou **selon mes critères** (tri multi-critères : prix, tdv, ventes, doublons, rareté…) |
 | Étiquette de secours | aucune | Reprend les slots d'une étiquette vide |
 | Proposer une carte déjà en vente | non | |
 | Compter les enchères en cours dans le prix moyen | non | |
