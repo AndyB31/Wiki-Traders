@@ -23,6 +23,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-19d',
+    title: 'Défausse plus rapide',
+    sections: [
+      {
+        title: 'Paquets',
+        items: [
+          {
+            title: '« Tout défausser » en un instant',
+            text: 'Les cartes du paquet sont défaussées en une ou deux requêtes au lieu d\'une par carte. Les cartes en favori sont simplement ignorées (signalées dans le message, sans erreur).',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-19c',
     title: 'Actions rapides après l\'ouverture d\'un paquet',
     sections: [

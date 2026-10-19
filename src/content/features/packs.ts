@@ -215,7 +215,7 @@ async function discardAll(result: PackResult, recap: ReturnType<typeof buildReca
         '',
         `Valeur moyenne totale : ${wiki(recap.total)}.`,
         fresh.length ? `${fresh.length} carte${fresh.length > 1 ? 's' : ''} que tu n'avais pas encore.` : '',
-        'Un exemplaire de chaque carte est retiré définitivement (les favoris sont verrouillés).',
+        'Un exemplaire de chaque carte est retiré définitivement ; les cartes en favori sont ignorées.',
       ].filter((l, i, all) => l !== '' || all[i - 1] !== '').join('\n'),
       confirm: `Défausser ${n} carte${n > 1 ? 's' : ''}`,
       danger: true,
@@ -228,10 +228,15 @@ async function discardAll(result: PackResult, recap: ReturnType<typeof buildReca
   discarded.set(result.at, res.done.length);
   btn.textContent = `Défaussé ✓ (${res.done.length})`;
   noticeToast(
-    [res.done.length ? `${res.done.length} carte${res.done.length > 1 ? 's' : ''} défaussée${res.done.length > 1 ? 's' : ''}.` : '', ...res.failed.map((f) => `✗ ${f.title} : ${f.error}`), 'Recharge la page pour voir ton solde à jour.']
+    [
+      res.done.length ? `${res.done.length} carte${res.done.length > 1 ? 's' : ''} défaussée${res.done.length > 1 ? 's' : ''}.` : 'Aucune carte défaussée.',
+      res.skipped.length ? `★ ${res.skipped.length} favori${res.skipped.length > 1 ? 's' : ''} ignoré${res.skipped.length > 1 ? 's' : ''} : ${res.skipped.join(', ')}` : '',
+      ...res.failed.map((f) => `✗ ${f.title} : ${f.error}`),
+      res.done.length ? 'Recharge la page pour voir ton solde à jour.' : '',
+    ]
       .filter(Boolean)
       .join('\n'),
-    { title: 'Défausse', error: !res.done.length },
+    { title: 'Défausse', error: !res.done.length && res.failed.length > 0 },
   );
   window.dispatchEvent(new Event('wiky-refresh-collection'));
 }
