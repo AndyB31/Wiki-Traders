@@ -6,7 +6,8 @@ import { ext } from '../../lib/browser';
 import { slugify } from '../../lib/text';
 import type { Card, Rarity } from '../../lib/types';
 import type { CardPrice } from '../catalog';
-import { displayPrice } from '../catalog';
+import { displayCount, displayPrice, sellRateOf } from '../catalog';
+import type { SellRate } from '../../lib/sellrate';
 
 const RARITIES: Rarity[] = ['C', 'PC', 'R', 'SR', 'UR', 'L'];
 
@@ -177,7 +178,16 @@ export async function resetPullStats(): Promise<void> {
 // ---------------------------------------------------------------- récapitulatif
 
 export interface RecapRow extends PackCard {
+  /** Prix moyen dans la rareté de la carte (comme le badge des cartes). */
   price: number | null;
+  /** Ventes derrière ce prix moyen. */
+  sales: number;
+  /** Taux de vente (null : aucune enchère terminée ou pas encore lu). */
+  rate: SellRate | null;
+  /** Médiane, min et max de toutes les ventes (infobulle). */
+  median: number | null;
+  min: number | null;
+  max: number | null;
   /** Exemplaires possédés avant l'ouverture (0 : nouvelle carte). */
   ownedBefore: number;
   /** Déjà obtenue plus haut dans ce même récapitulatif. */
@@ -198,7 +208,18 @@ export function buildRecap(cards: PackCard[], prices: Map<string, CardPrice>, ow
   const rows: RecapRow[] = cards.map((c) => {
     const repeat = seen.has(c.siteId);
     seen.add(c.siteId);
-    return { ...c, price: displayPrice(prices.get(c.siteId), c.rarity), ownedBefore: owned(c), repeat };
+    const p = prices.get(c.siteId);
+    return {
+      ...c,
+      price: displayPrice(p, c.rarity),
+      sales: displayCount(p, c.rarity),
+      rate: sellRateOf(p),
+      median: p?.median ?? null,
+      min: p?.min ?? null,
+      max: p?.max ?? null,
+      ownedBefore: owned(c),
+      repeat,
+    };
   });
   const order = (r: RecapRow) => (r.price == null ? -1 : r.price);
   rows.sort((a, b) => order(b) - order(a));
