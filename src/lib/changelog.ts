@@ -24,6 +24,73 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-19f',
+    title: 'Version 1.0 : des réglages plus simples',
+    intro: 'Les réglages sont rangés par ce que tu veux faire, et non plus par niveau de risque. Rien de ce que tu avais réglé n\'est perdu.',
+    sections: [
+      {
+        title: 'Réglages',
+        items: [
+          {
+            title: 'Six onglets',
+            text: 'Accueil, Ventes, Étiquettes, Sur le site, Accès au site, Avancé. Chaque option est rangée avec ce qu\'elle concerne, avec un badge ⚠ si elle agit à ta place.',
+          },
+          {
+            title: 'Ventes et étiquetage séparés',
+            text: 'Une étiquette se règle en deux endroits : comment tu la vends (slots, mise de départ, garder) dans Ventes, quelles cartes y vont (plage de prix, famille, conditions) dans Étiquettes.',
+          },
+          {
+            title: 'Enregistrement automatique',
+            text: 'Plus de bouton Enregistrer : chaque modification est enregistrée aussitôt, avec « Annuler » pour revenir en arrière.',
+          },
+          {
+            title: 'Profils',
+            text: 'Prudent, Confort ou Complet : règle d\'un coup ce que Wiki-Traders a le droit de faire sur le site.',
+            where: 'Réglages → Accueil.',
+          },
+        ],
+      },
+      {
+        title: 'Taux de vente',
+        items: [
+          {
+            title: 'Paliers en « % du prix »',
+            text: '81 veut maintenant dire 81 % du prix conseillé (100 = inchangé, 50 = moitié prix). Avant, c\'était un ajustement (+81 % !). Tes paliers ont été convertis pour donner le même prix qu\'avant : vérifie-les.',
+            where: 'Réglages → Ventes → Taux de vente.',
+          },
+          {
+            title: 'Interrupteur et seuil réglable',
+            text: 'Coupe les paliers sans les supprimer, et choisis à partir de combien d\'enchères terminées le taux de vente compte (5 par défaut).',
+            where: 'Réglages → Ventes → Taux de vente.',
+          },
+        ],
+      },
+      {
+        title: 'Ventes',
+        items: [
+          {
+            title: 'Cartes de tes familles jamais vendues',
+            text: 'Une carte d\'une de tes familles n\'est plus proposée à la vente, sauf pour une étiquette qui vise justement cette famille.',
+            where: 'Réglages → Ventes → Jamais vendu (activé par défaut).',
+          },
+        ],
+      },
+      {
+        title: 'Popup',
+        items: [
+          {
+            title: 'Quatre onglets',
+            text: 'Vendre, Enchères (mes ventes et mes mises), Historique, Cartes (cartes et étiquetage). Outils et Nouveautés sont dans l\'en-tête. Les ventes conseillées sont plus compactes, le détail se déplie avec « ? ».',
+          },
+          {
+            title: 'Plus lisible',
+            text: 'Textes gris plus contrastés partout, et « 17 / 20 vendues » en vert et blanc sur les cartes.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     // Fusion des mises à jour du 19 octobre (identifiant gardé à la dernière publiée, pour l'ordre des suivantes).
     id: '2026-10-19e',
     title: 'Taux de vente, ventes plus fines, paquets, étiquettes automatiques',

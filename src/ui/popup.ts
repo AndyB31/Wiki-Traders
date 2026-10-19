@@ -3,7 +3,7 @@ import './popup.css';
 import { allocate, makeContext, type FreeSlot } from '../lib/allocation';
 import { rarityBase } from '../lib/pricing';
 import { catalogPriceOf, diagnoseAutoTags, planAutoTags, type CatalogPriceEntry } from '../lib/autotag';
-import { rateOf, sellRateOfCache, SELL_RATE_MIN_SAMPLES, type RateEntry } from '../lib/sellrate';
+import { rateOf, sellRateOfCache, type RateEntry } from '../lib/sellrate';
 import { DURATIONS, durationFor, durationLabel } from '../lib/duration';
 import { ext } from '../lib/browser';
 import { CARD_PRICES_KEY, SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
@@ -227,6 +227,7 @@ function whyEmpty(slot: FreeSlot) {
     e.onSale ? `${e.onSale} déjà en vente` : '',
     e.favorite ? `${e.favorite} en favori` : '',
     e.blacklist ? `${e.blacklist} en liste noire` : '',
+    e.family ? `${e.family} dans tes familles (protégées)` : '',
     e.lowRate ? `${e.lowRate} sous le taux de vente minimum (${store.settings.minSellRate} %)` : '',
   ].filter(Boolean);
   return h(
@@ -358,15 +359,16 @@ function openSellDialog(slot: FreeSlot): void {
   const tiers = slot.rule.sale?.durationRules ?? store.settings.durationRules;
 
   const info = (label: string, value: string | Node, title?: string) => h('div', { class: 'sell-info', title }, h('span', { class: 'muted small' }, label), h('strong', null, value));
-  const rateClass = !rate ? '' : rate.total < SELL_RATE_MIN_SAMPLES ? '' : rate.pct <= 15 ? 'down' : rate.pct >= 70 ? 'up' : '';
+  const minSamples = store.settings.sellRateMinSamples;
+  const rateClass = !rate ? '' : rate.total < minSamples ? 'muted' : rate.pct <= 15 ? 'down' : rate.pct >= 70 ? 'up' : '';
   const infos = h(
     'div',
     { class: 'sell-infos' },
     info('Prix moyen', p.pricing.base.value != null ? formatPrice(Math.round(p.pricing.base.value)) : '—', p.pricing.detail),
     info(
       'Taux de vente',
-      rate ? h('span', { class: rateClass }, `${rate.pct} %`) : '—',
-      rate ? `${rate.sold} vendue(s) sur ${rate.total} enchère(s) terminée(s)${rate.total < SELL_RATE_MIN_SAMPLES ? ' : trop peu pour être fiable' : ''}` : 'Pas encore lu (ouvre ta collection)',
+      rate ? h('span', { class: rateClass }, `${rate.pct} % (${rate.sold}/${rate.total})`) : '—',
+      rate ? `${rate.sold} vendue(s) sur ${rate.total} enchère(s) terminée(s)${rate.total < minSamples ? ` : moins de ${minSamples}, pas pris en compte` : ''}` : 'Pas encore lu (ouvre ta collection)',
     ),
     info('Ventes', rate ? `${rate.sold} / ${rate.total}` : cached ? String(cached.count) : '—', 'Enchères conclues / enchères terminées'),
     cached?.median != null ? info('Médiane', formatPrice(Math.round(cached.median))) : null,
