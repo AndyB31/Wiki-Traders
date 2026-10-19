@@ -398,4 +398,6 @@ export interface StoreShape {
   pendingRetags: PendingRetag[];
   /** Mode « meilleures cartes » : rang de la première carte proposée (bouton « Suivant »). */
   poolOffset: number;
+  /** Dernières nouveautés vues (identifiant de lib/changelog.ts) ; null : jamais vues. */
+  changelogSeen: string | null;
 }

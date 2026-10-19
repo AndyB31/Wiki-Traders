@@ -20,6 +20,7 @@ import { initWindow, setOpen as setWindowOpen, toggleWindow } from './window';
 import { enhanceSellDialog } from './sell-market';
 import { closeModal, isModalOpen, openModal, renderSiteUi, setUpdatesAvailable } from './site-ui';
 import { UPDATE_KEY, type UpdateInfo } from '../lib/update';
+import { LATEST_CHANGELOG } from '../lib/changelog';
 import { renderAuctionSwitch } from './auction-mode';
 import { makeContext as featureContext, runFeatures } from './features/runtime';
 import './features';
@@ -835,6 +836,12 @@ async function main(): Promise<void> {
     }
   };
   void readUpdate();
+  // Nouveautés : une fois après une mise à jour, par-dessus la page (la fenêtre les marque comme vues).
+  setTimeout(() => {
+    void load('changelogSeen').then(({ changelogSeen }) => {
+      if (store?.settings.siteIntegration && changelogSeen !== LATEST_CHANGELOG && !isModalOpen() && document.visibilityState === 'visible') openModal('news');
+    });
+  }, 1500);
   ext.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && UPDATE_KEY in changes) void readUpdate();
   });

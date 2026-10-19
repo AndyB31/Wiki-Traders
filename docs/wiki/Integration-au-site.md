@@ -18,7 +18,7 @@ Avec l'option **Barre latérale compacte** (activée par défaut), toute la barr
 | **Social ▸** | Échanges · Guilde · Amis · Messages · Bataille |
 | **Progression ▸** | Profil · Succès · Classement |
 | En bas | Le **récapitulatif Wiki-Traders** (et « Mises en direct ») |
-| Tout en bas | **Paramètres ▸** : Paramètres du site · 🟠 Réglages Wiki-Traders · 🟠 Outils |
+| Tout en bas | **Paramètres ▸** : Paramètres du site · 🟠 Réglages Wiki-Traders · 🟠 Outils · 🟠 Nouveautés |
 
 - Un clic sur **Collection**, **Marché** ou **Paramètres** ouvre la page et déplie le menu ; la **flèche** ne fait que déplier ou replier.
 - Le menu de la page affichée est ouvert et mis en valeur ; l'état des autres menus est mémorisé.
@@ -54,6 +54,7 @@ Juste au-dessus de *Paramètres* :
 | Cartes & prix | page | Ta collection par famille, étiquette, catégorie ou rareté, et les enchères en cours de chaque carte |
 | Étiquettes | fenêtre (bouton à côté de « Plus chères » sur la collection) | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
 | Outils | fenêtre | Relire la page, diagnostic, journal, bilan des prix |
+| Nouveautés | fenêtre | S'ouvre une fois après chaque mise à jour : les nouveautés expliquées, où les trouver et lesquelles sont à activer. Rouvrable ici ou depuis les Outils. |
 | Réglages Wiki-Traders | page | L'onglet Wiki-Traders de *Paramètres* |
 
 Les **fenêtres** s'affichent par-dessus la page en cours (Échap ou clic à côté pour fermer). Les **pages** prennent la place du contenu du site (adresse `?wiky=…`), sans le quitter.
