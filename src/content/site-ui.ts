@@ -22,7 +22,7 @@ export interface SiteUiActions {
   refresh: () => void;
 }
 
-type View = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'families' | 'tags' | 'tools';
+type View = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'families' | 'tags' | 'tools' | 'news';
 
 const ICONS: Record<string, string> = {
   coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
@@ -63,6 +63,8 @@ const ITEMS: { view: View; label: string; title: string; icon: string; page?: st
   { view: 'sold', label: 'Ventes conclues', title: 'Ventes conclues', icon: 'receipt', page: '/marketplace' },
   { view: 'tags', label: 'Étiquettes', title: 'Étiquetage', icon: 'tags' },
   { view: 'tools', label: 'Outils', title: 'Outils', icon: 'wrench' },
+  // Pas dans le menu : ouverte une fois après une mise à jour, et depuis les Outils.
+  { view: 'news', label: 'Nouveautés', title: 'Nouveautés de Wiki-Traders', icon: 'trending', wide: true },
 ];
 
 /**
@@ -129,7 +131,7 @@ const SETTINGS_GROUP: TreeGroup = {
   icon: 'sliders',
   iconFrom: '/settings',
   href: '/settings',
-  entries: [{ site: '/settings', label: 'Paramètres du site' }, { link: '/settings?wiky=settings', label: 'Réglages Wiki-Traders', icon: 'sliders', route: 'settings' }, { wiky: 'tools' }],
+  entries: [{ site: '/settings', label: 'Paramètres du site' }, { link: '/settings?wiky=settings', label: 'Réglages Wiki-Traders', icon: 'sliders', route: 'settings' }, { wiky: 'tools' }, { wiky: 'news' }],
 };
 
 /** Liens du site laissés en haut, hors menus. */

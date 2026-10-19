@@ -3,6 +3,7 @@ import { ext } from '../lib/browser';
 import { JOURNAL_MAX, PRICE_OBS_MAX, PRICE_OBS_MAX_AGE_MS, SITE_ORIGIN } from '../lib/defaults';
 import { expireAuctions, journalEntry, reconcileAuctions } from '../lib/journal';
 import { queueRetags, tagsToRestore } from '../lib/retag';
+import { LATEST_CHANGELOG } from '../lib/changelog';
 import type { ScanMessage, ScannedCard, ToBackground } from '../lib/messages';
 import { reliableBase } from '../lib/pricing';
 import { load, loadAll, onStoreChange, save } from '../lib/storage';
@@ -406,7 +407,11 @@ function olderThan(v: string | undefined, ref: string): boolean {
 }
 
 ext.runtime.onInstalled.addListener(async (details) => {
-  if (details.reason === 'install') void ext.runtime.openOptionsPage();
+  if (details.reason === 'install') {
+    // Installation neuve : rien de « nouveau » à montrer.
+    await save({ changelogSeen: LATEST_CHANGELOG });
+    void ext.runtime.openOptionsPage();
+  }
   // Avant 0.3.0, les cartes du marché étaient enregistrées comme possédées et les prix n'avaient pas
   // de rareté : on repart de zéro (relu à la prochaine visite de la collection).
   if (details.reason === 'update' && olderThan(details.previousVersion, '0.3.0')) {

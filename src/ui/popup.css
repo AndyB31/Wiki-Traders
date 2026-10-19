@@ -77,3 +77,8 @@ button.tag-switch:disabled { opacity: .4; }
 .sell-fields label { display: flex; flex-direction: column; gap: 2px; }
 .sell-fields input { width: 100%; }
 .sell-dialog .ok { color: var(--ok); }
+/* Nouveautés */
+.news > summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; cursor: pointer; }
+.news-section h3 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.news-section ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 6px; }
+.news-section li .pill { margin-left: 6px; }

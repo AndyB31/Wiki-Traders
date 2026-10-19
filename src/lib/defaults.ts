@@ -70,6 +70,7 @@ export const DEFAULT_STORE: StoreShape = {
   familiesImportedAt: null,
   pendingRetags: [],
   poolOffset: 0,
+  changelogSeen: null,
 };
 
 /** Cache des prix moyens par carte (catalog.ts), lu aussi par la popup pour l'étiquetage. */

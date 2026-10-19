@@ -9,6 +9,7 @@ import { ext } from '../lib/browser';
 import { CARD_PRICES_KEY, SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
 import type { DiagnosticResult, ToBackground, ToContent } from '../lib/messages';
 import { featureFlags } from '../lib/features';
+import { CHANGELOG, LATEST_CHANGELOG, unseenChangelog } from '../lib/changelog';
 import { loadAll, onStoreChange, save } from '../lib/storage';
 import { formatDuration, formatPrice, normalize, RARITIES, slugify } from '../lib/text';
 import type { BidStatus, Card, CardAuctionsResult, Family, FamilyCard, MyBid, Rarity, SoldItem, StoreShape } from '../lib/types';
@@ -25,7 +26,7 @@ function closeUi(): void {
 }
 let store: StoreShape;
 let activeTab: chrome.tabs.Tab | undefined;
-type PopupTab = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'tags' | 'tools';
+type PopupTab = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'tags' | 'tools' | 'news';
 type GroupBy = 'family' | 'tag' | 'category' | 'rarity';
 let groupBy = localStorage.getItem('wiky-group') as GroupBy | null;
 let cardFilter = '';
@@ -419,6 +420,66 @@ function openSellDialog(slot: FreeSlot): void {
   document.body.append(modal);
   priceIn.focus();
   priceIn.select();
+}
+
+/**
+ * Nouveautés (lib/changelog.ts) : ouvertes une fois après une mise à jour, puis depuis les Outils. Les entrées pas
+ * encore vues sont marquées « Nouveau » et dépliées ; les afficher les marque comme vues.
+ */
+function newsBlock() {
+  const unseen = new Set(unseenChangelog(store.changelogSeen).map((e) => e.id));
+  if (store.changelogSeen !== LATEST_CHANGELOG) void save({ changelogSeen: LATEST_CHANGELOG });
+  const done = () => {
+    if (embedded) parent.postMessage({ wiky: 'close' }, '*');
+    else {
+      currentTab = 'sell';
+      render();
+    }
+  };
+  return [
+    ...CHANGELOG.map((entry, i) =>
+      h(
+        'details',
+        { class: 'news card', open: unseen.has(entry.id) || (i === 0 && !unseen.size) },
+        h('summary', null, unseen.has(entry.id) ? h('span', { class: 'pill' }, 'Nouveau') : null, h('strong', null, entry.title), h('span', { class: 'muted small' }, ` · ${fmtDay(entry.id)}`)),
+        entry.intro ? h('p', { class: 'small' }, entry.intro) : null,
+        entry.sections.map((s) =>
+          h(
+            'section',
+            { class: 'news-section' },
+            h('h3', null, s.title),
+            h(
+              'ul',
+              null,
+              s.items.map((it) =>
+                h(
+                  'li',
+                  null,
+                  h('strong', null, it.title),
+                  it.optIn ? h('span', { class: 'pill muted', title: 'Désactivé par défaut' }, 'à activer') : null,
+                  h('div', { class: 'small' }, it.text),
+                  it.where ? h('div', { class: 'small muted' }, `→ ${it.where}`) : null,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    h(
+      'div',
+      { class: 'row' },
+      h('button', { onclick: () => ext.runtime.openOptionsPage() }, '⚙️ Réglages'),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'primary', onclick: done }, 'C\'est noté'),
+    ),
+  ];
+}
+
+/** « 19 octobre 2026 » à partir d'un identifiant de nouveautés (date ISO, suffixe éventuel). */
+function fmtDay(id: string): string {
+  const d = new Date(`${id.slice(0, 10)}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? id : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 async function copy(btn: HTMLButtonElement, text: string): Promise<void> {
@@ -1212,6 +1273,7 @@ function render(): void {
     { id: 'sold', label: 'Vendues', body: soldBlock },
     { id: 'cards', label: 'Cartes', body: cardsBlock },
     { id: 'tags', label: 'Étiquettes', body: () => [autoTagBlock(!!activeTab?.url?.startsWith(SITE_ORIGIN + '/collection'))] },
+    { id: 'news', label: 'Nouveautés', hidden: true, body: newsBlock },
     {
       id: 'tools',
       label: 'Outils',
@@ -1222,6 +1284,7 @@ function render(): void {
           'div',
           { class: 'tools row small' },
           h('button', { onclick: () => ext.tabs.create({ url: ext.runtime.getURL('journal.html') }) }, '📒 Journal'),
+          h('button', { onclick: () => ((currentTab = 'news'), render()) }, '🎉 Nouveautés'),
           h('button', { onclick: () => ext.runtime.openOptionsPage() }, '⚙️ Réglages'),
         ),
         h('p', { class: 'muted small' }, `Ventes relues : ${fmtDate(store.meta.lastAuctionsScan)} · collection : ${fmtDate(store.meta.lastCollectionScan)}`),
@@ -1385,6 +1448,9 @@ async function refresh(): Promise<void> {
 async function main(): Promise<void> {
   // Dans la fenêtre flottante, l'onglet est celui qui contient l'iframe.
   activeTab = (embedded ? await ext.tabs.getCurrent() : undefined) ?? (await ext.tabs.query({ active: true, currentWindow: true }))[0];
+  store = await loadAll();
+  // Après une mise à jour, la popup du navigateur s'ouvre d'abord sur les nouveautés (une fois).
+  if (!view && store.changelogSeen !== LATEST_CHANGELOG) currentTab = 'news';
   await refresh();
   void refreshBidsOnOpen();
   await readCatalogPrices();

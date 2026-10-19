@@ -54,7 +54,7 @@ describe('barre latérale du site', () => {
     expect(items('market')).toEqual(['Parcourir', 'Mes ventes', 'Mes enchères', 'Historique']);
     expect(items('social')).toEqual(['Échanges', 'Guilde', 'Amis', 'Messages', 'Bataille']);
     expect(items('progress')).toEqual(['Profil', 'Succès', 'Classement']);
-    expect(items('settings')).toEqual(['Paramètres du site', 'Réglages Wiki-Traders', 'Outils']);
+    expect(items('settings')).toEqual(['Paramètres du site', 'Réglages Wiki-Traders', 'Outils', 'Nouveautés']);
     // Les pages de l'extension se distinguent par leur icône orange ; les onglets du Marché (pages du site) restent neutres.
     expect(nav.querySelectorAll('[data-group="collection"] .wiky-sub:not(.site-tab) .wiky-ico')).toHaveLength(2);
     expect(nav.querySelectorAll('[data-group="market"] .wiky-sub.site-tab')).toHaveLength(4);
