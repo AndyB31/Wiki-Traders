@@ -223,6 +223,11 @@ function loadPrices(): Promise<void> {
   return loaded;
 }
 
+/** Attend le cache des prix stocké (à appeler avant `knownPrice` pour ne pas redemander des prix déjà connus). */
+export function pricesLoaded(): Promise<void> {
+  return loadPrices();
+}
+
 /** Enregistre tout de suite le cache des prix (la popup le lit pour l'étiquetage). */
 export async function flushPrices(): Promise<void> {
   clearTimeout(persistTimer);
@@ -313,6 +318,23 @@ async function fetchPrices(ids: string[]): Promise<void> {
   }
 }
 
+/** Lots de prix chargés en même temps (chacun lit déjà ses pages en parallèle). */
+const PRICE_BATCHES = 3;
+let running = 0;
+const queued: (() => void)[] = [];
+
+/** File d'attente : au plus PRICE_BATCHES lots en vol, pour ne pas inonder le serveur sur une grosse collection. */
+async function limited<T>(job: () => Promise<T>): Promise<T> {
+  if (running >= PRICE_BATCHES) await new Promise<void>((resolve) => queued.push(resolve));
+  running++;
+  try {
+    return await job();
+  } finally {
+    running--;
+    queued.shift()?.();
+  }
+}
+
 /**
  * Prix moyens des cartes demandées : le cache répond tout de suite, le reste est chargé par lots de 150
  * (une requête par lot, en parallèle limité). `force` ignore le cache.
@@ -330,7 +352,7 @@ export async function cardPrices(ids: string[], force = false): Promise<Map<stri
   });
   for (let i = 0; i < fresh.length; i += BATCH) {
     const batch = fresh.slice(i, i + BATCH);
-    const job = fetchPrices(batch).finally(() => batch.forEach((id) => inflight.delete(id)));
+    const job = limited(() => fetchPrices(batch)).finally(() => batch.forEach((id) => inflight.delete(id)));
     batch.forEach((id) => inflight.set(id, job));
     waits.push(job);
   }

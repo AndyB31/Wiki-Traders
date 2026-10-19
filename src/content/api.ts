@@ -128,30 +128,46 @@ export const PAGE_SIZE = 1000;
 export async function getAll<T>(cfg: ApiConfig, session: Session, path: string, max = 100_000): Promise<T[]> {
   const sep = path.includes('?') ? '&' : '?';
   const ordered = /[?&]order=/.test(path) ? path : `${path}${sep}order=id`;
-  const out: T[] = [];
-  let total: number | null = null;
-  while (out.length < max) {
-    const res = await fetch(`${cfg.url}/rest/v1/${ordered}&limit=${PAGE_SIZE}&offset=${out.length}`, {
+  const page = async (offset: number, count: boolean): Promise<{ rows: T[]; total: number | null }> => {
+    const res = await fetch(`${cfg.url}/rest/v1/${ordered}&limit=${PAGE_SIZE}&offset=${offset}`, {
       method: 'GET',
       headers: {
         apikey: cfg.anonKey,
         Authorization: `Bearer ${session.accessToken}`,
         Accept: 'application/json',
-        ...(total == null ? { Prefer: 'count=exact' } : {}),
+        ...(count ? { Prefer: 'count=exact' } : {}),
       },
     });
     if (!res.ok) throw new ApiError(`API ${res.status} sur ${path.split('?')[0]}`);
-    if (total == null) {
-      const m = /\/(\d+)\s*$/.exec(res.headers.get('content-range') ?? '');
-      total = m ? Number(m[1]) : null;
+    const m = count ? /\/(\d+)\s*$/.exec(res.headers.get('content-range') ?? '') : null;
+    return { rows: (await res.json()) as T[], total: m ? Number(m[1]) : null };
+  };
+  const first = await page(0, true);
+  const out = [...first.rows];
+  const step = first.rows.length;
+  if (!step) return out;
+  if (first.total != null) {
+    // Total connu : les pages restantes partent en parallèle (par groupes de PARALLEL_PAGES), à la taille de page
+    // réellement servie (le serveur peut plafonner sous PAGE_SIZE).
+    const offsets: number[] = [];
+    for (let o = step; o < Math.min(first.total, max); o += step) offsets.push(o);
+    for (let i = 0; i < offsets.length; i += PARALLEL_PAGES) {
+      const pages = await Promise.all(offsets.slice(i, i + PARALLEL_PAGES).map((o) => page(o, false)));
+      for (const p of pages) out.push(...p.rows);
     }
-    const rows = (await res.json()) as T[];
-    out.push(...rows);
-    // Fin : plus rien, total atteint, ou (sans total connu) une page incomplète par rapport à la taille demandée.
-    if (!rows.length || (total != null ? out.length >= total : rows.length < PAGE_SIZE)) break;
+    return out;
+  }
+  // Sans total : page par page, jusqu'à une page incomplète.
+  while (out.length < max && step >= PAGE_SIZE) {
+    const next = await page(out.length, false);
+    out.push(...next.rows);
+    if (next.rows.length < PAGE_SIZE) break;
   }
   return out;
 }
+
+/** Pages lues en même temps quand le total est connu. */
+const PARALLEL_PAGES = 4;
 
 export const inList = (ids: string[]) => `in.(${ids.map((i) => `"${i}"`).join(',')})`;
 

@@ -8,14 +8,15 @@
 import { featureFlags, type FeatureKey } from '../../lib/features';
 import { load } from '../../lib/storage';
 import { formatDuration } from '../../lib/text';
-import { cardPrices, knownCardPrice, knownCardRate, knownPrice, type CardPrice } from '../catalog';
+import { cardPrices, knownCardPrice, knownCardRate, knownPrice, pricesLoaded, type CardPrice } from '../catalog';
+import { RATE_HIGH, RATE_LOW, shortCount } from './price-badges';
 import { catalogPrice, planAutoTags } from '../../lib/autotag';
 import { applyTagsViaApi } from '../api-tags';
 import { noticeToast } from '../toast';
 import { discardPackCards } from './discard';
 import { onSiteResponse } from '../net';
 import { endProgress, showProgress } from '../overlay';
-import { AUTO_OPEN_KEY, buildRecap, loadAutoOpen, loadPullStats, mapPackCards, normalizeBounds, openPacksSequence, PULL_STATS_KEY, pullShares, randomDelay, recordPulls, resetPullStats, saveAutoOpen, type AutoOpenState, type OpenAllResult, type PackCard, packCardsForTagging, type PullStats, importOtherPullStats, OTHER_PULL_STATS_KEY, readOtherPullStats } from './packs-logic';
+import { AUTO_OPEN_KEY, buildRecap, type RecapRow, loadAutoOpen, loadPullStats, mapPackCards, normalizeBounds, openPacksSequence, PULL_STATS_KEY, pullShares, randomDelay, recordPulls, resetPullStats, saveAutoOpen, type AutoOpenState, type OpenAllResult, type PackCard, packCardsForTagging, type PullStats, importOtherPullStats, OTHER_PULL_STATS_KEY, readOtherPullStats } from './packs-logic';
 import { type FeatureContext, registerFeature } from './runtime';
 import { button, confirmDialog, ensureFeatureStyle, floatingPanel, node, rarityChip, RARITY_COLORS, wiki } from './ui';
 import { ext } from '../../lib/browser';
@@ -28,6 +29,17 @@ const CSS = `
 .wiky-f-pack-actions .wiky-f-btn.danger { background: #ef4444; border-color: #ef4444; color: #fff; }
 .wiky-f-pack-actions .wiky-f-btn.danger:hover:not(:disabled) { background: #dc2626; }
 .wiky-f-confirm p { white-space: pre-line; }
+.wiky-f-recap-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; }
+.wiky-f-recap-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wiky-f-recap-main .wiky-f-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wiky-f-recap-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; color: color-mix(in srgb, var(--color-foreground, #e7e5e4) 85%, transparent); }
+.wiky-f-recap-sub b { color: #4ade80; font-weight: 800; }
+.wiky-f-recap-price { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-variant-numeric: tabular-nums; }
+.wiky-f-recap-price strong { font-weight: 800; }
+.wiky-f-recap-price .wiky-f-none { color: color-mix(in srgb, var(--color-foreground, #e7e5e4) 70%, transparent); font-weight: 600; }
+.wiky-f-rate { font-size: 11px; font-weight: 800; color: var(--color-foreground, #e7e5e4); }
+.wiky-f-rate.is-low { color: #f87171; }
+.wiky-f-rate.is-high { color: #4ade80; }
 [data-wiky="pulls-tools"] { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .wiky-pt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wiky-pt-box { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border, rgba(255,255,255,.12)); background: var(--color-surface, #1c1917); }
@@ -124,18 +136,7 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
     const { body, foot } = floatingPanel('pack-recap', result.packs > 1 ? `Wiki-Traders · ${result.packs} paquets` : 'Wiki-Traders · paquet', result.title, () => {
       dismissedAt = result.at;
     });
-    for (const r of recap.rows) {
-      const row = node('div', 'part', 'wiky-f-row');
-      const name = node('span', 'part', 'wiky-f-name', r.title);
-      name.title = r.title;
-      const tag = r.ownedBefore || r.repeat
-        ? node('span', 'part', 'wiky-f-tag dup', r.ownedBefore ? `×${r.ownedBefore + (r.repeat ? 1 : 0)}` : 'doublon')
-        : node('span', 'part', 'wiky-f-tag new', 'Nouvelle');
-      tag.title = r.ownedBefore ? `Déjà possédée (${r.ownedBefore} exemplaire${r.ownedBefore > 1 ? 's' : ''} avant)` : r.repeat ? 'Obtenue plus haut dans ce récapitulatif' : 'Jamais possédée';
-      const price = node('span', 'part', `wiky-f-price${r.price == null ? ' wiky-f-muted' : ''}`, loading && r.price == null ? '…' : wiki(r.price));
-      row.append(rarityChip(r.rarity), name, tag, price);
-      body.append(row);
-    }
+    for (const r of recap.rows) body.append(recapRow(r, loading));
     const total = node('span', 'part');
     total.append('Total ', node('b', 'part', '', wiki(recap.total)));
     const meta = node('span', 'part', 'wiky-f-muted', loading ? 'chargement des prix…' : `${recap.priced}/${recap.rows.length} cotées · ${recap.fresh} nouvelle${recap.fresh > 1 ? 's' : ''}`);
@@ -169,14 +170,55 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
     }
   };
   const ids = result.cards.map((c) => c.siteId);
-  const known = new Map(ids.flatMap((id) => (knownPrice(id) ? [[id, knownPrice(id)!] as const] : [])));
+  const knownNow = () => new Map(ids.flatMap((id) => (knownPrice(id) ? [[id, knownPrice(id)!] as const] : [])));
+  // Affichage immédiat avec ce qui est en mémoire, puis avec le cache stocké (6 h) : seules les cartes encore sans
+  // prix partent en requête (cardPrices ne redemande pas les autres).
+  let known = knownNow();
   draw(known, fetchPrices && known.size < new Set(ids).size);
-  if (!fetchPrices) return;
+  await pricesLoaded();
+  const stored = knownNow();
+  if (stored.size !== known.size) draw(stored, fetchPrices && stored.size < new Set(ids).size);
+  known = stored;
+  if (!fetchPrices || known.size === new Set(ids).size) return;
   try {
     draw(await cardPrices(ids), false);
   } catch {
     draw(known, false);
   }
+}
+
+/** Ligne du récapitulatif : rareté, nom, nouvelle ou doublon, ventes ; à droite le prix moyen et le taux de vente. */
+function recapRow(r: RecapRow, loading: boolean): HTMLElement {
+  const row = node('div', 'part', 'wiky-f-row wiky-f-recap-row');
+  const main = node('div', 'part', 'wiky-f-recap-main');
+  const name = node('span', 'part', 'wiky-f-name', r.title);
+  name.title = r.title;
+  const sub = node('div', 'part', 'wiky-f-recap-sub');
+  const tag = r.ownedBefore || r.repeat
+    ? node('span', 'part', 'wiky-f-tag dup', r.ownedBefore ? `×${r.ownedBefore + (r.repeat ? 1 : 0)}` : 'doublon')
+    : node('span', 'part', 'wiky-f-tag new', 'Nouvelle');
+  tag.title = r.ownedBefore ? `Déjà possédée (${r.ownedBefore} exemplaire${r.ownedBefore > 1 ? 's' : ''} avant)` : r.repeat ? 'Obtenue plus haut dans ce récapitulatif' : 'Jamais possédée';
+  sub.append(tag);
+  if (r.rate) {
+    const sold = node('span', 'part');
+    sold.append(node('b', 'part', '', shortCount(r.rate.sold)), ` / ${shortCount(r.rate.total)} vendue${r.rate.sold > 1 ? 's' : ''}`);
+    sold.title = `${r.rate.sold} enchère${r.rate.sold > 1 ? 's' : ''} conclue${r.rate.sold > 1 ? 's' : ''} sur ${r.rate.total} terminée${r.rate.total > 1 ? 's' : ''}`;
+    sub.append(sold);
+  }
+  main.append(name, sub);
+  const right = node('div', 'part', 'wiky-f-recap-price');
+  if (r.price != null) right.append(node('strong', 'part', '', `Moy. ${wiki(r.price)}`));
+  else right.append(node('span', 'part', 'wiky-f-none', loading ? 'Prix…' : 'Moy. —'));
+  if (r.rate) right.append(node('span', 'part', `wiky-f-rate${r.rate.pct <= RATE_LOW ? ' is-low' : r.rate.pct >= RATE_HIGH ? ' is-high' : ''}`, `tdv ${r.rate.pct} %`));
+  const details = [
+    r.price != null ? `Moyenne de ${r.sales} vente${r.sales > 1 ? 's' : ''}${r.rarity ? ` en ${r.rarity}` : ''}` : r.rate || !loading ? 'Aucune vente conclue' : '',
+    r.median != null ? `médiane ${wiki(r.median)}` : '',
+    r.min != null && r.max != null ? `min ${wiki(r.min)} · max ${wiki(r.max)}` : '',
+    r.rate ? `taux de vente ${r.rate.pct} % (${r.rate.sold}/${r.rate.total})` : '',
+  ].filter(Boolean);
+  row.title = details.join('\n');
+  row.append(rarityChip(r.rarity), main, right);
+  return row;
 }
 
 /** Paquets déjà défaussés (clé : `at` du résultat) → nombre de cartes défaussées. */

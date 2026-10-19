@@ -69,7 +69,7 @@ describe('réponse d\'ouverture de paquet', () => {
   it('récapitulatif : prix moyens, déjà possédée, doublon, total et tri par prix', () => {
     const cards = mapPackCards(PACK);
     const prices = new Map([
-      ['c1', { median: 120, mean: 120, count: 4, at: 0 }],
+      ['c1', { median: 120, mean: 120, count: 4, min: 90, max: 150, rate: { sold: 4, total: 5 }, at: 0 }],
       ['c2', { median: 8, mean: 8, count: 2, at: 0 }],
       ['c3', { median: null, mean: null, count: 0, at: 0 }],
     ]);
@@ -80,6 +80,8 @@ describe('réponse d\'ouverture de paquet', () => {
       ['Paris', 8, 0, true],
       ['Lune', null, 0, false],
     ]);
+    expect(recap.rows[0]).toMatchObject({ sales: 4, rate: { pct: 80, sold: 4, total: 5 }, median: 120, min: 90, max: 150 });
+    expect(recap.rows[3].rate).toBeNull();
     expect(recap.total).toBe(136);
     expect(recap.priced).toBe(3);
     // Nouvelles : Paris (une fois) et Lune.
@@ -106,8 +108,17 @@ describe('réponse d\'ouverture de paquet', () => {
     expect(decodeURIComponent(priceCalls[0])).toContain('card_id=in.("c1","c2","c3")');
     const panel = document.querySelector('[data-wiky="pack-recap"]')!;
     expect(panel.textContent).toContain('Victor Hugo');
-    expect(panel.textContent).toContain('120 W');
+    expect(panel.textContent).toContain('Moy. 120 W');
     expect(panel.textContent).toContain('Nouvelle');
+    // Comme sur les cartes : taux de vente (coloré) et « vendues ».
+    const hugo = [...panel.querySelectorAll('.wiky-f-recap-row')].find((r) => r.textContent!.includes('Victor Hugo'))!;
+    expect(hugo.querySelector('.wiky-f-rate')!.textContent).toBe('tdv 100 %');
+    expect(hugo.querySelector('.wiky-f-rate')!.classList.contains('is-high')).toBe(true);
+    expect(hugo.querySelector('.wiky-f-recap-sub')!.textContent).toContain('2 / 2 vendues');
+    expect((hugo as HTMLElement).title).toContain('médiane 120 W');
+    // Un second récapitulatif des mêmes cartes ne refait aucune requête (prix en cache).
+    await showRecap({ cards, packs: 1, at: 2, title: 'encore', owned: new Map() }, true);
+    expect(calls.filter((u) => u.includes('/rest/v1/auctions'))).toHaveLength(1);
     expect(panel.querySelector('.wiky-f-foot b')!.textContent).toBe('136 W');
   });
 });
