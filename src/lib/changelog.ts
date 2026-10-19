@@ -2,6 +2,7 @@
  * Nouveautés affichées une fois après une mise à jour (fenêtre « Nouveautés » sur le site, ou dans la popup).
  * À chaque mise à jour publiée, ajouter une entrée EN TÊTE de la liste, avec un identifiant plus grand que le
  * précédent (date ISO, suffixe b, c… pour plusieurs le même jour) : elle s'affiche à la prochaine visite.
+ * L'identifiant ne doit jamais redescendre (un utilisateur qui a vu « 2026-10-19e » ne verrait pas « 2026-10-19c »).
  */
 
 export interface ChangelogItem {
@@ -23,87 +24,11 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    // Fusion des mises à jour du 19 octobre (identifiant gardé à la dernière publiée, pour l'ordre des suivantes).
     id: '2026-10-19e',
-    title: 'Seuil de confirmation de « Tout défausser »',
-    sections: [
-      {
-        title: 'Paquets',
-        items: [
-          {
-            title: 'Confirmer au-delà de… W',
-            text: '« Tout défausser » demande confirmation quand une carte obtenue vaut plus que ce prix moyen. 10 W par défaut ; 0 pour confirmer dès qu\'une carte est cotée.',
-            where: 'Réglages → Fonctionnalités → Paquets, sous les interrupteurs.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '2026-10-19d',
-    title: 'Défausse plus rapide',
-    sections: [
-      {
-        title: 'Paquets',
-        items: [
-          {
-            title: '« Tout défausser » en un instant',
-            text: 'Les cartes du paquet sont défaussées en une ou deux requêtes au lieu d\'une par carte. Les cartes en favori sont simplement ignorées (signalées dans le message, sans erreur).',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '2026-10-19c',
-    title: 'Actions rapides après l\'ouverture d\'un paquet',
-    sections: [
-      {
-        title: 'Paquets',
-        items: [
-          {
-            title: 'Tout étiqueter',
-            text: 'Sous le total du récapitulatif d\'ouverture (en bas à droite) : les cartes obtenues reçoivent d\'un coup les étiquettes de tes règles (plages de prix, texte, famille, taux de vente).',
-            where: 'Visible quand l\'étiquetage par l\'API est activé (Réglages → Automatisations).',
-          },
-          {
-            title: 'Tout défausser',
-            text: 'Bouton rouge : défausse un exemplaire de chaque carte obtenue, en un clic. Si une carte vaut plus de 10 W, une confirmation liste les cartes, leur valeur et celles que tu n\'avais pas encore. Irréversible ; les favoris restent verrouillés.',
-            where: 'Réglages → Fonctionnalités → Paquets → « Tout défausser après ouverture » pour le masquer.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '2026-10-19b',
-    title: 'Corrections',
-    sections: [
-      {
-        title: 'Vendre',
-        items: [
-          {
-            title: '« Suivant » en mode meilleures cartes',
-            text: 'Suivant, Précédent et ⏮ changent maintenant les cartes proposées à chaque clic (la fenêtre ne se mettait pas toujours à jour). L\'onglet « Mes ventes » du site suit la même page, et après une mise en vente on revient aux meilleures cartes.',
-            where: 'Fenêtre Vendre, avec la répartition « meilleures cartes, toutes étiquettes ».',
-          },
-        ],
-      },
-      {
-        title: 'Nouveautés',
-        items: [
-          {
-            title: 'Après une mise à jour en arrière-plan',
-            text: 'Si l\'onglet WikiMasters était en arrière-plan pendant la mise à jour, cette fenêtre s\'ouvre dès que tu y reviens.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '2026-10-19',
-    title: 'Taux de vente, ventes plus fines, étiquettes automatiques',
+    title: 'Taux de vente, ventes plus fines, paquets, étiquettes automatiques',
     intro:
-      'Le taux de vente (tdv) d\'une carte, c\'est la part de ses enchères terminées qui ont trouvé un acheteur. Il est maintenant partout : sur tes cartes, dans le prix conseillé, dans le choix des cartes à vendre et dans l\'étiquetage. Tout ce qui agit à ta place reste désactivé par défaut.',
+      'Le taux de vente (tdv) d\'une carte, c\'est la part de ses enchères terminées qui ont trouvé un acheteur. Il est maintenant partout : sur tes cartes, dans le prix conseillé, dans le choix des cartes à vendre et dans l\'étiquetage. Ce qui agit à ta place sans que tu cliques reste désactivé par défaut (badge « à activer »).',
     sections: [
       {
         title: 'Sur tes cartes',
@@ -145,7 +70,7 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
           {
             title: 'Mode « meilleures cartes »',
-            text: 'Plus de slots réservés par étiquette : les slots libres reçoivent les meilleures cartes de toutes tes étiquettes. « Suivant ▶ » passe aux suivantes.',
+            text: 'Plus de slots réservés par étiquette : les slots libres reçoivent les meilleures cartes de toutes tes étiquettes. « Suivant ▶ » / « ◀ Précédent » passent aux suivantes ; après une mise en vente, on revient aux meilleures.',
             where: 'Réglages → Prix conseillé → Répartition des slots.',
             optIn: true,
           },
@@ -154,6 +79,21 @@ export const CHANGELOG: ChangelogEntry[] = [
             text: 'Bouton « Vendre… » sur chaque vente conseillée : fiche de la carte (prix moyen, tdv, ventes, médiane…), prix et durée modifiables, et mise aux enchères directe. Contraire aux règles du site.',
             where: 'Réglages → Fonctionnalités → Automatisations → « Vendre depuis les ventes conseillées ».',
             optIn: true,
+          },
+        ],
+      },
+      {
+        title: 'Paquets',
+        items: [
+          {
+            title: 'Tout défausser',
+            text: 'Bouton rouge sous le total du récapitulatif d\'ouverture : défausse en un instant un exemplaire de chaque carte obtenue (jamais tes anciens exemplaires). Les cartes en favori sont ignorées. Si une carte vaut plus du seuil (10 W par défaut), une confirmation liste les cartes, leur valeur et celles que tu n\'avais pas encore. Irréversible.',
+            where: 'Seuil : Réglages → Fonctionnalités → Paquets → « confirmer au-delà de (W) ».',
+          },
+          {
+            title: 'Tout étiqueter',
+            text: 'À côté : les cartes obtenues reçoivent d\'un coup les étiquettes de tes règles (plages de prix, texte, famille, taux de vente).',
+            where: 'Visible quand l\'étiquetage par l\'API est activé (Réglages → Automatisations).',
           },
         ],
       },
@@ -171,15 +111,20 @@ export const CHANGELOG: ChangelogEntry[] = [
             text: 'Une règle peut poser son étiquette selon un mot du nom ou de la description (« pays »), une famille (« Films ») ou une plage de taux de vente (« Invendable » sous 15 %), en plus des plages de prix.',
             where: 'Réglages → Mes ventes → « Conditions et vente » sous chaque étiquette.',
           },
+          {
+            title: 'Vente sur mesure par étiquette',
+            text: 'Chaque étiquette peut avoir son taux de vente minimum, ses paliers de prix et de durée, son ordre de choix, ou une formule de score (mode avancé : « {prix} * {tdv} / 100 + {doublons} * 10 »).',
+            where: 'Réglages → Mes ventes → « Conditions et vente » → « Réglages de vente propres à cette étiquette ».',
+          },
         ],
       },
       {
-        title: 'Réglages par étiquette',
+        title: 'Cette fenêtre',
         items: [
           {
-            title: 'Vente sur mesure',
-            text: 'Chaque étiquette peut avoir son taux de vente minimum, ses paliers de prix et de durée, son ordre de choix, ou une formule de score (mode avancé : « {prix} * {tdv} / 100 + {doublons} * 10 »).',
-            where: 'Réglages → Mes ventes → « Conditions et vente » → « Réglages de vente propres à cette étiquette ».',
+            title: 'Nouveautés à chaque mise à jour',
+            text: 'Après chaque mise à jour, cette fenêtre présente ce qui a changé, une seule fois (même si l\'onglet était en arrière-plan).',
+            where: 'Pour la revoir : barre latérale → Paramètres ▸ Nouveautés, ou popup → Outils.',
           },
         ],
       },
