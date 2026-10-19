@@ -168,3 +168,4 @@ button.link.error { color: var(--danger); }
   .embed .toc ul { flex-direction: row; overflow-x: auto; gap: 4px; }
   .embed .toc a { white-space: nowrap; border-left: 0; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; background: var(--card); }
 }
+.feature-extra { margin-top: 10px; }

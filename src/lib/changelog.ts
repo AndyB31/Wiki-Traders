@@ -23,6 +23,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-19e',
+    title: 'Seuil de confirmation de « Tout défausser »',
+    sections: [
+      {
+        title: 'Paquets',
+        items: [
+          {
+            title: 'Confirmer au-delà de… W',
+            text: '« Tout défausser » demande confirmation quand une carte obtenue vaut plus que ce prix moyen. 10 W par défaut ; 0 pour confirmer dès qu\'une carte est cotée.',
+            where: 'Réglages → Fonctionnalités → Paquets, sous les interrupteurs.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-19d',
     title: 'Défausse plus rapide',
     sections: [
