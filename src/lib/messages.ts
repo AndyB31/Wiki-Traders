@@ -31,7 +31,7 @@ export interface ProposedMessage {
 export type ToBackground = ScanMessage | ProposedMessage | { type: 'refreshBadge' } | { type: 'retagsDone'; auctionIds: string[] } | { type: 'tabId' } | { type: 'prices'; prices: PriceObs[]; market?: { count: number; error?: string } } | { type: 'collection'; cards: ScannedCard[] } | { type: 'checkUpdate' } | { type: 'updaterStatus' } | { type: 'applyUpdate' } | { type: 'reloadExtension' };
 
 /** Messages envoyés par la popup au content script de l'onglet actif. */
-export type ToContent = { type: 'diagnostic' } | { type: 'rescan' } | { type: 'autoTag'; plan?: TagChange[] } | { type: 'stopAutoTag' } | { type: 'toggleWindow' } | { type: 'api'; op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 'myAuctions' | 'collectionPrices'; force?: boolean } | { type: 'api'; op: 'cardAuctions'; siteCardId: string } | { type: 'outbid'; auctionId: string };
+export type ToContent = { type: 'diagnostic' } | { type: 'rescan' } | { type: 'autoTag'; plan?: TagChange[] } | { type: 'stopAutoTag' } | { type: 'toggleWindow' } | { type: 'api'; op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 'myAuctions' | 'collectionPrices'; force?: boolean } | { type: 'api'; op: 'cardAuctions'; siteCardId: string } | { type: 'outbid'; auctionId: string } | { type: 'sell'; siteCardId: string; amount: number; durationMinutes: number; allowStarred?: boolean };
 
 export interface DiagnosticResult {
   url: string;

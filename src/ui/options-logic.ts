@@ -195,7 +195,8 @@ function ruleExtraErrors(r: TagRule): ValidationError[] {
 export function validateOptions(rules: TagRule[], settings: Settings, extra: { selectorsInvalid?: boolean } = {}): ValidationError[] {
   const errors: ValidationError[] = [];
   const sum = quotaSum(rules);
-  if (sum > settings.slots) {
+  // Mode « meilleures cartes » : les quotas ne servent pas.
+  if (sum > settings.slots && settings.allocationMode !== 'pool') {
     errors.push({
       section: 'rules',
       keys: ['slots', ...rules.filter((r) => r.active).map((r) => `rule:${r.id}:quota`)],

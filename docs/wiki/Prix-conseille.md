@@ -59,6 +59,7 @@ Dans le panneau **Conditions et vente** d'une règle, la case **Réglages de ven
 | --- | --- |
 | la plus chère / la moins chère / au hasard | après les doublons, comme le réglage global |
 | meilleur taux de vente | après les doublons, le tdv le plus haut (fiable) |
+| selon mes critères | critères appliqués dans l'ordre (prix, tdv, ventes…), voir [Vendre](Vendre.md#quelle-carte-est-proposée-) |
 | formule de score | le score le plus haut |
 
 La **formule de score** utilise des variables entre accolades : `{prix}`, `{prix_conseille}`, `{tdv}` (0 si inconnu), `{ventes}`, `{encheres}`, `{quantite}`, `{doublons}`, `{vendables}`, `{rarete}` (1 à 6), `{brillante}` (0 ou 1). Opérations `+ − * / % ^`, comparaisons (vrai = 1), `&& || !`, fonctions `min`, `max`, `abs`, `arrondi`, `plancher`, `plafond`, `racine`, `log`, `si(condition, alors, sinon)`.

@@ -24,6 +24,7 @@ import { renderAuctionSwitch } from './auction-mode';
 import { makeContext as featureContext, runFeatures } from './features/runtime';
 import './features';
 import { bidPollDelay, quickOutbidWithToast } from './features/bid-watch';
+import { createListing, SellError } from './features/market-sell';
 import { featureFlags } from '../lib/features';
 import { sellAdvice } from '../lib/allocation';
 import { auctionIdFromHref, hasEmptyState, parseAuctionDetail, parseAuctionList, type ParsedAuction } from './parsers/auctions';
@@ -879,6 +880,20 @@ async function main(): Promise<void> {
     if (message.type === 'api') {
       const job = message.op === 'cardAuctions' ? runCardAuctions(message.siteCardId) : runApi(message.op, !!message.force);
       void job.then(sendResponse, (e) => sendResponse({ ok: false, error: (e as Error).message }));
+      return true;
+    }
+    if (message.type === 'sell') {
+      // Vente depuis les ventes conseillées (option « popupSell », vérifiée ici au moment d'agir).
+      void refreshStore()
+        .then(() => createListing(featureFlags(store!.settings.features), message, 'popupSell'))
+        .then(
+          () => {
+            log(`[vente] ${message.siteCardId} : ${message.amount} W, ${message.durationMinutes} min`);
+            void refreshMyAuctions(true);
+            sendResponse({ ok: true });
+          },
+          (e) => sendResponse({ ok: false, error: (e as Error).message, code: e instanceof SellError ? e.code : undefined }),
+        );
       return true;
     }
     if (message.type === 'outbid') {

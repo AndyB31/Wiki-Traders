@@ -58,5 +58,6 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 | --- | --- |
 | Surenchère en un clic | Bouton « Surenchérir » dans le suivi des mises : mise minimale (+10 %), après confirmation avec le montant et ton solde |
 | Vendre depuis le classement | « Vendre » sur une ligne du classement : prix et durée conseillés modifiables, deux clics pour confirmer ; jamais un exemplaire déjà en vente, confirmation pour un favori |
+| Vendre depuis les ventes conseillées | non | Bouton « Vendre… » sur chaque vente conseillée (fenêtre Vendre) : prix moyen, taux de vente, ventes, médiane, min – max, calcul du prix conseillé ; prix et durée modifiables (la durée suit les paliers tant qu'elle n'est pas choisie à la main) ; mise aux enchères en un clic. Un onglet WikiMasters doit être ouvert |
 | Ouvrir tous les paquets | Ouvre tes paquets un par un (pause aléatoire, 100 au plus), progression et bouton Arrêter, récapitulatif final ; respecte la limite du site |
 | Ouverture automatique | Ouvre tes paquets à intervalle aléatoire (min / max en minutes) tant qu'un onglet visible est ouvert ; indicateur et bouton Arrêter |

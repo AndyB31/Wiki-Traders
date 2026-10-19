@@ -96,4 +96,23 @@ describe('page Réglages', () => {
     expect(rule.when).toMatchObject({ text: 'pays' });
     expect(rule.sale).toMatchObject({ sort: 'score', score: '{prix} *{prix}' });
   });
+
+  it('ordre « selon mes critères » et mode « meilleures cartes »', async () => {
+    const selects = [...document.querySelectorAll<HTMLSelectElement>('#prix select')];
+    const sort = selects.find((s) => [...s.options].some((o) => o.value === 'custom'))!;
+    sort.value = 'custom';
+    sort.dispatchEvent(new Event('change'));
+    const rows = () => [...document.querySelectorAll('#prix .criteria li')];
+    expect(rows()).toHaveLength(3);
+    document.querySelector<HTMLButtonElement>('#prix .criteria li:nth-child(3) button[title="Monter"]')!.click();
+    const mode = selects.find((s) => [...s.options].some((o) => o.value === 'pool'))!;
+    mode.value = 'pool';
+    mode.dispatchEvent(new Event('change'));
+    expect(document.querySelector('#ventes .quota-summary')!.textContent).toContain('meilleures cartes');
+    document.querySelector<HTMLButtonElement>('.savebar button.primary')!.click();
+    await flush();
+    const s2 = saved.at(-1)!.settings!;
+    expect(s2).toMatchObject({ sortPrice: 'custom', allocationMode: 'pool' });
+    expect(s2.sortCriteria.map((c) => c.key)).toEqual(['doublons', 'prix', 'tdv']);
+  });
 });

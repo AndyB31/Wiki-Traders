@@ -3,8 +3,8 @@ import './popup.css';
 import { allocate, makeContext, type FreeSlot } from '../lib/allocation';
 import { rarityBase } from '../lib/pricing';
 import { catalogPriceOf, diagnoseAutoTags, planAutoTags, type CatalogPriceEntry } from '../lib/autotag';
-import { sellRateOfCache, type RateEntry } from '../lib/sellrate';
-import { durationLabel } from '../lib/duration';
+import { rateOf, sellRateOfCache, SELL_RATE_MIN_SAMPLES, type RateEntry } from '../lib/sellrate';
+import { DURATIONS, durationFor, durationLabel } from '../lib/duration';
 import { ext } from '../lib/browser';
 import { CARD_PRICES_KEY, SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
 import type { DiagnosticResult, ToBackground, ToContent } from '../lib/messages';
@@ -125,6 +125,22 @@ async function rotateProposals(free: FreeSlot[]): Promise<void> {
   await save({ slotOverrides: overrides });
 }
 
+/** Mode « meilleures cartes » : position dans la liste commune, pages précédente et suivante. */
+function poolTools(free: FreeSlot[], pool: { size: number; offset: number }) {
+  const step = Math.max(1, free.length);
+  const go = (delta: number) => save({ slotOverrides: {}, poolOffset: pool.size ? (((pool.offset + delta) % pool.size) + pool.size) % pool.size : 0 });
+  const last = Math.min(pool.size, pool.offset + step);
+  const where = pool.size ? `${pool.offset + 1}–${last}${last < pool.offset + step ? ' + début' : ''} sur ${pool.size}` : 'aucune carte vendable';
+  return h(
+    'div',
+    { class: 'row proposal-tools' },
+    h('span', { class: 'muted small grow', title: 'Meilleures cartes de toutes les étiquettes, selon l\'ordre réglé dans Réglages → Prix conseillé' }, `Meilleures cartes ${where}`),
+    pool.offset > 0 ? h('button', { class: 'small', title: 'Revenir aux meilleures', onclick: () => save({ slotOverrides: {}, poolOffset: 0 }) }, '⏮') : null,
+    pool.size > step ? h('button', { class: 'small', title: `${step} cartes précédentes`, onclick: () => go(-step) }, '◀ Précédent') : null,
+    pool.size > step ? h('button', { title: `${step} cartes suivantes`, onclick: () => go(step) }, 'Suivant ▶') : null,
+  );
+}
+
 function proposalTools(free: FreeSlot[]) {
   const rotatable = free.some((s) => !s.ignored && s.candidates.length > 1);
   const custom = Object.keys(store.slotOverrides).length > 0;
@@ -210,6 +226,7 @@ function freeSlotView(slot: FreeSlot) {
   );
   if (slot.ignored) return h('div', { class: 'slot free ignored card' }, header, h('div', { class: 'muted small' }, 'Slot ignoré jusqu\'à la prochaine enchère.'));
   if (!p) {
+    if (slot.pool) return h('div', { class: 'slot free card' }, h('div', { class: 'muted' }, 'Plus aucune carte vendable dans tes étiquettes actives.'));
     return h('div', { class: 'slot free card' }, header, h('div', { class: 'muted' }, `Aucune carte vendable pour « ${slot.rule.tag} ».`), whyEmpty(slot));
   }
 
@@ -272,13 +289,136 @@ function freeSlotView(slot: FreeSlot) {
     h(
       'div',
       { class: 'row actions' },
-      h('button', { class: 'primary', onclick: () => openProposal(slot) }, store.settings.prefill ? (p.pricing.price != null ? 'Ouvrir et pré-remplir' : 'Ouvrir la vente') : 'Ouvrir'),
+      featureFlags(store.settings.features).popupSell && p.card.siteId
+        ? h('button', { class: 'primary', title: 'Infos de la carte, prix et durée modifiables, mise aux enchères en un clic', onclick: () => openSellDialog(slot) }, 'Vendre…')
+        : null,
+      h('button', { class: featureFlags(store.settings.features).popupSell && p.card.siteId ? undefined : 'primary', onclick: () => openProposal(slot) }, store.settings.prefill ? (p.pricing.price != null ? 'Ouvrir et pré-remplir' : 'Ouvrir la vente') : 'Ouvrir'),
       p.pricing.price != null
         ? h('button', { onclick: (e: Event) => copy(e.target as HTMLButtonElement, String(p.pricing.price)) }, 'Copier le prix')
         : null,
       slot.candidates.length > 1 ? select : null,
     ),
   );
+}
+
+/** Prix moyen d'une carte dans le cache des prix (lu via l'API), avec médiane, extrêmes et taux de vente. */
+type CachedPrice = CatalogPriceEntry & RateEntry & { median?: number | null; min?: number | null; max?: number | null };
+
+/**
+ * « Vendre… » sur une vente conseillée (option « popupSell ») : fiche de la carte (prix moyen, ventes, taux de vente,
+ * calcul du prix conseillé), prix et durée modifiables, puis mise aux enchères directe par la page du site.
+ */
+function openSellDialog(slot: FreeSlot): void {
+  const p = slot.proposal!;
+  const card = p.card;
+  document.querySelector('.modal')?.remove();
+  const close = () => modal.remove();
+  const cached = card.siteId ? (catalogPrices?.[card.siteId] as CachedPrice | undefined) : undefined;
+  const rate = rateOf(cached);
+  const tiers = slot.rule.sale?.durationRules ?? store.settings.durationRules;
+
+  const info = (label: string, value: string | Node, title?: string) => h('div', { class: 'sell-info', title }, h('span', { class: 'muted small' }, label), h('strong', null, value));
+  const rateClass = !rate ? '' : rate.total < SELL_RATE_MIN_SAMPLES ? '' : rate.pct <= 15 ? 'down' : rate.pct >= 70 ? 'up' : '';
+  const infos = h(
+    'div',
+    { class: 'sell-infos' },
+    info('Prix moyen', p.pricing.base.value != null ? formatPrice(Math.round(p.pricing.base.value)) : '—', p.pricing.detail),
+    info(
+      'Taux de vente',
+      rate ? h('span', { class: rateClass }, `${rate.pct} %`) : '—',
+      rate ? `${rate.sold} vendue(s) sur ${rate.total} enchère(s) terminée(s)${rate.total < SELL_RATE_MIN_SAMPLES ? ' : trop peu pour être fiable' : ''}` : 'Pas encore lu (ouvre ta collection)',
+    ),
+    info('Ventes', rate ? `${rate.sold} / ${rate.total}` : cached ? String(cached.count) : '—', 'Enchères conclues / enchères terminées'),
+    cached?.median != null ? info('Médiane', formatPrice(Math.round(cached.median))) : null,
+    cached?.min != null && cached?.max != null ? info('Min – max', `${formatPrice(cached.min)} – ${formatPrice(cached.max)}`) : null,
+    info('Exemplaires', `×${card.quantity}`, slot.rule.keepMin ? `Garder ${slot.rule.keepMin} exemplaire(s)` : undefined),
+  );
+
+  const priceIn = h('input', { type: 'number', min: '1', step: '1', inputmode: 'numeric', 'aria-label': 'Prix de départ', value: p.pricing.price ?? '' }) as HTMLInputElement;
+  const durIn = h(
+    'select',
+    { 'aria-label': 'Durée' },
+    DURATIONS.map((d) => h('option', { value: d.minutes, selected: d.minutes === (p.pricing.durationMin ?? 60) }, d.label)),
+  ) as HTMLSelectElement;
+  const go = h('button', { class: 'primary grow' }) as HTMLButtonElement;
+  const status = h('div', { class: 'small', 'aria-live': 'polite' });
+  const starred = h('button', { hidden: true }, 'Vendre le favori quand même') as HTMLButtonElement;
+  let durTouched = false;
+  const label = () => {
+    const amount = Number(priceIn.value);
+    go.textContent = amount > 0 ? `Mettre aux enchères · ${formatPrice(amount)} · ${durationLabel(Number(durIn.value))}` : 'Saisis un prix';
+    go.disabled = !(amount > 0);
+  };
+  priceIn.addEventListener('input', () => {
+    // La durée suit les paliers tant qu'elle n'a pas été choisie à la main.
+    const d = durationFor(Number(priceIn.value) || null, tiers);
+    if (!durTouched && d != null) durIn.value = String(d);
+    label();
+  });
+  durIn.addEventListener('change', () => {
+    durTouched = true;
+    label();
+  });
+
+  const send = async (allowStarred: boolean) => {
+    const amount = Math.round(Number(priceIn.value));
+    const durationMinutes = Number(durIn.value);
+    if (!(amount > 0)) return priceIn.focus();
+    if (!(await siteTab())) {
+      status.className = 'small error';
+      status.textContent = 'Ouvre un onglet WikiMasters : la mise en vente passe par la page du site.';
+      return;
+    }
+    go.disabled = true;
+    starred.hidden = true;
+    status.className = 'small muted';
+    status.textContent = 'Mise aux enchères…';
+    const res = (await sendToTab({ type: 'sell', siteCardId: card.siteId!, amount, durationMinutes, allowStarred })) as { ok: boolean; error?: string; code?: string } | null;
+    if (res?.ok) {
+      // Journal : la vente garde son étiquette (récapitulatif, étiquettes des invendues).
+      const msg: ToBackground = { type: 'proposed', cardId: card.id, cardName: card.name, tag: slot.rule.tag, price: amount, avgPrice: p.pricing.base.value };
+      await ext.runtime.sendMessage(msg).catch(() => {});
+      status.className = 'small ok';
+      status.textContent = `✓ « ${card.name} » mise aux enchères : ${formatPrice(amount)}, ${durationLabel(durationMinutes)}.`;
+      go.textContent = 'En vente ✓';
+      setTimeout(close, 1500);
+      return;
+    }
+    status.className = 'small error';
+    status.textContent = res?.error ?? 'Page non joignable : recharge l\'onglet WikiMasters.';
+    starred.hidden = res?.code !== 'STARRED';
+    label();
+  };
+  go.addEventListener('click', () => void send(false));
+  starred.addEventListener('click', () => void send(true));
+  label();
+
+  const modal = h(
+    'div',
+    { class: 'modal', onclick: (e: Event) => e.target === modal && close() },
+    h(
+      'div',
+      { class: 'modal-box sell-dialog', role: 'dialog', 'aria-label': `Vendre ${card.name}` },
+      h('div', { class: 'row modal-head' }, rarityDot(card.rarity), h('strong', { class: 'grow ellipsis', title: card.name }, `${card.name}${card.shiny ? ' ✨' : ''}`), h('button', { title: 'Fermer', onclick: close }, '×')),
+      card.category ? h('div', { class: 'small muted' }, card.category) : null,
+      h('div', { class: 'row wrap' }, h('span', { class: 'pill' }, slot.rule.tag), card.tags.filter((t) => t !== slot.rule.tag).map((t) => h('span', { class: 'pill muted' }, t))),
+      infos,
+      h('div', { class: 'small muted' }, `Conseillé : ${p.pricing.detail}`),
+      h(
+        'div',
+        { class: 'row sell-fields' },
+        h('label', { class: 'grow' }, h('span', { class: 'muted small' }, 'Prix de départ (W)'), priceIn),
+        h('label', null, h('span', { class: 'muted small' }, 'Durée'), durIn),
+      ),
+      h('div', { class: 'row' }, go),
+      starred,
+      status,
+      h('div', { class: 'small muted' }, 'Mise en vente directe par l\'API du site, sans passer par sa fiche : contraire à ses règles (risque de bannissement).'),
+    ),
+  );
+  document.body.append(modal);
+  priceIn.focus();
+  priceIn.select();
 }
 
 async function copy(btn: HTMLButtonElement, text: string): Promise<void> {
@@ -1057,7 +1197,7 @@ function render(): void {
       id: 'sell',
       label: `Vendre${sellCount ? ` (${sellCount})` : ''}`,
       body: () => [
-        proposalTools(alloc.free),
+        alloc.pool ? poolTools(alloc.free, alloc.pool) : proposalTools(alloc.free),
         ...free.map(freeSlotView),
         alloc.unassigned > 0 ? h('div', { class: 'muted small' }, `${alloc.unassigned} slot(s) libre(s) sans règle : ajoute un quota dans les réglages.`) : null,
         free.length || alloc.unassigned ? null : h('p', { class: 'muted empty' }, 'Tous les slots sont occupés.'),

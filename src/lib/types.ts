@@ -12,8 +12,16 @@ export interface RuleConditions {
   rateMax: number | null;
 }
 
-/** Ordre de choix des cartes d'une étiquette. `rate` : meilleur taux de vente d'abord ; `score` : formule. */
-export type CandidateSort = 'desc' | 'asc' | 'random' | 'rate' | 'score';
+/** Ordre de choix des cartes d'une étiquette. `rate` : meilleur taux de vente d'abord ; `score` : formule ; `custom` : critères. */
+export type CandidateSort = 'desc' | 'asc' | 'random' | 'rate' | 'score' | 'custom';
+
+/** Critère de tri des cartes proposées (voir lib/sorting.ts). */
+export type SortKey = 'prix' | 'prix_moyen' | 'tdv' | 'ventes' | 'encheres' | 'doublons' | 'rarete' | 'hasard';
+
+export interface SortCriterion {
+  key: SortKey;
+  dir: 'asc' | 'desc';
+}
 
 /** Réglages de vente propres à une étiquette (remplacent les réglages globaux). */
 export interface RuleSale {
@@ -23,6 +31,8 @@ export interface RuleSale {
   sort: CandidateSort;
   /** Formule de score (ordre `score`) : la plus haute d'abord. */
   score: string;
+  /** Critères de tri (ordre `custom`), dans l'ordre. */
+  sortCriteria?: SortCriterion[];
 }
 
 export interface TagRule {
@@ -129,7 +139,14 @@ export interface Settings {
   /** Pas d'arrondi du prix conseillé ; 0 = automatique selon le montant. */
   rounding: number;
   /** Classement à doublons égaux : prix le plus haut d'abord, ou le plus bas (pour écouler). */
-  sortPrice: 'desc' | 'asc' | 'random';
+  sortPrice: 'desc' | 'asc' | 'random' | 'custom';
+  /** Critères de tri des cartes proposées (ordre `custom`), dans l'ordre. */
+  sortCriteria: SortCriterion[];
+  /**
+   * `quota` : chaque étiquette réserve ses slots ; `pool` : les meilleures cartes de toutes les étiquettes remplissent
+   * les slots libres, page par page (« Suivant »).
+   */
+  allocationMode: 'quota' | 'pool';
   /** Graine du tirage « aléatoire » (stable entre deux rafraîchissements, change à la demande). */
   randomSeed: number;
   /** Autoriser à proposer une carte déjà en vente. */
@@ -379,4 +396,6 @@ export interface StoreShape {
   familiesImportedAt: number | null;
   /** Invendues dont les étiquettes restent à remettre (traitées par un onglet du site ouvert). */
   pendingRetags: PendingRetag[];
+  /** Mode « meilleures cartes » : rang de la première carte proposée (bouton « Suivant »). */
+  poolOffset: number;
 }

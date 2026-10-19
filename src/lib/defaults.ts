@@ -10,6 +10,8 @@ export const DEFAULT_SETTINGS: Settings = {
   // 0 = arrondi automatique (unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà).
   rounding: 0,
   sortPrice: 'desc',
+  sortCriteria: [],
+  allocationMode: 'quota',
   randomSeed: 1,
   allowDuplicateListing: false,
   includeListings: false,
@@ -67,6 +69,7 @@ export const DEFAULT_STORE: StoreShape = {
   myFamilies: [],
   familiesImportedAt: null,
   pendingRetags: [],
+  poolOffset: 0,
 };
 
 /** Cache des prix moyens par carte (catalog.ts), lu aussi par la popup pour l'étiquetage. */

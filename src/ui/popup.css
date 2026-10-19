@@ -69,3 +69,11 @@ button.tag-switch:disabled { opacity: .4; }
 /* Un seul onglet affiché dans une fenêtre ou une page du site. */
 .view #app { padding: 14px 18px 18px; gap: 10px; }
 .view .panel { gap: 10px; }
+/* Fenêtre « Vendre… » d'une vente conseillée */
+.sell-infos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.sell-info { display: flex; flex-direction: column; gap: 1px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.sell-info strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+.sell-fields { align-items: flex-end; }
+.sell-fields label { display: flex; flex-direction: column; gap: 2px; }
+.sell-fields input { width: 100%; }
+.sell-dialog .ok { color: var(--ok); }
