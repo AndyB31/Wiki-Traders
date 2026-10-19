@@ -1725,11 +1725,13 @@ function autoTagSection() {
     [
       h('div', { class: 'toggles' }, riskyToggle('autoTag', 'Étiquetage automatique', 'Pose et retire les étiquettes suivies selon le prix moyen de chaque carte.')),
       ui.autoTagMode,
-      field(
-        'Lancement',
+      h(
+        'div',
+        { class: 'launch' },
+        h('div', { class: 'field-label' }, 'Lancement'),
         h(
           'div',
-          { class: 'levels launch', role: 'radiogroup', 'aria-label': 'Lancement de l\'étiquetage' },
+          { class: 'levels', role: 'radiogroup', 'aria-label': 'Lancement de l\'étiquetage' },
           [
             [false, 'À la demande', 'Tu le lances depuis la popup (Cartes → Étiquetage), avec un bouton Arrêter.'],
             [true, 'En continu', 'Tourne tout seul tant qu\'un onglet du site est ouvert : seulement les cartes à changer, au plus toutes les 2 min, par petits lots. Par l\'API.'],

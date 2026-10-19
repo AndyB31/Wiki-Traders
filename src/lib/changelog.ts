@@ -81,6 +81,31 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: 'Étiquettes et familles',
+        items: [
+          {
+            title: 'Onglet Familles',
+            text: 'Tout ce qui concerne tes familles au même endroit, dont « les cartes de la famille X reçoivent l\'étiquette Y » pour l\'étiquetage automatique. Tes anciennes conditions « famille » y ont été déplacées.',
+            where: 'Réglages → Familles.',
+          },
+          {
+            title: 'Étiquetage en continu',
+            text: 'L\'étiquetage automatique peut tourner tout seul tant qu\'un onglet du site est ouvert : seulement les cartes à changer, par petits lots, au plus toutes les 2 minutes, et peu après l\'ouverture d\'un paquet.',
+            where: 'Réglages → Étiquettes → Lancement : « En continu » (avec l\'étiquetage par l\'API).',
+            optIn: true,
+          },
+        ],
+      },
+      {
+        title: 'Paquets',
+        items: [
+          {
+            title: 'Récapitulatif complet',
+            text: 'Chaque carte obtenue affiche son prix moyen, son taux de vente et « vendues / enchères », comme sur tes cartes ; médiane, min et max au survol. Les prix déjà connus s\'affichent sans nouvelle requête, et les lectures sont plus rapides.',
+          },
+        ],
+      },
+      {
         title: 'Popup',
         items: [
           {

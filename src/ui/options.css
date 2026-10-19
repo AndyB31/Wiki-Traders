@@ -209,4 +209,4 @@ button.link.error { color: var(--danger); }
 .family-tag { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
 .family-tag.inactive > :not(input.switch) { opacity: .5; }
 .family-tag select { max-width: 220px; }
-.levels.launch { margin-top: 4px; }
+.launch { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }

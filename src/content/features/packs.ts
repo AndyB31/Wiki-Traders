@@ -659,6 +659,8 @@ export function handlePackResponse(body: unknown, c: FeatureContext | null = ctx
   if (!cards.length) return;
   const pack: PackResult = { cards, packs: 1, at: Date.now(), title: `${cards.length} carte${cards.length > 1 ? 's' : ''} obtenue${cards.length > 1 ? 's' : ''}`, owned: ownedSnapshot(c) };
   last = pack;
+  // Nouvelles cartes : l'étiquetage en continu repasse bientôt (voir content/index.ts).
+  window.dispatchEvent(new Event('wiky-pack-opened'));
   if (c.flags.pullStats) {
     void recordPulls(cards).then((s) => {
       stats = s;

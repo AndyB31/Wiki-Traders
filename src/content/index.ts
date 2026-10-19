@@ -939,6 +939,10 @@ async function main(): Promise<void> {
   // Étiquetage en continu : après un changement de collection ou de réglages, et un passage de fond (prix compris).
   onStoreChange(['cards', 'rules', 'settings', 'myFamilies'], () => scheduleAutoTag());
   scheduleAutoTag(30_000);
+  window.addEventListener('wiky-pack-opened', () => {
+    lastApiCollection = 0;
+    scheduleAutoTag(15_000);
+  });
   setInterval(() => scheduleAutoTag(0), AUTO_TAG_EVERY);
   document.addEventListener('visibilitychange', () => void refreshMyAuctions());
   setInterval(() => void refreshBidsFast(), 5_000);
