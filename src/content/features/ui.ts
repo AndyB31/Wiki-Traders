@@ -132,7 +132,7 @@ export function floatingPanel(id: string, kicker: string, title: string, onClose
 }
 
 /** Fenêtre de confirmation du style du site ; résout `true` si l'utilisateur confirme. */
-export function confirmDialog(opts: { title: string; text: string; confirm: string; cancel?: string }): Promise<boolean> {
+export function confirmDialog(opts: { title: string; text: string; confirm: string; cancel?: string; danger?: boolean }): Promise<boolean> {
   ensureFeatureStyle();
   return new Promise((resolve) => {
     const overlay = node('div', 'confirm', 'wiky-f-confirm');
@@ -154,6 +154,7 @@ export function confirmDialog(opts: { title: string; text: string; confirm: stri
     };
     const ok = button(opts.confirm, () => done(true));
     ok.dataset.act = 'confirm';
+    if (opts.danger) Object.assign(ok.style, { background: '#ef4444', borderColor: '#ef4444', color: '#fff' });
     const no = button(opts.cancel ?? 'Annuler', () => done(false), 'ghost');
     no.dataset.act = 'cancel';
     actions.append(no, ok);

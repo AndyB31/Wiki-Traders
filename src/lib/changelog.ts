@@ -23,6 +23,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-19c',
+    title: 'Actions rapides après l\'ouverture d\'un paquet',
+    sections: [
+      {
+        title: 'Paquets',
+        items: [
+          {
+            title: 'Tout étiqueter',
+            text: 'Sous le total du récapitulatif d\'ouverture (en bas à droite) : les cartes obtenues reçoivent d\'un coup les étiquettes de tes règles (plages de prix, texte, famille, taux de vente).',
+            where: 'Visible quand l\'étiquetage par l\'API est activé (Réglages → Automatisations).',
+          },
+          {
+            title: 'Tout défausser',
+            text: 'Bouton rouge : défausse un exemplaire de chaque carte obtenue, en un clic. Si une carte vaut plus de 10 W, une confirmation liste les cartes, leur valeur et celles que tu n\'avais pas encore. Irréversible ; les favoris restent verrouillés.',
+            where: 'Réglages → Fonctionnalités → Paquets → « Tout défausser après ouverture » pour le masquer.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-19b',
     title: 'Corrections',
     sections: [

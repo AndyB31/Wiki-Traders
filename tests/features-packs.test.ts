@@ -19,8 +19,10 @@ const storage = vi.hoisted(() => {
   return data;
 });
 
-const { addPulls, buildRecap, emptyPullStats, loadPullStats, mapPackCards, normalizeBounds, openPackRequest, pullShares, randomDelay, recordPulls } = await import('../src/content/features/packs-logic');
-const { autoTick, openAllPacks, showRecap } = await import('../src/content/features/packs');
+const { addPulls, buildRecap, emptyPullStats, loadPullStats, mapPackCards, normalizeBounds, openPackRequest, packCardsForTagging, pullShares, randomDelay, recordPulls } = await import('../src/content/features/packs-logic');
+const { planAutoTags } = await import('../src/lib/autotag');
+const { DEFAULT_STORE } = await import('../src/lib/defaults');
+const { autoTick, discardNeedsConfirm, openAllPacks, showRecap } = await import('../src/content/features/packs');
 const { resetCatalog } = await import('../src/content/catalog');
 
 const b64url = (s: string) => Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -107,6 +109,34 @@ describe('réponse d\'ouverture de paquet', () => {
     expect(panel.textContent).toContain('120 W');
     expect(panel.textContent).toContain('Nouvelle');
     expect(panel.querySelector('.wiky-f-foot b')!.textContent).toBe('136 W');
+  });
+});
+
+describe('« Tout défausser » après ouverture', () => {
+  it('confirmation seulement si une carte vaut plus de 10 W, ou si les prix chargent encore', () => {
+    expect(discardNeedsConfirm([{ price: 8 }, { price: 10 }, { price: null }], false)).toBe(false);
+    expect(discardNeedsConfirm([{ price: 8 }, { price: 11 }], false)).toBe(true);
+    expect(discardNeedsConfirm([{ price: 2 }], true)).toBe(true);
+  });
+});
+
+describe('« Tout étiqueter » après ouverture', () => {
+  it('une carte par titre, étiquettes et favoris connus repris, puis plan d\'étiquetage limité au paquet', () => {
+    const cards = [...mapPackCards(PACK), mapPackCards(PACK)[0]];
+    const known = { 'victor-hugo': { id: 'victor-hugo', name: 'Victor Hugo', tags: ['Galaxy'], quantity: 2, favorite: false, rarity: 'SR' as const, sitePrice: null, sitePriceAt: null, updatedAt: 0 } };
+    const forTag = packCardsForTagging(cards, known);
+    expect(Object.keys(forTag).sort()).toEqual(['lune', 'paris', 'victor-hugo']);
+    expect(forTag['victor-hugo']).toMatchObject({ siteId: 'c1', tags: ['Galaxy'], quantity: 2 });
+    expect(forTag.paris).toMatchObject({ siteId: 'c2', tags: [], quantity: 1, favorite: false });
+    const prices: Record<string, number> = { c1: 120, c2: 8 };
+    const plan = planAutoTags(
+      { ...structuredClone(DEFAULT_STORE), cards: forTag, rules: [
+        { id: 'a', tag: '50-100', quota: 1, pct: 70, floor: 50, ceiling: 1000, keepMin: 1, active: true, match: 'tag' },
+        { id: 'b', tag: 'Ville', quota: 0, pct: 70, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', when: { text: 'paris', family: '', rateMin: null, rateMax: null } },
+      ] },
+      { removeOthers: true, extraPrice: (c) => prices[c.siteId!] },
+    );
+    expect(plan.map((c) => [c.cardName, c.add])).toEqual([['Paris', ['Ville']], ['Victor Hugo', ['50-100']]]);
   });
 });
 

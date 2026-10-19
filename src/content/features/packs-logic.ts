@@ -3,7 +3,8 @@
  * récapitulatif (prix, déjà possédée ?), ouverture en série (même requête que le site) et délais aléatoires.
  */
 import { ext } from '../../lib/browser';
-import type { Rarity } from '../../lib/types';
+import { slugify } from '../../lib/text';
+import type { Card, Rarity } from '../../lib/types';
 import type { CardPrice } from '../catalog';
 import { displayPrice } from '../catalog';
 
@@ -357,4 +358,31 @@ export async function saveAutoOpen(patch: Partial<AutoOpenState>): Promise<AutoO
   const next = { ...(await loadAutoOpen()), ...patch };
   await ext.storage.local.set({ [AUTO_OPEN_KEY]: next });
   return next;
+}
+
+/**
+ * Cartes d'un paquet pour l'étiquetage automatique : une par carte (les doublons du paquet comptent une fois),
+ * avec les étiquettes et favoris déjà connus de ma collection.
+ */
+export function packCardsForTagging(cards: PackCard[], known: Record<string, Card>): Record<string, Card> {
+  const out: Record<string, Card> = {};
+  for (const c of cards) {
+    const id = slugify(c.title);
+    if (out[id]) continue;
+    const mine = known[id];
+    out[id] = {
+      id,
+      siteId: c.siteId,
+      name: c.title,
+      rarity: c.rarity,
+      tags: mine?.tags ?? [],
+      quantity: Math.max(1, mine?.quantity ?? 1),
+      favorite: mine?.favorite ?? false,
+      category: mine?.category,
+      sitePrice: null,
+      sitePriceAt: null,
+      updatedAt: Date.now(),
+    };
+  }
+  return out;
 }
