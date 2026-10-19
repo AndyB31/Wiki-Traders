@@ -21,6 +21,8 @@ export const DEFAULT_SETTINGS: Settings = {
   myAuctionsPath: null,
   sellPath: '/collection',
   durationRules: [],
+  minSellRate: null,
+  sellRateRules: [],
   apiRead: false,
   sellMarketSummary: true,
   sellMarketList: true,

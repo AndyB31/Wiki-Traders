@@ -13,6 +13,22 @@ Réglages → **Règles par étiquette**. Voir le détail des colonnes dans [Pre
 - **Étiquette de secours** : quand une étiquette n'a plus de carte vendable, son slot passe à l'étiquette de secours.
 - **Liste noire** : une carte par ligne, jamais proposée. Les favoris ne le sont jamais non plus.
 
+### Conditions et vente (par étiquette)
+
+Sous chaque règle, le panneau **Conditions et vente** :
+
+**Conditions d'étiquetage** (toutes celles remplies doivent être vraies) :
+
+| Condition | Exemple |
+| --- | --- |
+| Le nom ou la catégorie contient | `pays, nation` : il suffit d'un mot ; accents et majuscules ignorés |
+| Dans la famille | `Films` : une de tes familles |
+| Taux de vente | de 0 à 15 % (compté à partir de 5 enchères terminées) |
+
+Une règle avec des conditions est **indépendante** des plages de prix : la carte France (catégorie Pays, 30 W) reçoit `20-50` **et** `Pays`. En appartenance « plage de prix moyen », les conditions comptent aussi pour les ventes.
+
+**Réglages de vente propres** (case à cocher, copiés des réglages globaux au départ) : taux de vente minimum, ordre de choix des cartes, paliers de prix selon le taux de vente, paliers de durée. Voir [Prix conseillé](Prix-conseille.md#réglages-par-étiquette-et-formule-de-score).
+
 ## Étiquettes sur les cartes
 
 Option **Étiquettes visibles sur les cartes** : sur chaque carte de la collection, les étiquettes s'affichent en haut, aux couleurs choisies sur le site.
@@ -30,7 +46,7 @@ L'interrupteur à côté de ⚙️ dans la popup bascule entre les deux.
 
 > ⚠️ Facultatif et désactivé par défaut : voir [Automatisations et risques](Automatisations-et-risques.md).
 
-Range chaque carte dans l'étiquette dont la plage **plancher – plafond** contient son prix de référence (ex. 62 → `50-100`).
+Range chaque carte dans l'étiquette dont la plage **plancher – plafond** contient son prix de référence (ex. 62 → `50-100`), une seule plage par carte. Les règles avec des **conditions** (texte, famille, taux de vente) ajoutent en plus leur étiquette à chaque carte qui les remplit. Une étiquette n'est retirée que si sa règle n'est plus remplie, jamais sur un prix ou un taux de vente inconnu.
 
 1. Réglages → Automatisations → **Étiquetage automatique sur le site** (confirmation).
 2. Options : **Retirer les autres étiquettes gérées** (une carte ne garde qu'une plage). Les cartes sans prix connu ne sont pas modifiées.

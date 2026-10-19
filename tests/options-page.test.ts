@@ -27,7 +27,7 @@ describe('page Réglages', () => {
 
   it('affiche les sections dans l\'ordre, avec sommaire et interrupteurs', () => {
     const ids = [...document.querySelectorAll('.sections > [id]')].map((s) => s.id);
-    expect(ids).toEqual(['demarrage', 'ventes', 'prix', 'durees', 'notifications', 'affichage', 'fonctionnalites', 'automatisations', 'maj', 'avance']);
+    expect(ids).toEqual(['demarrage', 'ventes', 'prix', 'durees', 'tdv', 'notifications', 'affichage', 'fonctionnalites', 'automatisations', 'maj', 'avance']);
     expect(document.querySelectorAll('.toc a')).toHaveLength(ids.length);
     expect(document.querySelectorAll('input[type=checkbox]:not([role=switch])')).toHaveLength(0);
     expect((document.getElementById('avance') as HTMLDetailsElement).open).toBe(false);
@@ -70,5 +70,30 @@ describe('page Réglages', () => {
     btn.click();
     expect(document.querySelectorAll('#durees .tier')).toHaveLength(3);
     expect([...document.querySelectorAll('.tiers-preview .chip')].map((c) => c.textContent)).toEqual(['0–20 W → 10 min', '21–100 W → 1 h', '101 W et + → 3 h']);
+  });
+
+  it('conditions et réglages de vente propres à une étiquette, formule vérifiée en direct, enregistrés', async () => {
+    const details = document.querySelector<HTMLDetailsElement>('#ventes details.rule-extra')!;
+    expect(details.querySelector('summary')!.textContent).toContain('aucune condition');
+    const text = details.querySelector<HTMLInputElement>('input[placeholder="ex. pays, ville"]')!;
+    text.value = 'pays';
+    text.dispatchEvent(new Event('input'));
+    expect(details.querySelector('summary')!.textContent).toContain('nom contient « pays »');
+    details.querySelector<HTMLInputElement>('.rule-sale .toggle input')!.click();
+    const sort = [...details.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'score'))!;
+    sort.value = 'score';
+    sort.dispatchEvent(new Event('change'));
+    const formula = details.querySelector<HTMLTextAreaElement>('textarea.formula')!;
+    expect(details.querySelector('.formula-state')!.className).toContain('ok');
+    formula.value = '{prix} *';
+    formula.dispatchEvent(new Event('input'));
+    expect(details.querySelector('.formula-state')!.textContent).toContain('formule incomplète');
+    details.querySelector<HTMLButtonElement>('.formula-vars button')!.click();
+    expect(formula.value).toBe('{prix} *{prix}');
+    document.querySelector<HTMLButtonElement>('.savebar button.primary')!.click();
+    await flush();
+    const rule = saved.at(-1)!.rules![0];
+    expect(rule.when).toMatchObject({ text: 'pays' });
+    expect(rule.sale).toMatchObject({ sort: 'score', score: '{prix} *{prix}' });
   });
 });

@@ -131,7 +131,7 @@ describe('explications', () => {
     const cards = cardsById(small('s1', { quantity: 1 }), small('s2', { quantity: 1, favorite: true }));
     const slot = allocate(input({ cards }), NOW).free.find((s) => s.rule.tag === '20-50')!;
     expect(slot.proposal).toBeNull();
-    expect(slot.excluded).toEqual({ total: 2, favorite: 1, blacklist: 0, onSale: 0, keep: 1 });
+    expect(slot.excluded).toEqual({ total: 2, favorite: 1, blacklist: 0, onSale: 0, keep: 1, lowRate: 0 });
   });
 });
 

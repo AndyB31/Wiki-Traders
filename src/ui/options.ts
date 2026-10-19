@@ -5,7 +5,10 @@ import { DEFAULT_RULES, DEFAULT_SETTINGS, SITE_ORIGIN } from '../lib/defaults';
 import { DURATIONS } from '../lib/duration';
 import { clearAll, loadAll, save } from '../lib/storage';
 import { formatPrice, RARITIES } from '../lib/text';
-import type { Settings, StoreShape, TagRule } from '../lib/types';
+import { conditionsSummary, EMPTY_CONDITIONS } from '../lib/conditions';
+import { FORMULA_VARS, formulaError } from '../lib/formula';
+import { adjustLabel, DEFAULT_RATE_TIERS, SELL_RATE_MIN_SAMPLES } from '../lib/sellrate';
+import type { CandidateSort, DurationRule, SellRateRule, Settings, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { updatePanel } from './update-panel';
@@ -55,6 +58,7 @@ const ui = {
   quota: null as unknown as HTMLElement,
   rules: null as unknown as HTMLElement,
   durations: null as unknown as HTMLElement,
+  rateTiers: null as unknown as HTMLElement,
   tiers: null as unknown as HTMLElement,
   manual: null as unknown as HTMLElement,
   rounding: null as unknown as HTMLElement,
@@ -166,7 +170,7 @@ function dependent<T extends HTMLInputElement | HTMLSelectElement>(el: T, enable
 }
 
 function section(id: string, title: string, intro: Child | Child[], ...body: (Child | Child[])[]) {
-  const errKey = ({ ventes: 'rules', prix: 'pricing', durees: 'durations' } as Record<string, OptionsSection>)[id];
+  const errKey = ({ ventes: 'rules', prix: 'pricing', durees: 'durations', tdv: 'sellRate' } as Record<string, OptionsSection>)[id];
   return h(
     'section',
     { class: 'card opt-section', id },
@@ -332,6 +336,189 @@ function ruleRow(rule: TagRule) {
   );
 }
 
+/** Panneaux « Conditions et vente » ouverts (gardés ouverts quand le tableau est redessiné). */
+const openRuleDetails = new Set<string>();
+
+const SORT_LABELS: Record<CandidateSort, string> = {
+  desc: 'doublons, puis la plus chère',
+  asc: 'doublons, puis la moins chère (écouler)',
+  random: 'doublons, puis au hasard',
+  rate: 'doublons, puis meilleur taux de vente',
+  score: 'formule de score (avancé)',
+};
+
+/** Réglages de vente propres à une étiquette (activés par la case, copiés des réglages globaux). */
+function ruleSaleBox(rule: TagRule): HTMLElement {
+  const box = h('div', { class: 'rule-sale' });
+  const prefix = `rule:${rule.id}:`;
+  const draw = () => {
+    const s = rule.sale;
+    const toggle = toggleField(
+      'Réglages de vente propres à cette étiquette',
+      !!s,
+      (input) => {
+        if (input.checked) {
+          rule.sale = {
+            minSellRate: settings.minSellRate,
+            sellRateRules: settings.sellRateRules.map((t) => ({ ...t })),
+            durationRules: settings.durationRules.map((t) => ({ ...t })),
+            sort: settings.sortPrice,
+            score: '{prix} * {tdv} / 100 + {doublons} * 10',
+          };
+        } else delete rule.sale;
+        draw();
+        onEdit();
+      },
+      'Sinon, l\'étiquette suit les réglages globaux (Prix conseillé, Durée des enchères, Taux de vente).',
+    );
+    if (!s) return mount(box, toggle);
+    const formulaState = h('div', { class: 'small formula-state', 'aria-live': 'polite' });
+    const checkFormula = () => {
+      const err = s.score.trim() ? formulaError(s.score) : 'formule vide';
+      formulaState.className = `small formula-state ${err ? 'bad' : 'ok'}`;
+      formulaState.textContent = err ? `⚠ ${err}` : '✓ formule valide : la carte au score le plus haut est proposée en premier';
+    };
+    const formula = reg(
+      `${prefix}score`,
+      h('textarea', {
+        rows: 2,
+        class: 'formula',
+        spellcheck: 'false',
+        'aria-label': 'Formule de score',
+        oninput: (e: Event) => {
+          s.score = (e.target as HTMLTextAreaElement).value;
+          checkFormula();
+          onEdit();
+        },
+      }),
+    ) as HTMLTextAreaElement;
+    formula.value = s.score;
+    checkFormula();
+    const insert = (name: string) => {
+      const at = formula.selectionStart ?? formula.value.length;
+      formula.value = `${formula.value.slice(0, at)}{${name}}${formula.value.slice(formula.selectionEnd ?? at)}`;
+      formula.dispatchEvent(new Event('input'));
+      formula.focus();
+    };
+    mount(
+      box,
+      toggle,
+      h(
+        'div',
+        { class: 'grid' },
+        field(
+          'Taux de vente minimum (%)',
+          reg(`${prefix}minSellRate`, h('input', { type: 'number', min: '0', max: '100', value: s.minSellRate ?? '', placeholder: 'aucun', oninput: (e: Event) => ((s.minSellRate = num((e.target as HTMLInputElement).value)), onEdit()) })),
+          'Sous ce taux, une carte de l\'étiquette n\'est plus proposée.',
+        ),
+        field(
+          'Ordre de choix des cartes',
+          h(
+            'select',
+            {
+              onchange: (e: Event) => {
+                s.sort = (e.target as HTMLSelectElement).value as CandidateSort;
+                draw();
+                onEdit();
+              },
+            },
+            (Object.keys(SORT_LABELS) as CandidateSort[]).map((k) => h('option', { value: k, selected: s.sort === k }, SORT_LABELS[k])),
+          ),
+          'Quelle carte de l\'étiquette est proposée en premier pour un slot libre.',
+        ),
+      ),
+      s.sort === 'score'
+        ? h(
+            'div',
+            { class: 'formula-box' },
+            h('div', { class: 'field-label' }, 'Formule de score'),
+            formula,
+            formulaState,
+            h(
+              'div',
+              { class: 'row wrap formula-vars' },
+              h('span', { class: 'muted small' }, 'Variables :'),
+              FORMULA_VARS.map((v) => h('button', { type: 'button', class: 'chip', title: v.help, onclick: () => insert(v.name) }, `{${v.name}}`)),
+            ),
+            h('p', { class: 'muted small' }, 'Opérations + − * / % ^, comparaisons (< > <= >= == !=, vrai = 1), && || !, parenthèses, fonctions min, max, abs, arrondi, plancher, plafond, racine, log, si(condition, alors, sinon). Décimales avec un point : 1.5. Ex. : si({tdv} < 20, 0, {prix} * {tdv} / 100).'),
+          )
+        : null,
+      h('h4', null, 'Prix selon le taux de vente'),
+      rateTiers(s.sellRateRules, prefix),
+      h('h4', null, 'Durée des enchères'),
+      durationTiers(s.durationRules, prefix),
+    );
+  };
+  draw();
+  return box;
+}
+
+/** Deuxième ligne d'une règle : conditions d'étiquetage et réglages de vente. */
+function ruleExtraRow(rule: TagRule) {
+  const prefix = `rule:${rule.id}:`;
+  const when = () => (rule.when ??= { ...EMPTY_CONDITIONS });
+  const summary = h('span', { class: 'muted small' });
+  const refreshSummary = () => {
+    const parts = [conditionsSummary(rule), rule.sale ? `vente : réglages propres (${SORT_LABELS[rule.sale.sort]})` : ''].filter(Boolean);
+    summary.textContent = parts.length ? parts.join(' — ') : 'aucune condition · réglages de vente globaux';
+  };
+  refreshSummary();
+  const edit = (fn: () => void) => () => {
+    fn();
+    refreshSummary();
+    onEdit();
+  };
+  const families = [...new Set((store.myFamilies ?? []).map((f) => f.name))].sort((a, b) => a.localeCompare(b));
+  const currentFamily = rule.when?.family ?? '';
+  const details = h(
+    'details',
+    {
+      class: 'advanced rule-extra',
+      open: openRuleDetails.has(rule.id),
+      ontoggle: (e: Event) => ((e.target as HTMLDetailsElement).open ? openRuleDetails.add(rule.id) : openRuleDetails.delete(rule.id)),
+    },
+    h('summary', null, h('span', null, 'Conditions et vente'), summary),
+    h('h4', null, 'Étiquetage automatique : conditions'),
+    h('p', { class: 'muted small' }, 'Avec au moins une condition, l\'étiquetage automatique pose cette étiquette sur chaque carte qui les remplit toutes (et dont le prix est dans la plage, si elle en a une), en plus de son étiquette de plage de prix. En appartenance « prix dans la plage », les conditions comptent aussi pour les ventes.'),
+    h(
+      'div',
+      { class: 'grid' },
+      field(
+        'Le nom ou la catégorie contient',
+        reg(`${prefix}text`, h('input', { value: rule.when?.text ?? '', placeholder: 'ex. pays, ville', oninput: (e: Event) => edit(() => (when().text = (e.target as HTMLInputElement).value))() })),
+        'Un ou plusieurs mots séparés par des virgules (il suffit d\'un) ; accents et majuscules ignorés.',
+      ),
+      field(
+        'Dans la famille',
+        h(
+          'select',
+          { onchange: (e: Event) => edit(() => (when().family = (e.target as HTMLSelectElement).value))() },
+          h('option', { value: '' }, '— peu importe —'),
+          families.map((f) => h('option', { value: f, selected: f === currentFamily }, f)),
+          currentFamily && !families.includes(currentFamily) ? h('option', { value: currentFamily, selected: true }, `${currentFamily} (introuvable)`) : null,
+        ),
+        families.length ? 'Une de tes familles (menu Familles).' : 'Aucune famille : crée-en dans le menu Familles du site.',
+      ),
+      field(
+        'Taux de vente (%)',
+        h(
+          'span',
+          { class: 'row nowrap' },
+          'de',
+          reg(`${prefix}rateMin`, h('input', { type: 'number', min: '0', max: '100', value: rule.when?.rateMin ?? '', placeholder: '0', 'aria-label': 'Taux de vente minimum', oninput: (e: Event) => edit(() => (when().rateMin = num((e.target as HTMLInputElement).value)))() })),
+          'à',
+          reg(`${prefix}rateMax`, h('input', { type: 'number', min: '0', max: '100', value: rule.when?.rateMax ?? '', placeholder: '100', 'aria-label': 'Taux de vente maximum', oninput: (e: Event) => edit(() => (when().rateMax = num((e.target as HTMLInputElement).value)))() })),
+        ),
+        `Compté à partir de ${SELL_RATE_MIN_SAMPLES} enchères terminées ; en dessous, l'étiquette n'est ni posée ni retirée.`,
+      ),
+    ),
+    h('h4', null, 'Mise en vente'),
+    ruleSaleBox(rule),
+  );
+  details.addEventListener('change', refreshSummary);
+  return h('tr', { class: `rule-extra-row${rule.active ? '' : ' inactive'}` }, h('td', { colspan: 8 }, details));
+}
+
 /** Étiquettes vues dans la collection et pas encore couvertes par une règle. */
 function detectedTagsBlock() {
   const counts = new Map<string, number>();
@@ -390,7 +577,7 @@ function renderRules(): void {
                 h('th', null, h('span', { class: 'sr-only' }, 'Supprimer')),
               ),
             ),
-            h('tbody', null, rules.map(ruleRow)),
+            h('tbody', null, rules.flatMap((r) => [ruleRow(r), ruleExtraRow(r)])),
           ),
         )
       : h('p', { class: 'muted' }, 'Aucune règle : ajoute une étiquette pour que Wiki-Traders te propose des ventes.'),
@@ -530,73 +717,70 @@ function pricingSection() {
 // Durée des enchères
 // ---------------------------------------------------------------------------
 
-function renderDurations(): void {
-  const rows = settings.durationRules;
+/** Éditeur de paliers de durée ; `prefix` : préfixe des champs (« » global, « rule:<id>: » par étiquette). */
+function durationTiers(rows: DurationRule[], prefix: string): HTMLElement {
+  const box = h('div');
   const set = (i: number, key: 'from' | 'to' | 'minutes', v: number | null) => {
     rows[i] = { ...rows[i], [key]: v };
     onEdit();
   };
-  mount(
-    ui.durations,
-    rows.length
-      ? h(
-          'ol',
-          { class: 'tiers' },
-          rows.map((r, i) =>
-            h(
-              'li',
-              { class: 'row tier' },
-              h('span', { class: 'muted small tier-num' }, `Palier ${i + 1}`),
-              'Mise de',
-              reg(`dur:${i}:from`, h('input', { type: 'number', min: '0', value: r.from ?? '', placeholder: '0', 'aria-label': `Palier ${i + 1} : de`, oninput: (e: Event) => set(i, 'from', num((e.target as HTMLInputElement).value)) })),
-              'à',
-              reg(`dur:${i}:to`, h('input', { type: 'number', min: '0', value: r.to ?? '', placeholder: '∞', 'aria-label': `Palier ${i + 1} : à`, oninput: (e: Event) => set(i, 'to', num((e.target as HTMLInputElement).value)) })),
-              'W →',
+  const draw = () =>
+    mount(
+      box,
+      rows.length
+        ? h(
+            'ol',
+            { class: 'tiers' },
+            rows.map((r, i) =>
               h(
-                'select',
-                { 'aria-label': `Palier ${i + 1} : durée`, onchange: (e: Event) => set(i, 'minutes', Number((e.target as HTMLSelectElement).value)) },
-                DURATIONS.map((d) => h('option', { value: d.minutes, selected: d.minutes === r.minutes }, d.label)),
-              ),
-              h(
-                'button',
-                { type: 'button', class: 'danger', title: 'Supprimer ce palier', 'aria-label': `Supprimer le palier ${i + 1}`, onclick: () => (rows.splice(i, 1), renderDurations(), onEdit()) },
-                '✕',
+                'li',
+                { class: 'row tier' },
+                h('span', { class: 'muted small tier-num' }, `Palier ${i + 1}`),
+                'Mise de',
+                reg(`${prefix}dur:${i}:from`, h('input', { type: 'number', min: '0', value: r.from ?? '', placeholder: '0', 'aria-label': `Palier ${i + 1} : de`, oninput: (e: Event) => set(i, 'from', num((e.target as HTMLInputElement).value)) })),
+                'à',
+                reg(`${prefix}dur:${i}:to`, h('input', { type: 'number', min: '0', value: r.to ?? '', placeholder: '∞', 'aria-label': `Palier ${i + 1} : à`, oninput: (e: Event) => set(i, 'to', num((e.target as HTMLInputElement).value)) })),
+                'W →',
+                h(
+                  'select',
+                  { 'aria-label': `Palier ${i + 1} : durée`, onchange: (e: Event) => set(i, 'minutes', Number((e.target as HTMLSelectElement).value)) },
+                  DURATIONS.map((d) => h('option', { value: d.minutes, selected: d.minutes === r.minutes }, d.label)),
+                ),
+                h(
+                  'button',
+                  { type: 'button', class: 'danger', title: 'Supprimer ce palier', 'aria-label': `Supprimer le palier ${i + 1}`, onclick: () => (rows.splice(i, 1), draw(), onEdit()) },
+                  '✕',
+                ),
               ),
             ),
-          ),
-        )
-      : null,
-    h(
-      'div',
-      { class: 'row wrap', style: 'margin-top:8px' },
+          )
+        : null,
       h(
-        'button',
-        {
-          type: 'button',
-          onclick: () => {
-            rows.push(nextTier(rows));
-            renderDurations();
-            onEdit();
+        'div',
+        { class: 'row wrap', style: 'margin-top:8px' },
+        h('button', { type: 'button', onclick: () => (rows.push(nextTier(rows)), draw(), onEdit()) }, '+ Ajouter un palier'),
+        h(
+          'button',
+          {
+            type: 'button',
+            title: '≤ 20 W : 10 min · 21–100 W : 1 h · plus de 100 W : 3 h',
+            onclick: () => {
+              if (rows.length && !confirm('Remplacer tes paliers par la proposition par défaut ?\n\n0–20 W → 10 min · 21–100 W → 1 h · 101 W et + → 3 h')) return;
+              rows.splice(0, rows.length, ...DEFAULT_DURATION_TIERS.map((t) => ({ ...t })));
+              draw();
+              onEdit();
+            },
           },
-        },
-        '+ Ajouter un palier',
+          'Proposition par défaut',
+        ),
       ),
-      h(
-        'button',
-        {
-          type: 'button',
-          title: '≤ 20 W : 10 min · 21–100 W : 1 h · plus de 100 W : 3 h',
-          onclick: () => {
-            if (rows.length && !confirm('Remplacer tes paliers par la proposition par défaut ?\n\n0–20 W → 10 min · 21–100 W → 1 h · 101 W et + → 3 h')) return;
-            settings.durationRules = DEFAULT_DURATION_TIERS.map((t) => ({ ...t }));
-            renderDurations();
-            onEdit();
-          },
-        },
-        'Proposition par défaut',
-      ),
-    ),
-  );
+    );
+  draw();
+  return box;
+}
+
+function renderDurations(): void {
+  mount(ui.durations, durationTiers(settings.durationRules, ''));
 }
 
 function refreshTiers(): void {
@@ -614,6 +798,104 @@ function durationsSection() {
     h('div', { class: 'muted small' }, 'Aperçu :'),
     ui.tiers,
     ui.durations,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Taux de vente
+// ---------------------------------------------------------------------------
+
+/** Éditeur de paliers de taux de vente ; `prefix` comme pour les paliers de durée. */
+function rateTiers(rows: SellRateRule[], prefix: string): HTMLElement {
+  const box = h('div');
+  const set = (i: number, key: 'from' | 'to' | 'adjust', v: number | null) => {
+    rows[i] = { ...rows[i], [key]: key === 'adjust' ? v ?? 0 : v };
+    onEdit();
+  };
+  const pct = (i: number, key: 'from' | 'to', placeholder: string) =>
+    reg(
+      `${prefix}tdv:${i}:${key}`,
+      h('input', { type: 'number', min: '0', max: '100', value: rows[i][key] ?? '', placeholder, 'aria-label': `Palier ${i + 1} : ${key === 'from' ? 'de' : 'à'}`, oninput: (e: Event) => set(i, key, num((e.target as HTMLInputElement).value)) }),
+    );
+  const draw = () =>
+    mount(
+      box,
+      rows.length
+        ? h(
+            'ol',
+            { class: 'tiers' },
+            rows.map((r, i) =>
+              h(
+                'li',
+                { class: 'row tier' },
+                h('span', { class: 'muted small tier-num' }, `Palier ${i + 1}`),
+                'Tdv de',
+                pct(i, 'from', '0'),
+                'à',
+                pct(i, 'to', '100'),
+                '% → prix',
+                reg(`${prefix}tdv:${i}:adjust`, h('input', { type: 'number', min: '-99', step: '5', value: r.adjust, 'aria-label': `Palier ${i + 1} : ajustement`, oninput: (e: Event) => set(i, 'adjust', num((e.target as HTMLInputElement).value, 0)) })),
+                '%',
+                h(
+                  'button',
+                  { type: 'button', class: 'danger', title: 'Supprimer ce palier', 'aria-label': `Supprimer le palier ${i + 1}`, onclick: () => (rows.splice(i, 1), draw(), onEdit()) },
+                  '✕',
+                ),
+              ),
+            ),
+          )
+        : null,
+      h(
+        'div',
+        { class: 'row wrap', style: 'margin-top:8px' },
+        h('button', { type: 'button', onclick: () => (rows.push({ from: null, to: null, adjust: 0 }), draw(), onEdit()) }, '+ Ajouter un palier'),
+        h(
+          'button',
+          {
+            type: 'button',
+            title: DEFAULT_RATE_TIERS.map(tierText).join(' · '),
+            onclick: () => {
+              if (rows.length && !confirm(`Remplacer tes paliers par la proposition par défaut ?\n\n${DEFAULT_RATE_TIERS.map(tierText).join('\n')}`)) return;
+              rows.splice(0, rows.length, ...DEFAULT_RATE_TIERS.map((t) => ({ ...t })));
+              draw();
+              onEdit();
+            },
+          },
+          'Proposition par défaut',
+        ),
+      ),
+    );
+  draw();
+  return box;
+}
+
+function renderRateTiers(): void {
+  mount(ui.rateTiers, rateTiers(settings.sellRateRules, ''));
+}
+
+function tierText(r: SellRateRule): string {
+  return `tdv ${r.from ?? 0}–${r.to ?? 100} % → ${adjustLabel(r.adjust)}`;
+}
+
+function sellRateSection() {
+  ui.rateTiers = h('div');
+  renderRateTiers();
+  return section(
+    'tdv',
+    'Taux de vente',
+    `Le taux de vente (tdv) d'une carte, c'est la part de ses enchères terminées qui ont trouvé un acheteur. Il est affiché à côté du prix sur tes cartes. Il ne compte qu'à partir de ${SELL_RATE_MIN_SAMPLES} enchères terminées : en dessous, il ne veut pas dire grand-chose.`,
+    h(
+      'div',
+      { class: 'grid' },
+      field(
+        'Taux de vente minimum (%)',
+        reg('minSellRate', h('input', { type: 'number', min: '0', max: '100', value: settings.minSellRate ?? '', placeholder: 'aucun', oninput: (e: Event) => ((settings.minSellRate = num((e.target as HTMLInputElement).value)), onEdit()) })),
+        'Une carte sous ce taux n\'est plus proposée pour remplir un slot (tu peux toujours la vendre à la main). Vide = aucun minimum. Ex. 15.',
+      ),
+    ),
+    h('h3', null, 'Prix selon le taux de vente'),
+    h('p', { class: 'muted small' }, 'Ajuste le prix conseillé selon le tdv de la carte : une carte qui part toute seule peut partir plus haut, une carte qui ne se vend pas doit baisser. −50 = moitié prix. Le premier palier qui correspond l\'emporte ; sans palier, le prix ne change pas.'),
+    ui.rateTiers,
   );
 }
 
@@ -1096,6 +1378,7 @@ const TOC: [id: string, label: string][] = [
   ['ventes', 'Mes ventes'],
   ['prix', 'Prix conseillé'],
   ['durees', 'Durée des enchères'],
+  ['tdv', 'Taux de vente'],
   ['notifications', 'Notifications'],
   ['affichage', 'Affichage sur le site'],
   ['fonctionnalites', 'Fonctionnalités'],
@@ -1164,6 +1447,7 @@ function render(): void {
         rulesSection(),
         pricingSection(),
         durationsSection(),
+        sellRateSection(),
         notificationsSection(),
         displaySection(),
         featuresSection(),

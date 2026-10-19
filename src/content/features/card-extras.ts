@@ -75,6 +75,25 @@ registerFeature({
   },
 });
 
+// ---------------------------------------------------------------- étiquettes du site masquées
+
+// Étiquettes du site : pastilles arrondies dans la première ligne du bas de la carte (au-dessus d'ATK / DEF).
+const HIDE_TAGS = 'data-wiky-hide-tags';
+const HIDE_TAGS_CSS = `
+html[${HIDE_TAGS}] div[class*="glow-"] div[class*="top-[45%]"] > div.mt-auto > div.flex-wrap:has(> span.rounded-full) { display: none !important; }
+`;
+
+registerFeature({
+  keys: ['hideCardTags'],
+  render() {
+    ensureStyle('wiky-hide-tags-style', HIDE_TAGS_CSS);
+    toggleRootAttr(HIDE_TAGS, true);
+  },
+  cleanup() {
+    toggleRootAttr(HIDE_TAGS, false);
+  },
+});
+
 // ---------------------------------------------------------------- bouton Wikipédia
 
 // En bas à droite de l'illustration : loin des étiquettes (en haut) et des boutons du site (favori, en haut à droite).

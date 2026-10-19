@@ -3,17 +3,17 @@
  * règles, mes ventes en cours, prix observés, mises et ventes terminées. Rechargées quand elles changent.
  */
 import type { AllocationInput } from '../../lib/allocation';
-import { knownCardPrice } from '../catalog';
+import { knownCardPrice, knownCardRate } from '../catalog';
 import { load, onStoreChange, type StoreKey } from '../../lib/storage';
 import type { MyBidsResult, MySalesResult, StoreShape } from '../../lib/types';
 import type { FeatureContext } from './runtime';
 
-export type MarketData = Pick<StoreShape, 'rules' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots'> & {
+export type MarketData = Pick<StoreShape, 'rules' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots'> & Partial<Pick<StoreShape, 'myFamilies'>> & {
   bidsCache: MyBidsResult | null;
   salesCache: MySalesResult | null;
 };
 
-const KEYS: StoreKey[] = ['rules', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'bidsCache', 'salesCache'];
+const KEYS: StoreKey[] = ['rules', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'bidsCache', 'salesCache', 'myFamilies'];
 
 let data: MarketData | null = null;
 let loading: Promise<void> | null = null;
@@ -56,6 +56,8 @@ export function allocationInput(ctx: FeatureContext, d: MarketData): AllocationI
     slotOverrides: d.slotOverrides,
     ignoredSlots: d.ignoredSlots,
     catalogPrice: knownCardPrice,
+    sellRate: knownCardRate,
+    myFamilies: d.myFamilies,
   };
 }
 
