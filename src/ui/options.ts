@@ -13,7 +13,7 @@ import { catalogPriceOf, type CatalogPriceEntry } from '../lib/autotag';
 import { roundTo } from '../lib/pricing';
 import { clampPrice, DEFAULT_CALC, defaultTiers, inheritCalc, newTier, PRIORITIES, simplePrice, tierLabel } from '../lib/salecalc';
 import { DEFAULT_CRITERIA, SORT_KEYS } from '../lib/sorting';
-import type { DurationRule, PriceCalc, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
+import type { DurationRule, FamilyTag, PriceCalc, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { updatePanel } from './update-panel';
@@ -62,12 +62,13 @@ const RISK_TEXT = 'Les règles de WikiMasters (section 3) interdisent les outils
 // Onglets
 // ---------------------------------------------------------------------------
 
-type TabId = 'accueil' | 'ventes' | 'etiquettes' | 'site' | 'acces' | 'avance';
+type TabId = 'accueil' | 'ventes' | 'etiquettes' | 'familles' | 'site' | 'acces' | 'avance';
 
 const TABS: [id: TabId, label: string][] = [
   ['accueil', 'Accueil'],
   ['ventes', 'Ventes'],
   ['etiquettes', 'Étiquettes'],
+  ['familles', 'Familles'],
   ['site', 'Sur le site'],
   ['acces', 'Accès au site'],
   ['avance', 'Avancé'],
@@ -102,6 +103,7 @@ const ui = {
   tiers: null as unknown as HTMLElement,
   priceTiers: null as unknown as HTMLElement,
   saleTags: null as unknown as HTMLElement,
+  familyTags: null as unknown as HTMLElement,
   priority: null as unknown as HTMLElement,
   preview: null as unknown as HTMLElement,
   tierTitles: [] as { el: HTMLElement; tier: PriceTier }[],
@@ -572,7 +574,8 @@ function homePanel() {
           { class: 'map' },
           [
             ['ventes', 'Ventes', 'tes slots, la mise de départ, le taux de vente, la durée des enchères, ce qui n\'est jamais vendu.'],
-            ['etiquettes', 'Étiquettes', 'quelles cartes vont dans chaque étiquette et l\'étiquetage automatique.'],
+            ['etiquettes', 'Étiquettes', 'quelles cartes reçoivent chaque étiquette et l\'étiquetage automatique (à la demande ou en continu).'],
+            ['familles', 'Familles', 'tes familles sur le site, une étiquette par famille, et si leurs cartes peuvent être vendues.'],
             ['site', 'Sur le site', 'ce que Wiki-Traders ajoute aux pages de WikiMasters, notifications.'],
             ['acces', 'Accès au site', 'lecture via l\'API et actions à ta place (risque de bannissement).'],
             ['avance', 'Avancé', 'pages du site, prix saisis, sauvegarde, mises à jour.'],
@@ -681,12 +684,14 @@ function saleCard(rule: TagRule) {
       ),
       durationSelect(() => rule.durationMin ?? null, (v) => (rule.durationMin = v)),
     ),
-    h(
-      'div',
-      { class: 'muted small rule-source' },
-      `Cartes proposées : ${MATCH_TEXT[rule.match]}. `,
-      h('button', { type: 'button', class: 'link', onclick: () => scrollToSection(`etiquette-${rule.id}`) }, 'Changer dans Étiquettes →'),
-    ),
+    rule.match === 'price'
+      ? h(
+          'div',
+          { class: 'muted small rule-source' },
+          `Cartes proposées : ${MATCH_TEXT.price} (ancien réglage). `,
+          h('button', { type: 'button', class: 'link', onclick: () => ((rule.match = 'tag'), renderRules(), onEdit()) }, 'Prendre les cartes qui portent l\'étiquette'),
+        )
+      : null,
     calcEditor(() => rule.calc ?? inheritCalc(), (c) => (rule.calc = c), `rule:${rule.id}:`, true),
   );
 }
@@ -1386,8 +1391,13 @@ function protectSection() {
       h(
         'div',
         { class: 'toggles' },
-        settingToggle('protectFamilies', 'Cartes de mes familles', 'Une carte d\'une de tes familles n\'est jamais proposée' + (pool() ? '.' : ', sauf pour une étiquette qui vise justement cette famille (Étiquettes → conditions).')),
         settingToggle('allowDuplicateListing', 'Proposer une carte déjà en vente', 'Autorise à mettre en vente un autre exemplaire d\'une carte déjà aux enchères.'),
+      ),
+      h(
+        'p',
+        { class: 'muted small' },
+        `Cartes de tes familles : ${settings.protectFamilies ? 'jamais vendues' : 'vendues comme les autres'}. `,
+        h('button', { type: 'button', class: 'link', onclick: () => scrollToSection('familles-vente') }, 'Régler dans Familles →'),
       ),
       blacklistBlock(),
     ],
@@ -1550,7 +1560,7 @@ const FEATURE_PLACE: Partial<Record<FeatureKey, { where: string; anchor: string 
 
 /** Groupe affiché dans « Sur le site » (les automatisations rejoignent ce qu'elles concernent). */
 const SITE_GROUP: Partial<Record<FeatureKey, FeatureGroup>> = { quickOutbid: 'market', openAllPacks: 'packs', autoOpenPacks: 'packs' };
-const OUTSIDE_SITE: FeatureKey[] = ['popupSell', 'rankingSell', 'packTagAll'];
+const OUTSIDE_SITE: FeatureKey[] = ['popupSell', 'rankingSell', 'packTagAll', 'families', 'familyBadges'];
 
 function featureCard(f: FeatureDef, need?: AccessKey) {
   const flags = featureFlags(settings.features);
@@ -1621,8 +1631,6 @@ function tagCard(rule: TagRule) {
     rule[key] = parse((e.target as HTMLInputElement).value);
     onEdit();
   };
-  const families = [...new Set((store.myFamilies ?? []).map((f) => f.name))].sort((a, b) => a.localeCompare(b));
-  const currentFamily = rule.when?.family ?? '';
   return h(
     'div',
     { class: `rule-card${rule.active ? '' : ' inactive'}`, 'data-rule': rule.id, id: `etiquette-${rule.id}` },
@@ -1640,19 +1648,6 @@ function tagCard(rule: TagRule) {
         'W',
         hint('Prix moyen des cartes de l\'étiquette. Ne change pas le prix conseillé.'),
       ),
-      pool()
-        ? null
-        : h(
-        'label',
-        { class: 'inline' },
-        'Pour les ventes, prendre les',
-        h(
-          'select',
-          { 'aria-label': 'Cartes prises pour les ventes', onchange: bind('match', (v) => v as TagRule['match']) },
-          h('option', { value: 'tag', selected: rule.match === 'tag' }, MATCH_TEXT.tag),
-          h('option', { value: 'price', selected: rule.match === 'price' }, `${MATCH_TEXT.price} (et les conditions)`),
-        ),
-      ),
     ),
     h(
       'details',
@@ -1662,7 +1657,7 @@ function tagCard(rule: TagRule) {
         ontoggle: (e: Event) => ((e.target as HTMLDetailsElement).open ? openRuleDetails.add(`when:${rule.id}`) : openRuleDetails.delete(`when:${rule.id}`)),
       },
       h('summary', null, h('span', null, 'Conditions en plus'), ' · ', summary),
-      h('p', { class: 'muted small' }, 'Avec une condition, l\'étiquetage automatique pose cette étiquette sur chaque carte qui les remplit toutes (et dont le prix est dans la plage, s\'il y en a une). Ex. : une étiquette « Films » pour les cartes de ta famille Films.'),
+      h('p', { class: 'muted small' }, 'Avec une condition, l\'étiquetage automatique pose cette étiquette sur chaque carte qui les remplit toutes (et dont le prix est dans la plage, s\'il y en a une). Ex. : une étiquette « Pays » pour les cartes dont la catégorie contient « pays ». Pour une famille, voir l\'onglet Familles.'),
       h(
         'div',
         { class: 'grid' },
@@ -1670,17 +1665,6 @@ function tagCard(rule: TagRule) {
           'Le nom ou la catégorie contient',
           reg(`${prefix}text`, h('input', { value: rule.when?.text ?? '', placeholder: 'ex. pays, ville', oninput: (e: Event) => edit(() => (when().text = (e.target as HTMLInputElement).value))() })),
           'Un ou plusieurs mots séparés par des virgules (il suffit d\'un) ; accents et majuscules ignorés.',
-        ),
-        field(
-          'Dans la famille',
-          h(
-            'select',
-            { onchange: (e: Event) => edit(() => (when().family = (e.target as HTMLSelectElement).value))() },
-            h('option', { value: '' }, '— peu importe —'),
-            families.map((f) => h('option', { value: f, selected: f === currentFamily }, f)),
-            currentFamily && !families.includes(currentFamily) ? h('option', { value: currentFamily, selected: true }, `${currentFamily} (introuvable)`) : null,
-          ),
-          families.length ? 'Une de tes familles (menu Familles).' : 'Aucune famille : crée-en dans le menu Familles du site.',
         ),
         field(
           'Taux de vente (%)',
@@ -1713,7 +1697,7 @@ function tagRulesSection() {
     'etiquettes',
     'Mes étiquettes',
     [
-      'Ici, tu décides quelles cartes vont dans chaque étiquette : une plage de prix (ex. « 20-50 » = cartes entre 20 et 50 W) et, si tu veux, des conditions. ',
+      'Ici, tu décides quelles cartes reçoivent chaque étiquette : une plage de prix (ex. « 20-50 » = cartes entre 20 et 50 W) et, si tu veux, des conditions. ',
       h('strong', null, 'Ça sert à l\'étiquetage automatique'),
       pool() ? ' ; les ventes, elles, se règlent par paliers de prix dans Ventes.' : ' ; les slots et les prix se règlent dans Ventes.',
     ],
@@ -1737,10 +1721,37 @@ function autoTagSection() {
   return section(
     'etiquetage-auto',
     'Étiquetage automatique',
-    'Range chaque carte dans l\'étiquette dont la plage de prix (et les conditions) lui correspond. Se lance depuis la popup, avec un bouton Arrêter.',
+    'Range chaque carte dans l\'étiquette dont la plage de prix (et les conditions) lui correspond, et pose les étiquettes de tes familles (onglet Familles).',
     [
       h('div', { class: 'toggles' }, riskyToggle('autoTag', 'Étiquetage automatique', 'Pose et retire les étiquettes suivies selon le prix moyen de chaque carte.')),
       ui.autoTagMode,
+      field(
+        'Lancement',
+        h(
+          'div',
+          { class: 'levels launch', role: 'radiogroup', 'aria-label': 'Lancement de l\'étiquetage' },
+          [
+            [false, 'À la demande', 'Tu le lances depuis la popup (Cartes → Étiquetage), avec un bouton Arrêter.'],
+            [true, 'En continu', 'Tourne tout seul tant qu\'un onglet du site est ouvert : seulement les cartes à changer, au plus toutes les 2 min, par petits lots. Par l\'API.'],
+          ].map(([on, title, help]) =>
+            h(
+              'label',
+              { class: `level${settings.autoTagContinuous === on ? ' is-on' : ''}` },
+              h('input', {
+                type: 'radio',
+                name: 'autoTagLaunch',
+                checked: settings.autoTagContinuous === on,
+                onchange: (e: Event) => {
+                  settings.autoTagContinuous = on as boolean;
+                  for (const l of (e.target as HTMLElement).closest('.levels')!.querySelectorAll('.level')) l.classList.toggle('is-on', l.contains(e.target as Node));
+                  onEdit();
+                },
+              }),
+              h('span', { class: 'level-text' }, h('strong', null, title as string), h('span', { class: 'muted small' }, help as string), on ? needs('apiWrite') : null),
+            ),
+          ),
+        ),
+      ),
       h(
         'div',
         { class: 'toggles' },
@@ -1787,6 +1798,92 @@ function tagDisplaySection() {
 
 function tagsPanel() {
   return panel('etiquettes', tagRulesSection(), autoTagSection(), tagDisplaySection());
+}
+
+// ---------------------------------------------------------------------------
+// Familles : sur le site, étiquette par famille, vente
+// ---------------------------------------------------------------------------
+
+function familyNames(): string[] {
+  return [...new Set((store.myFamilies ?? []).map((f) => f.name))].sort((a, b) => a.localeCompare(b));
+}
+
+function familyTagRow(ft: FamilyTag, i: number) {
+  const names = familyNames();
+  const list = settings.familyTags;
+  return h(
+    'li',
+    { class: `row wrap family-tag${ft.active ? '' : ' inactive'}` },
+    switchInput(ft.active, (box) => ((ft.active = box.checked), box.closest('li')?.classList.toggle('inactive', !box.checked), onEdit()), `Famille ${ft.family || 'sans nom'} active`),
+    'Les cartes de',
+    reg(
+      `famtag:${ft.id}:family`,
+      h(
+        'select',
+        { 'aria-label': 'Famille', onchange: (e: Event) => ((ft.family = (e.target as HTMLSelectElement).value), onEdit()) },
+        h('option', { value: '', selected: !ft.family }, '— famille —'),
+        names.map((n) => h('option', { value: n, selected: n === ft.family }, n)),
+        ft.family && !names.includes(ft.family) ? h('option', { value: ft.family, selected: true }, `${ft.family} (introuvable)`) : null,
+      ),
+    ),
+    'reçoivent l\'étiquette',
+    reg(`famtag:${ft.id}:tag`, h('input', { class: 'tag-input', list: 'wiky-known-tags', value: ft.tag, placeholder: 'ex. Films', 'aria-label': 'Étiquette', oninput: (e: Event) => ((ft.tag = (e.target as HTMLInputElement).value), onEdit()) })),
+    h('button', { type: 'button', class: 'danger', title: 'Supprimer', 'aria-label': `Supprimer ${ft.family || 'cette famille'}`, onclick: () => (list.splice(i, 1), renderFamilyTags(), onEdit()) }, '✕'),
+  );
+}
+
+function renderFamilyTags(): void {
+  const list = settings.familyTags;
+  const names = familyNames();
+  mount(
+    ui.familyTags,
+    h('datalist', { id: 'wiky-known-tags' }, knownTags().map((t) => h('option', { value: t }))),
+    list.length ? h('ul', { class: 'family-tags' }, list.map(familyTagRow)) : h('p', { class: 'muted' }, names.length ? 'Aucune famille étiquetée.' : 'Aucune famille : crée-en dans le menu Familles du site.'),
+    h(
+      'div',
+      { class: 'row wrap', style: 'margin-top:8px' },
+      h(
+        'button',
+        {
+          type: 'button',
+          disabled: !names.length,
+          onclick: () => {
+            const used = new Set(list.map((f) => f.family));
+            const family = names.find((n) => !used.has(n)) ?? '';
+            list.push({ id: `ft-${Date.now()}-${++idSeq}`, active: true, family, tag: family });
+            renderFamilyTags();
+            onEdit();
+          },
+        },
+        '+ Étiqueter une famille',
+      ),
+    ),
+  );
+}
+
+function familiesPanel() {
+  ui.familyTags = h('div');
+  renderFamilyTags();
+  const byKey = (k: FeatureKey) => FEATURES.find((f) => f.key === k)!;
+  return panel(
+    'familles',
+    section('familles-site', 'Familles sur le site', 'Regroupe des cartes en familles (menu Familles du site) et suis ta progression.', [
+      h('div', { class: 'feature-grid' }, featureCard(byKey('families')), featureCard(byKey('familyBadges'))),
+    ]),
+    section(
+      'familles-etiquettes',
+      'Une étiquette par famille',
+      [
+        'Quand une carte appartient à une famille, l\'étiquetage automatique lui pose l\'étiquette choisie (et la retire si la carte quitte la famille, avec « Retirer les autres étiquettes suivies »). ',
+        h('button', { type: 'button', class: 'link', onclick: () => scrollToSection('etiquetage-auto') }, settings.autoTag ? 'Étiquetage automatique : activé →' : 'Étiquetage automatique : désactivé, à activer dans Étiquettes →'),
+      ],
+      [ui.familyTags],
+      { errKey: 'families' },
+    ),
+    section('familles-vente', 'Vente', null, [
+      h('div', { class: 'toggles' }, settingToggle('protectFamilies', 'Ne jamais vendre les cartes de mes familles', pool() ? 'Une carte d\'une de tes familles n\'est jamais proposée à la vente (tu peux toujours la vendre à la main).' : 'Une carte d\'une de tes familles n\'est jamais proposée, sauf pour l\'étiquette posée sur cette famille ci-dessus.')),
+    ]),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2153,7 +2250,7 @@ function render(): void {
   ui.status = h('span', { class: 'status muted', role: 'status', 'aria-live': 'polite' });
   ui.undoBtn = h('button', { type: 'button', class: 'small', hidden: true, title: 'Revenir à l\'état d\'avant tes dernières modifications', onclick: () => void undo() }, 'Annuler') as HTMLButtonElement;
   const tabs = tabBar();
-  const panels = [homePanel(), salesPanel(), tagsPanel(), sitePanel(), panel('acces', accessSection()), advancedPanel()];
+  const panels = [homePanel(), salesPanel(), tagsPanel(), familiesPanel(), sitePanel(), panel('acces', accessSection()), advancedPanel()];
   renderRules();
   mount(
     app,

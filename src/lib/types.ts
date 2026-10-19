@@ -58,6 +58,15 @@ export interface PriceTier {
   durationMin: number | null;
 }
 
+/** Étiquette posée sur les cartes d'une famille. */
+export interface FamilyTag {
+  id: string;
+  active: boolean;
+  /** Nom d'une de mes familles. */
+  family: string;
+  tag: string;
+}
+
 /** Ordre de priorité des cartes proposées. */
 export type Priority = 'balanced' | 'value' | 'fast' | 'clear' | 'custom' | 'formula';
 
@@ -234,6 +243,10 @@ export interface Settings {
   autoTagRemoveOthers: boolean;
   /** Retirer les étiquettes de plage des cartes sans prix propre connu. */
   autoTagClearUnpriced: boolean;
+  /** Étiquetage en continu : l'étiquetage automatique tourne tout seul (par l'API) tant qu'un onglet du site est ouvert. */
+  autoTagContinuous: boolean;
+  /** Familles → étiquette : une carte d'une de ces familles reçoit l'étiquette (étiquetage automatique). */
+  familyTags: FamilyTag[];
   /** Remettre ses étiquettes à une carte dont l'enchère se termine sans acheteur (par l'API, nécessite apiWrite). */
   retagUnsold: boolean;
   /** « Tout défausser » après ouverture : confirmation si une carte vaut plus que ce prix moyen (W). */

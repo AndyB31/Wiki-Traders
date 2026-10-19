@@ -1,5 +1,6 @@
 import { ext } from './browser';
 import { DEFAULT_META, DEFAULT_SETTINGS, DEFAULT_STORE } from './defaults';
+import { hasConditions, hasRange } from './conditions';
 import { inheritCalc, legacyCalc } from './salecalc';
 import { migrateRateRules } from './sellrate';
 import type { Priority, SellRateRule, Settings, StoreShape, TagRule } from './types';
@@ -44,6 +45,12 @@ export function migrateSettings(stored: LegacySettings | undefined, rules?: Lega
     s.defaultCalc = legacyCalc(70, legacyTiers(stored), DEFAULT_SETTINGS.defaultCalc);
     if (stored.allocationMode === 'pool') s.saleTags = { mode: 'include', tags: (rules ?? []).filter((r) => r.active && r.tag.trim()).map((r) => r.tag.trim()) };
   }
+  // Condition « famille » d'une étiquette (avant la 1.0) → Familles : « famille X → étiquette Y ».
+  if (!stored?.familyTags) {
+    s.familyTags = (rules ?? [])
+      .filter((r) => r.when?.family?.trim() && r.tag.trim())
+      .map((r) => ({ id: `ft-${r.id}`, active: r.active, family: r.when!.family.trim(), tag: r.tag.trim() }));
+  }
   delete s.sortPrice;
   delete s.sellRateRules;
   delete s.sellRateTiersOn;
@@ -53,12 +60,18 @@ export function migrateSettings(stored: LegacySettings | undefined, rules?: Lega
 /** Étiquettes d'avant la 1.0 : leur mise de départ (et leurs paliers de taux de vente) devient leur calcul. */
 export function migrateRules(rules: LegacyRule[], stored?: LegacySettings): TagRule[] {
   const defaultCalc = migrateSettings(stored).defaultCalc;
-  return rules.map((r) => {
-    if (r.calc || r.pct == null) return r;
+  return rules.flatMap((r) => {
+    // La famille passe dans Familles (voir migrateSettings) ; une étiquette qui n'existait que pour elle disparaît.
+    if (r.when?.family?.trim()) {
+      const when = { ...r.when, family: '' };
+      if (!hasConditions({ when }) && !hasRange(r) && !r.quota) return [];
+      r = { ...r, when };
+    }
+    if (r.calc || r.pct == null) return [r];
     const { pct, sale, ...rest } = r;
     const own = sale?.sellRateRules != null;
     const tiers = own ? migrateRateRules(sale!.sellRateRules) : legacyTiers(stored);
-    return { ...rest, calc: pct === 70 && !own ? inheritCalc() : legacyCalc(pct, tiers, defaultCalc) };
+    return [{ ...rest, calc: pct === 70 && !own ? inheritCalc() : legacyCalc(pct, tiers, defaultCalc) }];
   });
 }
 

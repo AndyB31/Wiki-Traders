@@ -1154,10 +1154,11 @@ function autoTagBlock(onCollection: boolean) {
   const why = () => {
     const d = diag;
     if (!d.cards) return 'Aucune carte connue : ouvre ta collection.';
-    if (!d.rulesWithRange) return 'Aucune règle d\'étiquetage : renseigne une plage de prix (ex. « Mettre au Enchère » : 20 à 1000) ou des conditions (texte, famille, taux de vente) dans les réglages.';
+    if (!d.rulesWithRange) return 'Aucune règle d\'étiquetage : renseigne une plage de prix (ex. « Mettre au Enchère » : 20 à 1000) ou des conditions (texte, taux de vente) dans Réglages → Étiquettes, ou une famille dans Réglages → Familles.';
     if (!d.pricedCards) return store.settings.apiRead ? 'Aucune carte n\'a encore de prix : patiente pendant le chargement, ou clique « Rafraîchir les prix ».' : 'Aucune carte n\'a de prix : active la lecture via l\'API (Réglages → Accès au site).';
     return `Les ${d.pricedCards} carte(s) au prix connu sont déjà dans la bonne étiquette.`;
   };
+  const continuous = store.settings.autoTagContinuous && viaApi;
   return h(
     'div',
     { class: 'card autotag' },
@@ -1167,7 +1168,8 @@ function autoTagBlock(onCollection: boolean) {
       'div',
       { class: 'row' },
       h('strong', { class: 'grow' }, `Étiquetage auto : ${plan.length} carte(s)`),
-      plan.length ? h('button', { class: 'primary', onclick: start }, onCollection || viaApi ? 'Lancer' : 'Aller à la collection') : null,
+      continuous ? h('span', { class: 'pill', title: 'Tourne tout seul tant qu\'un onglet du site est ouvert (Réglages → Étiquettes)' }, 'en continu') : null,
+      plan.length ? h('button', { class: continuous ? undefined : 'primary', onclick: start }, continuous ? 'Maintenant' : onCollection || viaApi ? 'Lancer' : 'Aller à la collection') : null,
       h('button', { title: 'Désactiver', onclick: () => save({ settings: { ...store.settings, autoTag: false } }) }, 'Off'),
     ),
     plan.length

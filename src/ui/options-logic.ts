@@ -125,7 +125,7 @@ export function nextTier(rules: DurationRule[]): DurationRule {
 // Validation
 // ---------------------------------------------------------------------------
 
-export type OptionsSection = 'rules' | 'pricing' | 'tiers' | 'priority' | 'durations' | 'sellRate' | 'advanced';
+export type OptionsSection = 'rules' | 'pricing' | 'tiers' | 'priority' | 'families' | 'durations' | 'sellRate' | 'advanced';
 
 export interface ValidationError {
   section: OptionsSection;
@@ -237,6 +237,10 @@ export function validateOptions(rules: TagRule[], settings: Settings, extra: { s
   errors.push(...rateErrors(settings.minSellRate, [], 'sellRate', '', ''));
   errors.push(...calcErrors(settings.defaultCalc, 'pricing', 'calc:', 'Calcul par défaut : '));
   if (pool) errors.push(...tierErrors(settings));
+  for (const ft of settings.familyTags) {
+    if (!ft.family.trim()) errors.push({ section: 'families', keys: [`famtag:${ft.id}:family`], message: 'Choisis la famille à étiqueter.' });
+    if (!ft.tag.trim()) errors.push({ section: 'families', keys: [`famtag:${ft.id}:tag`], message: `Famille ${ft.family || '?'} : indique l'étiquette à poser.` });
+  }
   if (settings.priority === 'formula') {
     const err = settings.priorityFormula.trim() ? formulaError(settings.priorityFormula) : 'formule vide';
     if (err) errors.push({ section: 'priority', keys: ['priorityFormula'], message: `Formule de priorité : ${err}.` });

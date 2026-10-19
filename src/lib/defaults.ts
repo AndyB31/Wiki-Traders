@@ -46,6 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTag: false,
   autoTagRemoveOthers: true,
   autoTagClearUnpriced: false,
+  autoTagContinuous: false,
+  familyTags: [],
   retagUnsold: false,
   discardConfirmAbove: 10,
   selectorOverrides: {},

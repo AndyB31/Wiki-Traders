@@ -54,7 +54,7 @@ describe('page Réglages', () => {
 
   it('six onglets, un seul panneau visible, interrupteurs partout', () => {
     const tabs = [...document.querySelectorAll('[role=tab]')].map((t) => t.textContent);
-    expect(tabs).toEqual(['Accueil', 'Ventes', 'Étiquettes', 'Sur le site', 'Accès au site', 'Avancé']);
+    expect(tabs).toEqual(['Accueil', 'Ventes', 'Étiquettes', 'Familles', 'Sur le site', 'Accès au site', 'Avancé']);
     expect([...document.querySelectorAll<HTMLElement>('[role=tabpanel]')].filter((p) => !p.hidden).map((p) => p.dataset.tab)).toEqual(['accueil']);
     expect(document.querySelectorAll('input[type=checkbox]:not([role=switch])')).toHaveLength(0);
     document.querySelector<HTMLButtonElement>('#tab-ventes')!.click();
@@ -201,8 +201,9 @@ describe('page Réglages', () => {
     expect(saved.at(-1)!.settings).toMatchObject({ sellRateMinSamples: 10, minSellRate: 15 });
   });
 
-  it('familles protégées par défaut, réglables dans « Jamais vendu »', async () => {
-    const toggle = [...document.querySelectorAll<HTMLElement>('#protection .toggle')].find((t) => t.textContent!.includes('Cartes de mes familles'))!;
+  it('familles protégées par défaut, réglables dans Familles', async () => {
+    expect(document.querySelector('#protection')!.textContent).toContain('Cartes de tes familles : jamais vendues');
+    const toggle = document.querySelector<HTMLElement>('#familles-vente .toggle')!;
     const box = toggle.querySelector<HTMLInputElement>('input')!;
     expect(box.checked).toBe(true);
     box.click();
@@ -243,6 +244,29 @@ describe('page Réglages', () => {
     expect(saved.at(-1)!.settings).toMatchObject({ apiRead: true, apiWrite: true, autoTag: true, prefill: false });
     expect(document.querySelector('.profile.is-on')!.textContent).toContain('Complet');
     confirm.mockRestore();
+  });
+});
+
+describe('page Réglages : familles et étiquetage', () => {
+  it('une étiquette par famille ; plus de famille ni de « pour les ventes » dans Étiquettes', async () => {
+    extra = { myFamilies: [{ id: 'f1', name: 'Films', color: '#f00', cards: [], createdAt: 0, updatedAt: 0 }] as never };
+    await open();
+    expect(panel('etiquettes').textContent).not.toContain('Dans la famille');
+    expect(panel('etiquettes').textContent).not.toContain('Pour les ventes');
+    [...document.querySelectorAll<HTMLButtonElement>('#familles-etiquettes button')].find((b) => b.textContent === '+ Étiqueter une famille')!.click();
+    type(document.querySelector<HTMLInputElement>('#familles-etiquettes input.tag-input')!, 'Cinéma');
+    await ctrlS();
+    expect(saved.at(-1)!.settings!.familyTags).toMatchObject([{ active: true, family: 'Films', tag: 'Cinéma' }]);
+    extra = {};
+  });
+
+  it('lancement de l\'étiquetage : à la demande ou en continu', async () => {
+    await open();
+    const continuous = document.querySelector<HTMLInputElement>('#etiquetage-auto input[name="autoTagLaunch"]:not(:checked)')!;
+    continuous.click();
+    expect(continuous.closest('.level')!.textContent).toContain('Nécessite l\'étiquetage par l\'API');
+    await ctrlS();
+    expect(saved.at(-1)!.settings!.autoTagContinuous).toBe(true);
   });
 });
 

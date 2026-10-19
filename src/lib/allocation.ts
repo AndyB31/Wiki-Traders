@@ -51,8 +51,11 @@ export function protectedByFamily(card: Card, ctx: PricingContext, rule?: TagRul
   if (!ctx.settings.protectFamilies || !ctx.families) return false;
   const mine = familiesOf(ctx.families, card.siteId ?? null, card.name);
   if (!mine.length) return false;
-  const target = normalize(rule?.when?.family ?? '');
-  return !target || !mine.some((f) => normalize(f.name) === target);
+  // Exception : une étiquette (mode « par étiquette ») posée sur cette famille par l'étiquetage (Familles).
+  const targets = new Set(
+    [rule?.when?.family ?? '', ...(rule ? ctx.settings.familyTags.filter((f) => f.active && sameTag(f.tag, rule.tag)).map((f) => f.family) : [])].map(normalize).filter(Boolean),
+  );
+  return !mine.some((f) => targets.has(normalize(f.name)));
 }
 
 /** Tdv fiable sous le minimum : la carte n'est pas proposée (elle reste vendable à la main). */

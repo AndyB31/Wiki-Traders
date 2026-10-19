@@ -582,6 +582,89 @@ async function processRetags(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Étiquetage en continu (option « autoTagContinuous », par l'API)
+// ---------------------------------------------------------------------------
+
+/** Au plus un passage toutes les 2 min ; passage de fond toutes les 10 min ; collection relue au plus toutes les 10 min. */
+const AUTO_TAG_GAP = 2 * 60_000;
+const AUTO_TAG_EVERY = 10 * 60_000;
+const AUTO_TAG_COLLECTION_EVERY = 10 * 60_000;
+/** Cartes traitées par passage (le reste au passage suivant) : pas de rafale d'écritures. */
+const AUTO_TAG_BATCH = 40;
+/** Verrou entre onglets : un seul onglet étiquette à la fois. */
+const AUTO_TAG_LOCK = 'autoTagLock';
+const AUTO_TAG_LOCK_MS = 5 * 60_000;
+const tabToken = Math.random().toString(36).slice(2);
+let autoTagTimer: ReturnType<typeof setTimeout> | undefined;
+let lastAutoTag = 0;
+let autoTagBusy = false;
+
+function continuousOn(): boolean {
+  const s = store?.settings;
+  return !!s && s.autoTag && s.autoTagContinuous && s.apiWrite;
+}
+
+/** Prochain passage dans `delay` ms (les demandes rapprochées sont regroupées). */
+function scheduleAutoTag(delay = 20_000): void {
+  if (!continuousOn()) return;
+  clearTimeout(autoTagTimer);
+  autoTagTimer = setTimeout(() => void autoTagPass(), Math.max(delay, lastAutoTag + AUTO_TAG_GAP - Date.now()));
+}
+
+async function takeAutoTagLock(): Promise<boolean> {
+  try {
+    const held = (await ext.storage.local.get(AUTO_TAG_LOCK))[AUTO_TAG_LOCK] as { at: number; token: string } | undefined;
+    if (held && held.token !== tabToken && Date.now() - held.at < AUTO_TAG_LOCK_MS) return false;
+    await ext.storage.local.set({ [AUTO_TAG_LOCK]: { at: Date.now(), token: tabToken } });
+    await new Promise((r) => setTimeout(r, 100));
+    return ((await ext.storage.local.get(AUTO_TAG_LOCK))[AUTO_TAG_LOCK] as { token: string } | undefined)?.token === tabToken;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Un passage : collection relue si elle date (nouvelles cartes), prix manquants chargés (cache de 6 h, une requête
+ * par lot de 150), puis seulement les cartes à changer, écrites par l'API. Rien à faire : aucune écriture.
+ */
+async function autoTagPass(): Promise<void> {
+  if (!continuousOn() || automating || autoTagBusy || retagBusy) return scheduleAutoTag(AUTO_TAG_GAP);
+  if (!(await takeAutoTagLock())) return scheduleAutoTag(AUTO_TAG_EVERY);
+  autoTagBusy = true;
+  lastAutoTag = Date.now();
+  try {
+    if (Date.now() - lastApiCollection > AUTO_TAG_COLLECTION_EVERY) await runApi('collection');
+    await refreshStore();
+    await runApi('collectionPrices');
+    const plan = planAutoTags(store!, {
+      removeOthers: store!.settings.autoTagRemoveOthers,
+      clearUnpriced: store!.settings.autoTagClearUnpriced,
+      extraPrice: (card) => (card.siteId ? catalogPrice(knownPrice(card.siteId), card.rarity) : undefined),
+    });
+    if (!plan.length) return;
+    const batch = plan.slice(0, AUTO_TAG_BATCH);
+    const results = await applyTagsViaApi(batch, (_d, _t, step) => log(`[étiquetage continu] ${step.cardName}`), () => !continuousOn());
+    const ok = results.filter((r) => r.ok);
+    if (ok.length) {
+      const lines = batch.filter((c) => ok.some((r) => r.cardName === c.cardName)).map((c) => `${c.cardName} → ${c.target || 'aucune'}`);
+      noticeToast([...lines.slice(0, 5), lines.length > 5 ? `… et ${lines.length - 5} autre(s)` : ''].filter(Boolean).join('\n'), { title: `Étiquetage automatique : ${ok.length} carte${ok.length > 1 ? 's' : ''}` });
+      lastApiCollection = 0;
+      await runApi('collection').catch(() => {});
+    }
+    if (plan.length > batch.length) scheduleAutoTag(AUTO_TAG_GAP);
+  } catch (e) {
+    log(`[étiquetage continu] ${(e as Error).message}`);
+  } finally {
+    autoTagBusy = false;
+    try {
+      await ext.storage.local.remove(AUTO_TAG_LOCK);
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+}
+
 async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: number }> {
   if (!store || automating) return { ok: 0, failed: 0 };
   automating = true;
@@ -853,6 +936,10 @@ async function main(): Promise<void> {
   onStoreChange(['pendingRetags'], () => void processRetags());
   void processRetags();
   setInterval(() => void processRetags(), 30_000);
+  // Étiquetage en continu : après un changement de collection ou de réglages, et un passage de fond (prix compris).
+  onStoreChange(['cards', 'rules', 'settings', 'myFamilies'], () => scheduleAutoTag());
+  scheduleAutoTag(30_000);
+  setInterval(() => scheduleAutoTag(0), AUTO_TAG_EVERY);
   document.addEventListener('visibilitychange', () => void refreshMyAuctions());
   setInterval(() => void refreshBidsFast(), 5_000);
   setInterval(() => void refreshLiveBids(), LIVE_BIDS_MS);

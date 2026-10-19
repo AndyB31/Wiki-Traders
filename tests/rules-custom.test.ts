@@ -7,6 +7,7 @@ import { evalFormula, formulaError } from '../src/lib/formula';
 import { rateOf, type SellRate } from '../src/lib/sellrate';
 import type { Card, RuleConditions, TagRule } from '../src/lib/types';
 import { validateOptions } from '../src/ui/options-logic';
+import { migrateRules, migrateSettings } from '../src/lib/storage';
 import { NOW, TEST_SETTINGS, card, cardsById, input, pctCalc } from './helpers';
 
 const rate = (sold: number, total: number): SellRate => rateOf({ rate: { sold, total } })!;
@@ -76,6 +77,30 @@ describe('étiquetage automatique avec conditions', () => {
     expect(cardMatchesRule(cards.france, rule('Pays', { match: 'price', when: when({ text: 'pays' }) }), ctx)).toBe(true);
     expect(cardMatchesRule(cards.lyon, rule('Pays', { match: 'price', when: when({ text: 'pays' }) }), ctx)).toBe(false);
     expect(cardMatchesRule(cards.france, rule('x', { match: 'price', floor: 50, when: when({ text: 'pays' }) }), ctx)).toBe(false);
+  });
+});
+
+describe('étiquette par famille (onglet Familles)', () => {
+  const films = newFamily('Films', [], [{ siteId: 's-titanic', title: 'Titanic (film)', rarity: 'R', category: null, imageUrl: null, wikipediaUrl: null, atk: null, def: null }], NOW);
+  const cards = cardsById(card('titanic', { name: 'Titanic (film)', siteId: 's-titanic', sitePrice: 30 }), card('lyon', { name: 'Lyon', sitePrice: 30, tags: ['Cinéma'] }));
+
+  it('pose l\'étiquette sur les cartes de la famille, la retire des autres', () => {
+    const settings = { ...TEST_SETTINGS, familyTags: [{ id: 'x', active: true, family: 'Films', tag: 'Cinéma' }] };
+    const plan = planAutoTags(input({ cards, rules: [], settings, myFamilies: [films] }), { removeOthers: true }, NOW);
+    expect(plan.map((c) => [c.cardId, c.add, c.remove])).toEqual([['lyon', [], ['Cinéma']], ['titanic', ['Cinéma'], []]]);
+    expect(planAutoTags(input({ cards, rules: [], settings: { ...settings, familyTags: [{ ...settings.familyTags[0], active: false }] }, myFamilies: [films] }), { removeOthers: true }, NOW)).toEqual([]);
+  });
+
+  it('conversion : la condition « famille » d\'une étiquette devient une famille étiquetée', () => {
+    const legacy = [
+      { id: 'a', tag: 'Films', quota: 0, pct: 70, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', when: { text: '', family: 'Films', rateMin: null, rateMax: null } },
+      { id: 'b', tag: 'Pays', quota: 0, pct: 70, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', when: { text: 'pays', family: 'Monde', rateMin: null, rateMax: null } },
+    ] as never;
+    expect(migrateSettings({ sortPrice: 'desc' } as never, legacy).familyTags).toEqual([
+      { id: 'ft-a', active: true, family: 'Films', tag: 'Films' },
+      { id: 'ft-b', active: true, family: 'Monde', tag: 'Pays' },
+    ]);
+    expect(migrateRules(legacy, { sortPrice: 'desc' } as never).map((r) => [r.tag, r.when?.family, r.when?.text])).toEqual([['Pays', '', 'pays']]);
   });
 });
 
