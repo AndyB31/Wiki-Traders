@@ -1,6 +1,6 @@
 /**
  * Fonctionnalités reprises (et accélérées) de l'extension « WikiMasters - Prix moyen collection ».
- * Chacune s'active dans Réglages → Fonctionnalités. Les automatisations (qui agissent sur le site à ta place)
+ * Chacune s'active dans Réglages → Sur le site (ou avec ce qu'elle concerne : Ventes, Étiquettes). Les automatisations (qui agissent sur le site à ta place)
  * sont désactivées par défaut et demandent une confirmation : risque de bannissement.
  */
 export type FeatureKey =
@@ -41,7 +41,7 @@ export interface FeatureDef {
   default: boolean;
   /** Agit sur le site à ta place : confirmation à l'activation. */
   risky?: boolean;
-  /** Nécessite la lecture via l'API (Réglages → Automatisations). */
+  /** Nécessite la lecture via l'API (Réglages → Accès au site). */
   api?: boolean;
 }
 

@@ -209,7 +209,7 @@ function fillBids(panel: HTMLElement, ctx: FeatureContext, d: MarketData, force:
   const cache = d.bidsCache;
   const list = filterBids(cache?.bids ?? [], bidsFilter, now);
   const statusText = !ctx.apiRead
-    ? 'Lecture via l\'API désactivée (Réglages → Automatisations).'
+    ? 'Lecture via l\'API désactivée (Réglages → Accès au site).'
     : bidsRefreshing
       ? 'Actualisation…'
       : cache
@@ -497,7 +497,7 @@ function stat(label: string, value: string, title = ''): HTMLElement {
 function fillHistory(panel: HTMLElement, ctx: FeatureContext, d: MarketData, force: boolean): void {
   const items = d.salesCache?.items ?? [];
   const statusText = !ctx.apiRead
-    ? 'Lecture via l\'API désactivée (Réglages → Automatisations).'
+    ? 'Lecture via l\'API désactivée (Réglages → Accès au site).'
     : salesRefreshing
       ? 'Actualisation…'
       : d.salesCache

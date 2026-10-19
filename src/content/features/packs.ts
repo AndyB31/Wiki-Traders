@@ -185,7 +185,7 @@ const discarded = new Map<number, number>();
 /** Seuil par défaut (W) au-delà duquel « Tout défausser » demande confirmation. */
 export const DISCARD_CONFIRM_ABOVE = 10;
 
-/** Seuil réglé (Réglages → Fonctionnalités → Paquets). */
+/** Seuil réglé (Réglages → Sur le site → Paquets). */
 export function discardThreshold(settings: { discardConfirmAbove?: number } | null | undefined): number {
   const v = settings?.discardConfirmAbove;
   return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : DISCARD_CONFIRM_ABOVE;
@@ -202,7 +202,7 @@ export function discardNeedsConfirm(rows: { price: number | null }[], loading: b
 /** « Tout défausser » : un exemplaire de chaque carte obtenue (option « packDiscard ») ; confirmation pour les cartes de valeur. */
 async function discardAll(result: PackResult, recap: ReturnType<typeof buildRecap>, loading: boolean, btn: HTMLButtonElement): Promise<void> {
   if (!(await flagNow('packDiscard'))) {
-    noticeToast('« Tout défausser après ouverture » est désactivé (Réglages → Fonctionnalités → Automatisations).', { title: 'Défausse', error: true });
+    noticeToast('« Tout défausser après ouverture » est désactivé (Réglages → Sur le site → Paquets).', { title: 'Défausse', error: true });
     return;
   }
   const n = result.cards.length;
@@ -255,7 +255,7 @@ async function tagAll(cards: PackCard[], btn: HTMLButtonElement): Promise<void> 
   const label = btn.textContent;
   try {
     const s = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'myFamilies');
-    if (!s.settings.apiWrite) throw new Error('active l\'étiquetage par l\'API (Réglages → Automatisations)');
+    if (!s.settings.apiWrite) throw new Error('active l\'étiquetage par l\'API (Réglages → Accès au site)');
     const plan = planAutoTags(
       { ...s, cards: packCardsForTagging(cards, s.cards), catalogPrice: knownCardPrice, sellRate: knownCardRate },
       {

@@ -17,7 +17,7 @@ export interface FeatureContext {
   /** Ma collection connue (clé : slug du nom). */
   cards: Record<string, Card>;
   families: CardFamily[];
-  /** Lecture via l'API autorisée (Réglages → Automatisations). */
+  /** Lecture via l'API autorisée (Réglages → Accès au site). */
   apiRead: boolean;
   /** Chemin de la page (sans origine), ex. `/collection`. */
   path: string;

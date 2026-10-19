@@ -174,8 +174,6 @@ export interface Settings {
   sellRateMinSamples: number;
   /** Ne jamais proposer à la vente une carte d'une de mes familles (sauf étiquette qui vise cette famille). */
   protectFamilies: boolean;
-  /** Profil choisi dans l'accueil des réglages (null = réglages personnalisés). */
-  profile: 'prudent' | 'confort' | 'complet' | null;
   /** Pastilles d'étiquettes sur les cartes de la collection. */
   showTagOverlay: boolean;
   /** `label` : nom de l'étiquette ; `dot` : simple pastille de couleur (nom au survol). */

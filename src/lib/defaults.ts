@@ -28,7 +28,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sellRateTiersOn: true,
   sellRateMinSamples: 5,
   protectFamilies: true,
-  profile: null,
   apiRead: false,
   sellMarketSummary: true,
   sellMarketList: true,

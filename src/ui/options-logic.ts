@@ -71,6 +71,12 @@ export function pctExample(pct: number, rounding: number, base = EXAMPLE_PRICE):
   return p == null ? 'le % doit être positif' : `ex. carte à ${base} W → départ ${p} W`;
 }
 
+/** Effet d'un palier de taux de vente : « ex. départ 28 W → 23 W » (100 % = inchangé). */
+export function rateTierExample(pricePct: number, rounding: number, start = 28): string {
+  if (!Number.isFinite(pricePct) || pricePct <= 0) return 'le % doit être positif';
+  return pricePct === 100 ? `ex. départ ${start} W, inchangé` : `ex. départ ${start} W → ${roundTo((start * pricePct) / 100, rounding)} W`;
+}
+
 /** Exemples d'arrondi : « 17 → 17 W · 63 → 65 W · 238 → 240 W ». */
 export function roundingExamples(step: number, values = [17, 63, 238]): string {
   return values.map((v) => `${v} → ${roundTo(v, step)} W`).join(' · ');
@@ -223,6 +229,9 @@ export function validateOptions(rules: TagRule[], settings: Settings, extra: { s
   }
   errors.push(...durationErrors(settings.durationRules, 'durations', '', ''));
   errors.push(...rateErrors(settings.minSellRate, settings.sellRateRules, 'sellRate', '', ''));
+  if (!(Number.isInteger(settings.sellRateMinSamples) && settings.sellRateMinSamples >= 1 && settings.sellRateMinSamples <= 1000)) {
+    errors.push({ section: 'sellRate', keys: ['sellRateMinSamples'], message: 'Le nombre d\'enchères terminées doit être un entier entre 1 et 1 000.' });
+  }
   if (extra.selectorsInvalid) errors.push({ section: 'advanced', keys: ['selectors'], message: 'JSON des sélecteurs invalide.' });
   return errors;
 }
@@ -285,7 +294,7 @@ export function quickStartChecks(input: { cardCount: number; rules: TagRule[]; s
     {
       id: 'rules',
       ok: active.length > 0,
-      label: 'Règles définies',
+      label: 'Étiquettes à vendre',
       detail: active.length ? `${plural(active.length, 'étiquette')} active${active.length > 1 ? 's' : ''}.` : 'Aucune étiquette active : rien ne sera proposé à la vente.',
     },
     { id: 'quotas', ok: q.status === 'ok', label: 'Quotas = slots', detail: q.message },

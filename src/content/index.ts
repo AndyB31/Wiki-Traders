@@ -421,7 +421,7 @@ async function findTile(cardId: string, cardName: string, cfg: SelectorConfig): 
 }
 
 async function runCardAuctions(siteCardId: string): Promise<{ ok: boolean; error?: string; result?: Awaited<ReturnType<typeof fetchCardAuctions>> }> {
-  if (!store?.settings.apiRead) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Automatisations).' };
+  if (!store?.settings.apiRead) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Accès au site).' };
   return { ok: true, result: await fetchCardAuctions(siteCardId) };
 }
 
@@ -448,7 +448,7 @@ function priceSummary() {
 
 /** Lectures via l'API (option « apiRead ») : mes mises, ventes récentes du marché. */
 async function runApi(op: 'myBids' | 'marketSales' | 'collection' | 'mySales' | 'myAuctions' | 'collectionPrices', force = false): Promise<{ ok: boolean; error?: string; count?: number }> {
-  if (!store?.settings.apiRead && !store?.settings.apiWrite) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Automatisations).' };
+  if (!store?.settings.apiRead && !store?.settings.apiWrite) return { ok: false, error: 'Lecture via l\'API désactivée (Réglages → Accès au site).' };
   if (op === 'collection') {
     const cards = await fetchMyCollection();
     await ext.runtime.sendMessage({ type: 'collection', cards });

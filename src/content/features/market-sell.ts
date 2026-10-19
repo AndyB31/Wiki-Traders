@@ -72,7 +72,7 @@ export async function createListing(
   req: ListingRequest,
   via: keyof typeof SELL_FEATURES = 'rankingSell',
 ): Promise<unknown> {
-  if (!flags[via]) throw new SellError(`${SELL_FEATURES[via]} est désactivée (Réglages → Fonctionnalités).`, 'DISABLED');
+  if (!flags[via]) throw new SellError(`${SELL_FEATURES[via]} est désactivée (Réglages → Ventes → Aide à la vente).`, 'DISABLED');
   const amount = Math.round(Number(req.amount));
   const duration = Math.round(Number(req.durationMinutes));
   if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(duration) || duration <= 0) throw new SellError('Prix ou durée invalide.', 'INVALID');
