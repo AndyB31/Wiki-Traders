@@ -61,7 +61,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'wikipediaButtons', group: 'cards', label: 'Bouton Wikipédia', help: 'Bouton « W » sur chaque carte vers son article.', default: true },
   { key: 'missingImages', group: 'cards', label: 'Images manquantes', help: 'Cherche une image (Wikidata, Wikipédia) pour les cartes qui n\'en ont pas.', default: true },
   { key: 'hideCardStats', group: 'cards', label: 'Masquer ATK / DEF', help: 'Cache les statistiques d\'attaque et de défense des cartes.', default: false },
-  { key: 'hideCardTags', group: 'cards', label: 'Masquer les étiquettes du site', help: 'Cache les étiquettes en bas des cartes (celles de Wiki-Traders restent en haut de l\'image, si elles sont affichées).', default: false },
+  { key: 'hideCardTags', group: 'cards', label: 'Masquer les étiquettes du site', help: 'Cache les étiquettes en bas des cartes : « 17 / 20 vendues » prend leur place (celles de Wiki-Traders restent en haut de l\'image, si elles sont affichées).', default: true },
   { key: 'copyCardImage', group: 'cards', label: 'Copier la carte en image', help: 'Bouton dans la fiche d\'une carte pour la copier en PNG.', default: true },
   { key: 'marketplacePrice', group: 'market', label: 'Prix moyen au marché', help: 'Prix moyen et nombre de ventes sur la page d\'une enchère et dans la fiche d\'une carte.', default: true, api: true },
   { key: 'bidWatch', group: 'market', label: 'Suivi de mes mises', help: 'Mes mises en direct (en tête, surenchéri), temps restant, bip sous la minute.', default: true, api: true },

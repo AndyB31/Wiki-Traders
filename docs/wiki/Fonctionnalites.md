@@ -26,7 +26,7 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 | Bouton Wikipédia | oui | « W » sur chaque carte vers son article |
 | Images manquantes | oui | Image trouvée sur Wikipédia (50 cartes par requête) ou Wikidata, mise en cache |
 | Masquer ATK / DEF | non | Cache les statistiques des cartes |
-| Masquer les étiquettes du site | non | Cache les étiquettes en bas des cartes ; celles de Wiki-Traders restent en haut de l'image (option *Étiquettes visibles sur les cartes*) |
+| Masquer les étiquettes du site | oui | Cache les étiquettes en bas des cartes ; celles de Wiki-Traders restent en haut de l'image (option *Étiquettes visibles sur les cartes*) |
 | Copier la carte en image | oui | Bouton « Copier » dans la fiche d'une carte (PNG ; téléchargé si le presse-papiers refuse) |
 
 ## Marché et enchères
