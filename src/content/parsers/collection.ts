@@ -47,6 +47,9 @@ export function parseCollection(root: Element, cfg: SelectorConfig, knownTags: s
       favorite: isFavorite(tile, cfg),
       updatedAt: now,
     };
+    // Description sous le titre (« réalisateur, scénariste… ») : la catégorie, cherchée par les conditions texte des règles.
+    const category = tile.querySelector('h3 ~ p:not([data-wiky])')?.textContent?.replace(/\s+/g, ' ').trim();
+    if (category) card.category = category;
     const qty = quantityIn(tile, cfg);
     if (qty != null) card.quantity = qty;
     const sitePrice = labeledNumber(leafTexts(tile), cfg.sitePriceLabelRe);
