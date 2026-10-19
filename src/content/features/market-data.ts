@@ -8,12 +8,12 @@ import { load, onStoreChange, type StoreKey } from '../../lib/storage';
 import type { MyBidsResult, MySalesResult, StoreShape } from '../../lib/types';
 import type { FeatureContext } from './runtime';
 
-export type MarketData = Pick<StoreShape, 'rules' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots'> & Partial<Pick<StoreShape, 'myFamilies'>> & {
+export type MarketData = Pick<StoreShape, 'rules' | 'priceObs' | 'myAuctions' | 'manualPrices' | 'slotOverrides' | 'ignoredSlots'> & Partial<Pick<StoreShape, 'myFamilies' | 'poolOffset'>> & {
   bidsCache: MyBidsResult | null;
   salesCache: MySalesResult | null;
 };
 
-const KEYS: StoreKey[] = ['rules', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'bidsCache', 'salesCache', 'myFamilies'];
+const KEYS: StoreKey[] = ['rules', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'bidsCache', 'salesCache', 'myFamilies', 'poolOffset'];
 
 let data: MarketData | null = null;
 let loading: Promise<void> | null = null;
@@ -58,6 +58,7 @@ export function allocationInput(ctx: FeatureContext, d: MarketData): AllocationI
     catalogPrice: knownCardPrice,
     sellRate: knownCardRate,
     myFamilies: d.myFamilies,
+    poolOffset: d.poolOffset,
   };
 }
 

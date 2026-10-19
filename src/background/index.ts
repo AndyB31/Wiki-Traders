@@ -133,9 +133,11 @@ async function handleScan(msg: ScanMessage): Promise<void> {
     Object.assign(patch, retagPatch(merged, finished, now));
     patch.meta!.lastAuctionsScan = now;
     if (created.length) {
-      // Une nouvelle enchère : les choix manuels et slots ignorés repartent de zéro (et nouveau tirage aléatoire).
+      // Une nouvelle enchère : les choix manuels et slots ignorés repartent de zéro (et nouveau tirage aléatoire) ;
+      // en mode « meilleures cartes », retour aux meilleures.
       patch.slotOverrides = {};
       patch.ignoredSlots = [];
+      patch.poolOffset = 0;
       if (store.settings.sortPrice === 'random') patch.settings = { ...(patch.settings ?? store.settings), randomSeed: (now % 2_147_483_647) || 1 };
       if (store.pendingFocus && created.some((a) => a.cardId === store.pendingFocus!.cardId)) patch.pendingFocus = null;
     }

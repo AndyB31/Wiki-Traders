@@ -1460,7 +1460,7 @@ async function main(): Promise<void> {
   ext.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && CARD_PRICES_KEY in changes) void readCatalogPrices().then(render);
   });
-  onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'myFamilies', 'journal'], refresh);
+  onStoreChange(['cards', 'myAuctions', 'priceObs', 'rules', 'settings', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'poolOffset', 'meta', 'intent', 'bidsCache', 'salesCache', 'families', 'myFamilies', 'journal'], refresh);
   setInterval(render, 15_000);
   // Compte à rebours des mises (sans tout redessiner).
   setInterval(() => {
