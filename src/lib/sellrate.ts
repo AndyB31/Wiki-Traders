@@ -29,9 +29,9 @@ export function sellRateOfCache(cache: Record<string, RateEntry> | null | undefi
   return (card) => (card.siteId && cache ? rateOf(cache[card.siteId]) : null);
 }
 
-/** Tdv assez fiable pour agir (au moins SELL_RATE_MIN_SAMPLES enchères terminées), sinon null. */
-export function reliableRate(rate: SellRate | null | undefined): SellRate | null {
-  return rate && rate.total >= SELL_RATE_MIN_SAMPLES ? rate : null;
+/** Tdv assez fiable pour agir (au moins `min` enchères terminées, réglable), sinon null. */
+export function reliableRate(rate: SellRate | null | undefined, min = SELL_RATE_MIN_SAMPLES): SellRate | null {
+  return rate && rate.total >= Math.max(1, min) ? rate : null;
 }
 
 /** Premier palier dont l'intervalle [de, à] (en %) contient le tdv. */
@@ -53,13 +53,26 @@ export function overlappingRateRules(rules: SellRateRule[]): [number, number] | 
 
 /** Proposition : les cartes qui partent toutes seules montent, celles qui ne partent pas baissent. */
 export const DEFAULT_RATE_TIERS: SellRateRule[] = [
-  { from: 80, to: null, adjust: 30 },
-  { from: 50, to: 79, adjust: 0 },
-  { from: 20, to: 49, adjust: -20 },
-  { from: null, to: 19, adjust: -50 },
+  { from: 80, to: null, pricePct: 130 },
+  { from: 50, to: 79, pricePct: 100 },
+  { from: 20, to: 49, pricePct: 80 },
+  { from: null, to: 19, pricePct: 50 },
 ];
 
-/** « +30 % », « −50 % », « ±0 % ». */
-export function adjustLabel(adjust: number): string {
-  return adjust > 0 ? `+${adjust} %` : adjust < 0 ? `−${-adjust} %` : '±0 %';
+/** « 130 % du prix », « 50 % du prix ». */
+export function pricePctLabel(pricePct: number): string {
+  return `${pricePct} % du prix`;
+}
+
+/**
+ * Avant la 1.0, un palier stockait un ajustement (`adjust` : +30 = « +30 % », −50 = moitié prix), souvent lu à tort
+ * comme « % du prix ». Il stocke maintenant le % du prix (`pricePct` : 100 = inchangé). Sans effet sur un palier déjà converti.
+ */
+export function migrateRateRule(r: SellRateRule & { adjust?: number }): SellRateRule {
+  if (typeof r.pricePct === 'number') return { from: r.from, to: r.to, pricePct: r.pricePct };
+  return { from: r.from ?? null, to: r.to ?? null, pricePct: 100 + (typeof r.adjust === 'number' ? r.adjust : 0) };
+}
+
+export function migrateRateRules(list: unknown): SellRateRule[] {
+  return Array.isArray(list) ? list.map((r) => migrateRateRule(r as SellRateRule)) : [];
 }

@@ -7,7 +7,7 @@ export interface RuleConditions {
   text: string;
   /** Nom d'une de mes familles : la carte doit en faire partie. */
   family: string;
-  /** Taux de vente (en %) entre ces bornes, à partir de SELL_RATE_MIN_SAMPLES enchères terminées. */
+  /** Taux de vente (en %) entre ces bornes, à partir de `sellRateMinSamples` enchères terminées. */
   rateMin: number | null;
   rateMax: number | null;
 }
@@ -125,11 +125,11 @@ export interface DurationRule {
   minutes: number;
 }
 
-/** Palier de taux de vente : tdv entre `from` et `to` % (inclus) → prix conseillé ajusté de `adjust` % (−50 = moitié prix). */
+/** Palier de taux de vente : tdv entre `from` et `to` % (inclus) → prix conseillé × `pricePct` % (100 = inchangé, 50 = moitié prix). */
 export interface SellRateRule {
   from: number | null;
   to: number | null;
-  adjust: number;
+  pricePct: number;
 }
 
 export interface Settings {
@@ -166,8 +166,16 @@ export interface Settings {
   durationRules: DurationRule[];
   /** Ne pas proposer une carte dont le taux de vente est sous ce % (null = pas de minimum). */
   minSellRate: number | null;
-  /** Ajustement du prix conseillé selon le taux de vente (vide = aucun). */
+  /** Prix conseillé selon le taux de vente (vide = aucun). */
   sellRateRules: SellRateRule[];
+  /** Paliers de taux de vente appliqués (faux : gardés mais sans effet). */
+  sellRateTiersOn: boolean;
+  /** Nombre d'enchères terminées à partir duquel le taux de vente compte (minimum, paliers, conditions, tri). */
+  sellRateMinSamples: number;
+  /** Ne jamais proposer à la vente une carte d'une de mes familles (sauf étiquette qui vise cette famille). */
+  protectFamilies: boolean;
+  /** Profil choisi dans l'accueil des réglages (null = réglages personnalisés). */
+  profile: 'prudent' | 'confort' | 'complet' | null;
   /** Pastilles d'étiquettes sur les cartes de la collection. */
   showTagOverlay: boolean;
   /** `label` : nom de l'étiquette ; `dot` : simple pastille de couleur (nom au survol). */

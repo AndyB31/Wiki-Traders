@@ -29,12 +29,12 @@ const CSS = `
 .wiky-avg-refresh:disabled { opacity: .6; cursor: default; }
 .wiky-avg-legend .wiky-avg { position: static; margin: 0; }
 .wiky-avg .wiky-rate { color: #e7e5e4; font-weight: 800; }
-.wiky-avg .wiky-rate::before { content: '·'; margin-right: 3px; color: #a8a29e; }
+.wiky-avg .wiky-rate::before { content: '·'; margin-right: 3px; color: #d6d3d1; }
 .wiky-avg .wiky-rate.is-low { color: #f87171; }
 .wiky-avg .wiky-rate.is-high { color: #4ade80; }
 .wiky-avg-count { position: relative; z-index: 25; align-self: flex-start; display: inline-flex; gap: 2px; padding: 1px 5px; border-radius: 999px; pointer-events: none;
-  background: rgba(12,10,9,.78); border: 1px solid rgba(214,211,209,.3); color: #a8a29e; font-size: 8px; line-height: 1.2; font-weight: 600; white-space: nowrap; }
-.wiky-avg-count b { color: #e7e5e4; font-weight: 800; }
+  background: rgba(12,10,9,.85); border: 1px solid rgba(214,211,209,.35); color: #fafaf9; font-size: 8px; line-height: 1.2; font-weight: 600; white-space: nowrap; }
+.wiky-avg-count b { color: #4ade80; font-weight: 800; }
 .wiky-avg-legend .wiky-avg-count { position: static; }
 `;
 

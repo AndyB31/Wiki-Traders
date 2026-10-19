@@ -1,7 +1,7 @@
 import { MIN_RARITY_SAMPLES, MIN_SALES } from './defaults';
 import { durationFor } from './duration';
 import type { FamilyIndex } from './families';
-import { adjustLabel, rateRuleFor, reliableRate, type SellRate } from './sellrate';
+import { rateRuleFor, reliableRate, type SellRate } from './sellrate';
 import { RARITIES } from './text';
 import type { Card, PriceObs, Settings, TagRule } from './types';
 
@@ -22,7 +22,7 @@ export interface PriceResult {
   /** Durée conseillée (minutes) selon les paliers de durée de l'étiquette ou globaux ; null = durée du site. */
   durationMin?: number | null;
   /** Ajustement appliqué selon le taux de vente (palier de tdv), en %. */
-  rateAdjust?: { pct: number; adjust: number };
+  rateAdjust?: { pct: number; pricePct: number };
   /** Détail lisible du calcul : « moyenne 86 × 70 % = 60 ». */
   detail: string;
   estimate: boolean;
@@ -227,14 +227,15 @@ export function computePrice(card: Card, rule: TagRule, ctx: PricingContext, pee
     base.source === 'estimate' && base.group ? `estimation ${base.group}` :
     SOURCE_LABEL[base.source];
   // Palier de taux de vente : seulement si le tdv porte sur assez d'enchères (sinon 1 vente sur 1 = 100 %).
-  const tiers = rule.sale?.sellRateRules ?? ctx.settings.sellRateRules;
-  const rate = tiers.length ? reliableRate(ctx.sellRate?.(card)) : null;
+  const tiers = ctx.settings.sellRateTiersOn === false ? [] : rule.sale?.sellRateRules ?? ctx.settings.sellRateRules;
+  const rate = tiers.length ? reliableRate(ctx.sellRate?.(card), ctx.settings.sellRateMinSamples) : null;
   const tier = rate ? rateRuleFor(rate.pct, tiers) : null;
-  const adjust = tier?.adjust ?? 0;
-  const price = roundTo(((base.value * rule.pct) / 100) * (1 + adjust / 100), ctx.settings.rounding);
+  const pricePct = tier?.pricePct ?? 100;
+  const adjust = pricePct !== 100;
+  const price = roundTo(((base.value * rule.pct) / 100) * (pricePct / 100), ctx.settings.rounding);
   const samples = base.source === 'history' || base.source === 'rarity' ? ` (${base.samples} ventes)` : base.group ? ` (${base.samples})` : '';
-  const rateText = rate && adjust ? ` ${adjustLabel(adjust)} (tdv ${rate.pct} %)` : '';
+  const rateText = rate && adjust ? ` × ${pricePct} % (tdv ${rate.pct} %)` : '';
   const detail = `${label} ${Math.round(base.value)}${samples} × ${rule.pct} %${rateText} = ${price}`;
   const durationMin = durationFor(price, rule.sale?.durationRules ?? ctx.settings.durationRules);
-  return { price, base, detail, estimate: base.source === 'estimate', durationMin, ...(rate && adjust ? { rateAdjust: { pct: rate.pct, adjust } } : {}) };
+  return { price, base, detail, estimate: base.source === 'estimate', durationMin, ...(rate && adjust ? { rateAdjust: { pct: rate.pct, pricePct } } : {}) };
 }

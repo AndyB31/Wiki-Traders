@@ -81,6 +81,19 @@ describe('étiquetage automatique avec conditions', () => {
   });
 });
 
+describe('cartes de mes familles protégées de la vente', () => {
+  const films = newFamily('Films', [], [{ siteId: 's-titanic', title: 'Titanic (film)', rarity: 'R', category: null, imageUrl: null, wikipediaUrl: null, atk: null, def: null }], NOW);
+  const cards = cardsById(card('titanic', { name: 'Titanic (film)', siteId: 's-titanic', tags: ['20-50'], sitePrice: 40, quantity: 2 }));
+  const proposed = (rules: TagRule[], protectFamilies: boolean) =>
+    allocate(input({ cards, rules, myFamilies: [films], settings: { ...DEFAULT_SETTINGS, slots: 1, protectFamilies } }), NOW).free.map((f) => f.proposal?.card.id ?? null);
+
+  it('jamais proposées par défaut, sauf si l\'étiquette vise cette famille ou si la protection est coupée', () => {
+    expect(proposed([rule('20-50')], true)).toEqual([null]);
+    expect(proposed([rule('20-50')], false)).toEqual(['titanic']);
+    expect(proposed([rule('20-50', { match: 'price', when: when({ family: 'Films' }) })], true)).toEqual(['titanic']);
+  });
+});
+
 describe('réglages de vente par étiquette', () => {
   const cheap = (id: string, over: Partial<Card> = {}) => card(id, { tags: ['20-50'], sitePrice: 40, ...over });
   const rules20 = (s?: RuleSale) => [rule('20-50', { quota: 3, pct: 50, sale: s })];
@@ -107,7 +120,7 @@ describe('réglages de vente par étiquette', () => {
 
   it('paliers de prix et de durée propres à l\'étiquette', () => {
     const cards = cardsById(cheap('a'));
-    const s = sale({ sellRateRules: [{ from: null, to: 30, adjust: -50 }], durationRules: [{ from: null, to: 15, minutes: 10 }] });
+    const s = sale({ sellRateRules: [{ from: null, to: 30, pricePct: 50 }], durationRules: [{ from: null, to: 15, minutes: 10 }] });
     const advice = adviceForCard(input({ cards, rules: rules20(s), sellRate: () => rate(1, 10), settings: { ...DEFAULT_SETTINGS, rounding: 1 } }), 'a', NOW)!;
     expect(advice.pricing).toMatchObject({ price: 10, durationMin: 10 });
     const global = adviceForCard(input({ cards, rules: rules20(), sellRate: () => rate(1, 10), settings: { ...DEFAULT_SETTINGS, rounding: 1 } }), 'a', NOW)!;

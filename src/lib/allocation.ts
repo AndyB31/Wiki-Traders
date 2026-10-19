@@ -1,7 +1,7 @@
 import { computePrice, indexObs, referencePrice, reliableBase, type PriceResult, type PricingContext } from './pricing';
 import { hasRange, ruleStatus } from './conditions';
 import { durationFor } from './duration';
-import { familyIndex, RARITY_ORDER } from './families';
+import { familiesOf, familyIndex, RARITY_ORDER } from './families';
 import { evalFormula } from './formula';
 import { reliableRate, type SellRate } from './sellrate';
 import { normalize, sameTag } from './text';
@@ -41,25 +41,37 @@ export interface Exclusions {
   keep: number;
   /** Taux de vente sous le minimum réglé. */
   lowRate: number;
+  /** Dans une de mes familles (protégées). */
+  family: number;
+}
+
+/** Carte d'une de mes familles, protégée de la vente (sauf si l'étiquette vise justement cette famille). */
+export function protectedByFamily(card: Card, ctx: PricingContext, rule?: TagRule): boolean {
+  if (!ctx.settings.protectFamilies || !ctx.families) return false;
+  const mine = familiesOf(ctx.families, card.siteId ?? null, card.name);
+  if (!mine.length) return false;
+  const target = normalize(rule?.when?.family ?? '');
+  return !target || !mine.some((f) => normalize(f.name) === target);
 }
 
 /** Tdv fiable sous le minimum (de l'étiquette, sinon global) : la carte n'est pas proposée (elle reste vendable à la main). */
 export function belowMinRate(card: Card, ctx: PricingContext, rule?: TagRule): boolean {
   const min = rule?.sale ? rule.sale.minSellRate : ctx.settings.minSellRate;
   if (min == null) return false;
-  const rate = reliableRate(ctx.sellRate?.(card));
+  const rate = reliableRate(ctx.sellRate?.(card), ctx.settings.sellRateMinSamples);
   return !!rate && rate.pct < min;
 }
 
 /** Compte les cartes d'une règle écartées, par motif. */
 export function exclusions(rule: TagRule, ctx: PricingContext, onSale: Map<string, number>): Exclusions {
   const blacklist = new Set(ctx.settings.blacklist.map(normalize));
-  const out: Exclusions = { total: 0, favorite: 0, blacklist: 0, onSale: 0, keep: 0, lowRate: 0 };
+  const out: Exclusions = { total: 0, favorite: 0, blacklist: 0, onSale: 0, keep: 0, lowRate: 0, family: 0 };
   for (const card of Object.values(ctx.cards)) {
     if (!cardMatchesRule(card, rule, ctx)) continue;
     out.total++;
     if (card.favorite) out.favorite++;
     else if (blacklist.has(normalize(card.id)) || blacklist.has(normalize(card.name))) out.blacklist++;
+    else if (protectedByFamily(card, ctx, rule)) out.family++;
     else if ((onSale.get(card.id) ?? 0) > 0 && !ctx.settings.allowDuplicateListing) out.onSale++;
     else if (card.quantity - rule.keepMin <= 0) out.keep++;
     else if (belowMinRate(card, ctx, rule)) out.lowRate++;
@@ -159,6 +171,7 @@ export function rankCandidates(
   for (const card of peers) {
     if (card.favorite) continue;
     if (blacklist.has(normalize(card.id)) || blacklist.has(normalize(card.name))) continue;
+    if (protectedByFamily(card, ctx, rule)) continue;
     const listed = (onSale.get(card.id) ?? 0) + (reserved.get(card.id) ?? 0);
     if (listed > 0 && !settings.allowDuplicateListing) continue;
     const sellable = card.quantity - rule.keepMin - listed;
@@ -180,7 +193,7 @@ export function criterionValue(c: Candidate, key: SortCriterion['key'], ctx: Pri
     case 'prix_moyen':
       return c.pricing.base.value;
     case 'tdv':
-      return reliableRate(rate)?.pct ?? null;
+      return reliableRate(rate, ctx.settings.sellRateMinSamples)?.pct ?? null;
     case 'ventes':
       return rate?.sold ?? null;
     case 'encheres':
@@ -225,7 +238,7 @@ export function sortCandidates(
       return a.card.name.localeCompare(b.card.name);
     });
   }
-  const rateOfCard = (c: Candidate) => reliableRate(ctx.sellRate?.(c.card))?.pct ?? -1;
+  const rateOfCard = (c: Candidate) => reliableRate(ctx.sellRate?.(c.card), ctx.settings.sellRateMinSamples)?.pct ?? -1;
   const dir = sort === 'asc' ? 1 : -1;
   out.sort((a, b) => {
     const dup = b.card.quantity - a.card.quantity;

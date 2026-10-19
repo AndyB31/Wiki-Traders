@@ -156,7 +156,7 @@ function rateErrors(min: number | null, rows: SellRateRule[], section: OptionsSe
     if (r.from != null && r.to != null && r.from > r.to) {
       errors.push({ section, keys: [`${prefix}tdv:${i}:from`, `${prefix}tdv:${i}:to`], message: `${label}Palier de taux de vente ${i + 1} : « de » dépasse « à ».` });
     }
-    if (!(r.adjust > -100)) errors.push({ section, keys: [`${prefix}tdv:${i}:adjust`], message: `${label}Palier de taux de vente ${i + 1} : l'ajustement doit être au-dessus de −100 %.` });
+    if (!(r.pricePct > 0 && r.pricePct <= 500)) errors.push({ section, keys: [`${prefix}tdv:${i}:pricePct`], message: `${label}Palier de taux de vente ${i + 1} : le % du prix doit être entre 1 et 500 (100 = prix inchangé).` });
   }
   const overlap = overlappingRateRules(rows);
   if (overlap) {

@@ -6,13 +6,15 @@
 import { familiesOf, type FamilyIndex } from './families';
 import { reliableRate, type SellRate } from './sellrate';
 import { normalize } from './text';
-import type { Card, RuleConditions, TagRule } from './types';
+import type { Card, RuleConditions, Settings, TagRule } from './types';
 
 export type Tri = 'yes' | 'no' | 'unknown';
 
 export interface ConditionContext {
   families?: FamilyIndex;
   sellRate?: (card: Card) => SellRate | null | undefined;
+  /** Seuil d'enchères terminées du taux de vente (absent = SELL_RATE_MIN_SAMPLES). */
+  settings?: Pick<Settings, 'sellRateMinSamples'>;
 }
 
 export const EMPTY_CONDITIONS: RuleConditions = { text: '', family: '', rateMin: null, rateMax: null };
@@ -63,7 +65,7 @@ export function conditionStatus(card: Card, rule: Pick<TagRule, 'when'>, ctx: Co
     out.push(mine.some((f) => normalize(f.name) === family) ? 'yes' : 'no');
   }
   if (w.rateMin != null || w.rateMax != null) {
-    const rate = reliableRate(ctx.sellRate?.(card));
+    const rate = reliableRate(ctx.sellRate?.(card), ctx.settings?.sellRateMinSamples);
     out.push(!rate ? 'unknown' : (w.rateMin == null || rate.pct >= w.rateMin) && (w.rateMax == null || rate.pct <= w.rateMax) ? 'yes' : 'no');
   }
   return all(out);
