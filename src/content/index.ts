@@ -860,6 +860,7 @@ async function main(): Promise<void> {
   window.addEventListener('wiky-refresh-sales', () => void refreshMyAuctions(true));
   window.addEventListener('wiky-refresh-bids', () => void runApi('myBids').catch(() => {}));
   window.addEventListener('wiky-refresh-sales-history', () => void runApi('mySales').catch(() => {}));
+  window.addEventListener('wiky-refresh-collection', () => void runApi('collection').catch(() => {}));
 
   ext.runtime.onMessage.addListener((raw: unknown, _sender, sendResponse) => {
     const message = raw as ToContent;

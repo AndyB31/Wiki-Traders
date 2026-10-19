@@ -8,10 +8,14 @@
 import { featureFlags, type FeatureKey } from '../../lib/features';
 import { load } from '../../lib/storage';
 import { formatDuration } from '../../lib/text';
-import { cardPrices, knownPrice, type CardPrice } from '../catalog';
+import { cardPrices, knownCardPrice, knownCardRate, knownPrice, type CardPrice } from '../catalog';
+import { catalogPrice, planAutoTags } from '../../lib/autotag';
+import { applyTagsViaApi } from '../api-tags';
+import { noticeToast } from '../toast';
+import { discardPackCards } from './discard';
 import { onSiteResponse } from '../net';
 import { endProgress, showProgress } from '../overlay';
-import { AUTO_OPEN_KEY, buildRecap, loadAutoOpen, loadPullStats, mapPackCards, normalizeBounds, openPacksSequence, PULL_STATS_KEY, pullShares, randomDelay, recordPulls, resetPullStats, saveAutoOpen, type AutoOpenState, type OpenAllResult, type PackCard, type PullStats, importOtherPullStats, OTHER_PULL_STATS_KEY, readOtherPullStats } from './packs-logic';
+import { AUTO_OPEN_KEY, buildRecap, loadAutoOpen, loadPullStats, mapPackCards, normalizeBounds, openPacksSequence, PULL_STATS_KEY, pullShares, randomDelay, recordPulls, resetPullStats, saveAutoOpen, type AutoOpenState, type OpenAllResult, type PackCard, packCardsForTagging, type PullStats, importOtherPullStats, OTHER_PULL_STATS_KEY, readOtherPullStats } from './packs-logic';
 import { type FeatureContext, registerFeature } from './runtime';
 import { button, confirmDialog, ensureFeatureStyle, floatingPanel, node, rarityChip, RARITY_COLORS, wiki } from './ui';
 import { ext } from '../../lib/browser';
@@ -19,6 +23,11 @@ import { sharePack } from './pull-image';
 
 const CSS = `
 [data-wiky="pulls-tools"][data-opening] { display: none !important; }
+.wiky-f-pack-actions { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; margin-top: 2px; border-top: 1px dashed var(--color-border, rgba(255,255,255,.12)); }
+.wiky-f-pack-actions .wiky-f-btn { flex: 1; }
+.wiky-f-pack-actions .wiky-f-btn.danger { background: #ef4444; border-color: #ef4444; color: #fff; }
+.wiky-f-pack-actions .wiky-f-btn.danger:hover:not(:disabled) { background: #dc2626; }
+.wiky-f-confirm p { white-space: pre-line; }
 [data-wiky="pulls-tools"] { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .wiky-pt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wiky-pt-box { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border, rgba(255,255,255,.12)); background: var(--color-surface, #1c1917); }
@@ -138,6 +147,26 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
       share.style.marginLeft = 'auto';
       foot.append(share);
     }
+    // Actions sur les cartes obtenues, sous le total.
+    const canTag = flag('packTagAll') && !!ctx?.settings.apiWrite;
+    const canDiscard = flag('packDiscard');
+    if ((canTag || canDiscard) && result.cards.length) {
+      const actions = node('div', 'part', 'wiky-f-pack-actions');
+      if (canDiscard) {
+        const done = discarded.get(result.at);
+        const discard = button(done ? `Défaussé ✓ (${done})` : 'Tout défausser', () => void discardAll(result, recap, loading, discard), '', true);
+        discard.classList.add('danger');
+        discard.disabled = done != null;
+        discard.title = `Défausse les ${result.cards.length} cartes obtenues (un exemplaire chacune). Confirmation si une carte vaut plus de ${DISCARD_CONFIRM_ABOVE} W. Irréversible.`;
+        actions.append(discard);
+      }
+      if (canTag) {
+        const tag = button('Tout étiqueter', () => void tagAll(result.cards, tag), '', true);
+        tag.title = 'Pose sur les cartes obtenues les étiquettes de tes règles (plages de prix, conditions), comme l\'étiquetage automatique';
+        actions.append(tag);
+      }
+      foot.append(actions);
+    }
   };
   const ids = result.cards.map((c) => c.siteId);
   const known = new Map(ids.flatMap((id) => (knownPrice(id) ? [[id, knownPrice(id)!] as const] : [])));
@@ -147,6 +176,100 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
     draw(await cardPrices(ids), false);
   } catch {
     draw(known, false);
+  }
+}
+
+/** Paquets déjà défaussés (clé : `at` du résultat) → nombre de cartes défaussées. */
+const discarded = new Map<number, number>();
+
+/** Au-delà de ce prix moyen (W), « Tout défausser » demande confirmation. */
+export const DISCARD_CONFIRM_ABOVE = 10;
+
+/**
+ * Confirmation nécessaire : une carte vaut plus de DISCARD_CONFIRM_ABOVE W, ou les prix ne sont pas encore chargés
+ * (une carte jamais vendue, prix « — », ne la déclenche pas).
+ */
+export function discardNeedsConfirm(rows: { price: number | null }[], loading: boolean): boolean {
+  return loading || rows.some((r) => r.price != null && r.price > DISCARD_CONFIRM_ABOVE);
+}
+
+/** « Tout défausser » : un exemplaire de chaque carte obtenue (option « packDiscard ») ; confirmation pour les cartes de valeur. */
+async function discardAll(result: PackResult, recap: ReturnType<typeof buildRecap>, loading: boolean, btn: HTMLButtonElement): Promise<void> {
+  if (!(await flagNow('packDiscard'))) {
+    noticeToast('« Tout défausser après ouverture » est désactivé (Réglages → Fonctionnalités → Automatisations).', { title: 'Défausse', error: true });
+    return;
+  }
+  const n = result.cards.length;
+  const fresh = recap.rows.filter((r) => !r.ownedBefore && !r.repeat);
+  const lines = recap.rows.map((r) => `• ${r.title}${r.rarity ? ` (${r.rarity})` : ''} · ${wiki(r.price)}${!r.ownedBefore && !r.repeat ? ' · nouvelle' : ''}`);
+  const valuable = recap.rows.filter((r) => r.price != null && r.price > DISCARD_CONFIRM_ABOVE);
+  if (discardNeedsConfirm(recap.rows, loading)) {
+    const ok = await confirmDialog({
+      title: `Défausser ${n} carte${n > 1 ? 's' : ''} ?`,
+      text: [
+        loading
+          ? 'Les prix ne sont pas encore chargés.'
+          : `⚠ ${valuable.length} carte${valuable.length > 1 ? 's' : ''} à plus de ${DISCARD_CONFIRM_ABOVE} W : ${valuable.map((r) => `${r.title} (${wiki(r.price)})`).join(', ')}.`,
+        '',
+        ...lines,
+        '',
+        `Valeur moyenne totale : ${wiki(recap.total)}.`,
+        fresh.length ? `${fresh.length} carte${fresh.length > 1 ? 's' : ''} que tu n'avais pas encore.` : '',
+        'Un exemplaire de chaque carte est retiré définitivement (les favoris sont verrouillés).',
+      ].filter((l, i, all) => l !== '' || all[i - 1] !== '').join('\n'),
+      confirm: `Défausser ${n} carte${n > 1 ? 's' : ''}`,
+      danger: true,
+    });
+    if (!ok) return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Défausse…';
+  const res = await discardPackCards(result.cards, (done, total) => (btn.textContent = `Défausse… ${done}/${total}`));
+  discarded.set(result.at, res.done.length);
+  btn.textContent = `Défaussé ✓ (${res.done.length})`;
+  noticeToast(
+    [res.done.length ? `${res.done.length} carte${res.done.length > 1 ? 's' : ''} défaussée${res.done.length > 1 ? 's' : ''}.` : '', ...res.failed.map((f) => `✗ ${f.title} : ${f.error}`), 'Recharge la page pour voir ton solde à jour.']
+      .filter(Boolean)
+      .join('\n'),
+    { title: 'Défausse', error: !res.done.length },
+  );
+  window.dispatchEvent(new Event('wiky-refresh-collection'));
+}
+
+/** « Tout étiqueter » : étiquetage automatique limité aux cartes du paquet, par l'API (option « apiWrite »). */
+async function tagAll(cards: PackCard[], btn: HTMLButtonElement): Promise<void> {
+  btn.disabled = true;
+  const label = btn.textContent;
+  try {
+    const s = await load('settings', 'rules', 'cards', 'priceObs', 'myAuctions', 'manualPrices', 'slotOverrides', 'ignoredSlots', 'myFamilies');
+    if (!s.settings.apiWrite) throw new Error('active l\'étiquetage par l\'API (Réglages → Automatisations)');
+    const plan = planAutoTags(
+      { ...s, cards: packCardsForTagging(cards, s.cards), catalogPrice: knownCardPrice, sellRate: knownCardRate },
+      {
+        removeOthers: s.settings.autoTagRemoveOthers,
+        extraPrice: (c) => (c.siteId ? catalogPrice(knownPrice(c.siteId), c.rarity) : undefined),
+      },
+    );
+    if (!plan.length) {
+      noticeToast('Aucune étiquette à poser : aucune règle (plage de prix ou condition) ne correspond à ces cartes, ou elles l\'ont déjà.', { title: 'Étiquettes' });
+      btn.textContent = 'Rien à étiqueter';
+      return;
+    }
+    btn.textContent = 'Étiquetage…';
+    const results = await applyTagsViaApi(plan, () => {}, () => false);
+    const failed = results.filter((r) => !r.ok);
+    const lines = plan.map((c) => `${c.cardName} → ${[...c.add.map((t) => `+${t}`), ...c.remove.map((t) => `−${t}`)].join(', ')}`);
+    noticeToast([...lines, ...failed.map((r) => `✗ ${r.cardName} : ${r.skipped ?? r.error ?? 'échec'}`)].join('\n'), {
+      title: `${plan.length - failed.length} carte${plan.length - failed.length > 1 ? 's' : ''} étiquetée${plan.length - failed.length > 1 ? 's' : ''}`,
+      error: failed.length === plan.length,
+    });
+    btn.textContent = failed.length ? 'Étiqueté (avec erreurs)' : 'Étiqueté ✓';
+    // La collection connue de l'extension est relue pour voir les nouvelles étiquettes.
+    window.dispatchEvent(new Event('wiky-refresh-collection'));
+  } catch (e) {
+    noticeToast(`Étiquetage impossible : ${(e as Error).message}`, { title: 'Étiquettes', error: true });
+    btn.textContent = label;
+    btn.disabled = false;
   }
 }
 

@@ -17,6 +17,8 @@ export type FeatureKey =
   | 'hideCardTags'
   | 'copyCardImage'
   | 'pullShare'
+  | 'packTagAll'
+  | 'packDiscard'
   | 'packRecap'
   | 'pullStats'
   | 'tradeValues'
@@ -69,6 +71,8 @@ export const FEATURES: FeatureDef[] = [
   { key: 'packRecap', group: 'packs', label: 'Récapitulatif d\'ouverture', help: 'Après l\'ouverture d\'un paquet : les cartes obtenues, leur prix moyen et le total.', default: true },
   { key: 'pullStats', group: 'packs', label: 'Statistiques de tirage', help: 'Répartition des raretés obtenues dans tes paquets.', default: true },
   { key: 'pullShare', group: 'packs', label: 'Partager un tirage', help: 'Copie l\'écran d\'ouverture en image.', default: true },
+  { key: 'packDiscard', group: 'packs', label: 'Tout défausser après ouverture', help: 'Bouton rouge « Tout défausser » sous le récapitulatif d\'ouverture : défausse un exemplaire de chaque carte obtenue. Confirmation si une carte vaut plus de 10 W (ou si les prix ne sont pas encore chargés). Irréversible.', default: true, api: true },
+  { key: 'packTagAll', group: 'packs', label: 'Tout étiqueter après ouverture', help: 'Bouton « Tout étiqueter » sous le récapitulatif : les cartes obtenues reçoivent les étiquettes de tes règles (étiquetage automatique). Nécessite l\'étiquetage par l\'API.', default: true, api: true },
   { key: 'tradeValues', group: 'social', label: 'Valeur des échanges', help: 'Prix moyen de chaque carte et total de chaque côté d\'un échange.', default: true, api: true },
   { key: 'tradePreviews', group: 'social', label: 'Aperçu des échanges', help: 'Mini-cartes au lieu des noms tronqués dans les échanges.', default: true },
   { key: 'notificationSound', group: 'social', label: 'Son des notifications', help: 'Petit son quand une nouvelle notification arrive.', default: false },
