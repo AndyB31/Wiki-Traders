@@ -157,7 +157,7 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
         const discard = button(done ? `Défaussé ✓ (${done})` : 'Tout défausser', () => void discardAll(result, recap, loading, discard), '', true);
         discard.classList.add('danger');
         discard.disabled = done != null;
-        discard.title = `Défausse les ${result.cards.length} cartes obtenues (un exemplaire chacune). Confirmation si une carte vaut plus de ${DISCARD_CONFIRM_ABOVE} W. Irréversible.`;
+        discard.title = `Défausse les ${result.cards.length} cartes obtenues (un exemplaire chacune). Confirmation si une carte vaut plus de ${discardThreshold(ctx?.settings)} W. Irréversible.`;
         actions.append(discard);
       }
       if (canTag) {
@@ -182,15 +182,21 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
 /** Paquets déjà défaussés (clé : `at` du résultat) → nombre de cartes défaussées. */
 const discarded = new Map<number, number>();
 
-/** Au-delà de ce prix moyen (W), « Tout défausser » demande confirmation. */
+/** Seuil par défaut (W) au-delà duquel « Tout défausser » demande confirmation. */
 export const DISCARD_CONFIRM_ABOVE = 10;
 
+/** Seuil réglé (Réglages → Fonctionnalités → Paquets). */
+export function discardThreshold(settings: { discardConfirmAbove?: number } | null | undefined): number {
+  const v = settings?.discardConfirmAbove;
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : DISCARD_CONFIRM_ABOVE;
+}
+
 /**
- * Confirmation nécessaire : une carte vaut plus de DISCARD_CONFIRM_ABOVE W, ou les prix ne sont pas encore chargés
+ * Confirmation nécessaire : une carte vaut plus que le seuil, ou les prix ne sont pas encore chargés
  * (une carte jamais vendue, prix « — », ne la déclenche pas).
  */
-export function discardNeedsConfirm(rows: { price: number | null }[], loading: boolean): boolean {
-  return loading || rows.some((r) => r.price != null && r.price > DISCARD_CONFIRM_ABOVE);
+export function discardNeedsConfirm(rows: { price: number | null }[], loading: boolean, threshold = DISCARD_CONFIRM_ABOVE): boolean {
+  return loading || rows.some((r) => r.price != null && r.price > threshold);
 }
 
 /** « Tout défausser » : un exemplaire de chaque carte obtenue (option « packDiscard ») ; confirmation pour les cartes de valeur. */
@@ -202,14 +208,16 @@ async function discardAll(result: PackResult, recap: ReturnType<typeof buildReca
   const n = result.cards.length;
   const fresh = recap.rows.filter((r) => !r.ownedBefore && !r.repeat);
   const lines = recap.rows.map((r) => `• ${r.title}${r.rarity ? ` (${r.rarity})` : ''} · ${wiki(r.price)}${!r.ownedBefore && !r.repeat ? ' · nouvelle' : ''}`);
-  const valuable = recap.rows.filter((r) => r.price != null && r.price > DISCARD_CONFIRM_ABOVE);
-  if (discardNeedsConfirm(recap.rows, loading)) {
+  // Seuil relu au moment d'agir (il vient peut-être d'être changé dans les réglages).
+  const threshold = discardThreshold((await load('settings')).settings);
+  const valuable = recap.rows.filter((r) => r.price != null && r.price > threshold);
+  if (discardNeedsConfirm(recap.rows, loading, threshold)) {
     const ok = await confirmDialog({
       title: `Défausser ${n} carte${n > 1 ? 's' : ''} ?`,
       text: [
         loading
           ? 'Les prix ne sont pas encore chargés.'
-          : `⚠ ${valuable.length} carte${valuable.length > 1 ? 's' : ''} à plus de ${DISCARD_CONFIRM_ABOVE} W : ${valuable.map((r) => `${r.title} (${wiki(r.price)})`).join(', ')}.`,
+          : `⚠ ${valuable.length} carte${valuable.length > 1 ? 's' : ''} à plus de ${threshold} W : ${valuable.map((r) => `${r.title} (${wiki(r.price)})`).join(', ')}.`,
         '',
         ...lines,
         '',

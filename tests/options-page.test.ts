@@ -115,4 +115,14 @@ describe('page Réglages', () => {
     expect(s2).toMatchObject({ sortPrice: 'custom', allocationMode: 'pool' });
     expect(s2.sortCriteria.map((c) => c.key)).toEqual(['doublons', 'prix', 'tdv']);
   });
+
+  it('seuil de confirmation de « Tout défausser », sous les fonctionnalités Paquets', async () => {
+    const input = document.querySelector<HTMLInputElement>('#fonctionnalites .feature-extra input[type="number"]')!;
+    expect(input.value).toBe('10');
+    input.value = '50';
+    input.dispatchEvent(new Event('input'));
+    document.querySelector<HTMLButtonElement>('.savebar button.primary')!.click();
+    await flush();
+    expect(saved.at(-1)!.settings!.discardConfirmAbove).toBe(50);
+  });
 });

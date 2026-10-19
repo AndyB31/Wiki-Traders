@@ -37,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTagRemoveOthers: true,
   autoTagClearUnpriced: false,
   retagUnsold: false,
+  discardConfirmAbove: 10,
   selectorOverrides: {},
   siteIntegration: true,
   compactNav: true,

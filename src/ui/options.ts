@@ -1059,7 +1059,7 @@ function featureCard(f: FeatureDef) {
   );
 }
 
-function featureGroup(group: FeatureGroup, title = FEATURE_GROUPS[group]) {
+function featureGroup(group: FeatureGroup, title = FEATURE_GROUPS[group], extra: Child = null) {
   return h(
     'div',
     { class: 'feature-group' },
@@ -1073,6 +1073,20 @@ function featureGroup(group: FeatureGroup, title = FEATURE_GROUPS[group]) {
         return card;
       }),
     ),
+    extra,
+  );
+}
+
+/** Réglages des paquets qui ne sont pas des interrupteurs. */
+function packSettings() {
+  return h(
+    'div',
+    { class: 'grid feature-extra' },
+    field(
+      '« Tout défausser » : confirmer au-delà de (W)',
+      reg('discardConfirmAbove', h('input', { type: 'number', min: '0', step: '1', value: settings.discardConfirmAbove, oninput: (e: Event) => ((settings.discardConfirmAbove = Math.max(0, num((e.target as HTMLInputElement).value, 10)!)), onEdit()) })),
+      'Si une des cartes obtenues vaut plus que ce prix moyen, une confirmation s\'affiche avant de défausser. 0 = toujours confirmer une carte cotée.',
+    ),
   );
 }
 
@@ -1082,7 +1096,7 @@ function featuresSection() {
     'fonctionnalites',
     'Fonctionnalités',
     'Ajouts au site, à activer ou couper selon tes goûts. Le badge API indique ce qui a besoin de la lecture via l\'API (section Automatisations).',
-    groups.map((g) => featureGroup(g)),
+    groups.map((g) => featureGroup(g, FEATURE_GROUPS[g], g === 'packs' ? packSettings() : null)),
   );
 }
 

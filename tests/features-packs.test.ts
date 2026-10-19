@@ -22,7 +22,7 @@ const storage = vi.hoisted(() => {
 const { addPulls, buildRecap, emptyPullStats, loadPullStats, mapPackCards, normalizeBounds, openPackRequest, packCardsForTagging, pullShares, randomDelay, recordPulls } = await import('../src/content/features/packs-logic');
 const { planAutoTags } = await import('../src/lib/autotag');
 const { DEFAULT_STORE } = await import('../src/lib/defaults');
-const { autoTick, discardNeedsConfirm, openAllPacks, showRecap } = await import('../src/content/features/packs');
+const { autoTick, discardNeedsConfirm, discardThreshold, openAllPacks, showRecap } = await import('../src/content/features/packs');
 const { resetCatalog } = await import('../src/content/catalog');
 
 const b64url = (s: string) => Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -117,6 +117,13 @@ describe('« Tout défausser » après ouverture', () => {
     expect(discardNeedsConfirm([{ price: 8 }, { price: 10 }, { price: null }], false)).toBe(false);
     expect(discardNeedsConfirm([{ price: 8 }, { price: 11 }], false)).toBe(true);
     expect(discardNeedsConfirm([{ price: 2 }], true)).toBe(true);
+    // Seuil réglé : 50 W ; 0 = toute carte cotée.
+    expect(discardNeedsConfirm([{ price: 40 }], false, 50)).toBe(false);
+    expect(discardNeedsConfirm([{ price: 1 }, { price: null }], false, 0)).toBe(true);
+    expect(discardThreshold({ discardConfirmAbove: 50 })).toBe(50);
+    expect(discardThreshold({ discardConfirmAbove: 0 })).toBe(0);
+    expect(discardThreshold({})).toBe(10);
+    expect(discardThreshold({ discardConfirmAbove: -3 })).toBe(10);
   });
 });
 

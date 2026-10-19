@@ -192,6 +192,8 @@ export interface Settings {
   autoTagClearUnpriced: boolean;
   /** Remettre ses étiquettes à une carte dont l'enchère se termine sans acheteur (par l'API, nécessite apiWrite). */
   retagUnsold: boolean;
+  /** « Tout défausser » après ouverture : confirmation si une carte vaut plus que ce prix moyen (W). */
+  discardConfirmAbove: number;
   /** Surcharges des sélecteurs CSS (voir content/parsers/selectors.ts). */
   selectorOverrides: Record<string, string>;
   /** Intégration au site : résumé et menu Wiki-Traders dans la barre latérale, fenêtres et pages, onglet dans Paramètres. */
