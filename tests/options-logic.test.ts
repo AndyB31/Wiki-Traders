@@ -17,7 +17,7 @@ import {
 } from '../src/ui/options-logic';
 
 const rules = (): TagRule[] => structuredClone(DEFAULT_RULES);
-const settings = (patch: Partial<Settings> = {}): Settings => ({ ...structuredClone(DEFAULT_SETTINGS), ...patch });
+const settings = (patch: Partial<Settings> = {}): Settings => ({ ...structuredClone(DEFAULT_SETTINGS), allocationMode: 'quota', ...patch });
 
 describe('quotaSummary', () => {
   it('résume la répartition et signale l\'égalité', () => {

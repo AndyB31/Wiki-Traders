@@ -130,9 +130,13 @@ async function refreshSales(): Promise<void> {
  * « Proposer d'autres cartes » : chaque slot libre passe à la carte suivante de ses candidates
  * (en boucle), sans proposer deux fois la même carte.
  */
+function randomOrder(): boolean {
+  return store.settings.priority === 'custom' && store.settings.sortCriteria[0]?.key === 'hasard';
+}
+
 async function rotateProposals(free: FreeSlot[]): Promise<void> {
-  // Mode aléatoire : un nouveau tirage plutôt qu'une rotation.
-  if (store.settings.sortPrice === 'random') {
+  // Critère « hasard » : un nouveau tirage plutôt qu'une rotation.
+  if (randomOrder()) {
     await save({ slotOverrides: {}, settings: { ...store.settings, randomSeed: (store.settings.randomSeed * 48271 + 11) % 2_147_483_647 } });
     return;
   }
@@ -180,7 +184,7 @@ function proposalTools(free: FreeSlot[]) {
     rotatable
       ? h(
           'button',
-          { title: store.settings.sortPrice === 'random' ? 'Nouveau tirage aléatoire' : 'Propose d\'autres cartes pour les slots libres', onclick: () => rotateProposals(free) },
+          { title: randomOrder() ? 'Nouveau tirage aléatoire' : 'Propose d\'autres cartes pour les slots libres', onclick: () => rotateProposals(free) },
           '🔀 Proposer d\'autres cartes',
         )
       : null,
@@ -219,7 +223,11 @@ function whyEmpty(slot: FreeSlot) {
   const e = slot.excluded;
   if (!e) return null;
   if (!e.total) {
-    const how = slot.rule.match === 'tag' ? `Aucune carte connue ne porte l'étiquette « ${slot.rule.tag} » : ouvre ta collection, ou vérifie le nom exact dans les réglages.` : 'Aucune carte connue dans cette plage de prix.';
+    const how = slot.rule.tier
+      ? 'Aucune carte connue dans ce palier : ouvre ta collection, ou vérifie les cartes à vendre (Réglages → Ventes).'
+      : slot.rule.match === 'tag'
+        ? `Aucune carte connue ne porte l'étiquette « ${slot.rule.tag} » : ouvre ta collection, ou vérifie le nom exact dans les réglages.`
+        : 'Aucune carte connue dans cette plage de prix.';
     return h('div', { class: 'small muted' }, how);
   }
   const parts = [
@@ -233,8 +241,8 @@ function whyEmpty(slot: FreeSlot) {
   return h(
     'div',
     { class: 'small muted' },
-    `${e.total} carte(s) dans l'étiquette : ${parts.join(', ')}.`,
-    e.keep ? h('div', null, 'Pour vendre ton seul exemplaire, mets « Garder » à 0 pour cette étiquette dans les réglages.') : null,
+    `${e.total} carte(s) dans ${slot.rule.tier ? 'le palier' : 'l\'étiquette'} : ${parts.join(', ')}.`,
+    e.keep ? h('div', null, slot.rule.tier ? 'Pour vendre ton seul exemplaire, mets « Exemplaires gardés » à 0 (Réglages → Ventes).' : 'Pour vendre ton seul exemplaire, mets « Garder » à 0 pour cette étiquette dans les réglages.') : null,
   );
 }
 
@@ -356,7 +364,7 @@ function openSellDialog(slot: FreeSlot): void {
   const close = () => modal.remove();
   const cached = card.siteId ? (catalogPrices?.[card.siteId] as CachedPrice | undefined) : undefined;
   const rate = rateOf(cached);
-  const tiers = slot.rule.sale?.durationRules ?? store.settings.durationRules;
+  const tiers = store.settings.durationRules;
 
   const info = (label: string, value: string | Node, title?: string) => h('div', { class: 'sell-info', title }, h('span', { class: 'muted small' }, label), h('strong', null, value));
   const minSamples = store.settings.sellRateMinSamples;
@@ -393,7 +401,7 @@ function openSellDialog(slot: FreeSlot): void {
   };
   priceIn.addEventListener('input', () => {
     // La durée suit les paliers tant qu'elle n'a pas été choisie à la main.
-    const d = durationFor(Number(priceIn.value) || null, tiers);
+    const d = slot.rule.durationMin ?? durationFor(Number(priceIn.value) || null, tiers);
     if (!durTouched && d != null) durIn.value = String(d);
     label();
   });

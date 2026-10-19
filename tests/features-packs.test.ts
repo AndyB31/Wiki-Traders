@@ -138,8 +138,8 @@ describe('« Tout étiqueter » après ouverture', () => {
     const prices: Record<string, number> = { c1: 120, c2: 8 };
     const plan = planAutoTags(
       { ...structuredClone(DEFAULT_STORE), cards: forTag, rules: [
-        { id: 'a', tag: '50-100', quota: 1, pct: 70, floor: 50, ceiling: 1000, keepMin: 1, active: true, match: 'tag' },
-        { id: 'b', tag: 'Ville', quota: 0, pct: 70, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', when: { text: 'paris', family: '', rateMin: null, rateMax: null } },
+        { id: 'a', tag: '50-100', quota: 1, floor: 50, ceiling: 1000, keepMin: 1, active: true, match: 'tag' },
+        { id: 'b', tag: 'Ville', quota: 0, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', when: { text: 'paris', family: '', rateMin: null, rateMax: null } },
       ] },
       { removeOthers: true, extraPrice: (c) => prices[c.siteId!] },
     );

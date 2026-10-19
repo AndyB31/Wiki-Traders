@@ -1,9 +1,11 @@
 import { MIN_RARITY_SAMPLES, MIN_SALES } from './defaults';
 import { durationFor } from './duration';
 import type { FamilyIndex } from './families';
-import { rateRuleFor, reliableRate, type SellRate } from './sellrate';
+import { evalFormula } from './formula';
+import { clampPrice, confidence, effectiveCalc, rateBonus, simplePrice } from './salecalc';
+import { reliableRate, type SellRate } from './sellrate';
 import { RARITIES } from './text';
-import type { Card, PriceObs, Settings, TagRule } from './types';
+import type { Card, PriceCalc, PriceObs, Settings, TagRule } from './types';
 
 export type PriceSource = 'site' | 'history' | 'manual' | 'rarity' | 'estimate' | 'none';
 
@@ -210,10 +212,37 @@ const SOURCE_LABEL: Record<PriceSource, string> = {
   none: '',
 };
 
+const RARITY_RANK: Record<NonNullable<Card['rarity']>, number> = { C: 1, PC: 2, R: 3, SR: 4, UR: 5, L: 6 };
+
+/** Variables d'une carte pour les formules (prix et priorité, voir lib/formula.ts). */
+export function cardVars(card: Card, ctx: PricingContext, base: number | null, extra: { trustSales: number; keepMin: number }): Record<string, number | null> {
+  const rate = ctx.sellRate?.(card) ?? null;
+  return {
+    prix: base,
+    tdv: rate?.total ? rate.pct : 50,
+    confiance: confidence(rate, extra.trustSales),
+    tdv_fiable: reliableRate(rate, ctx.settings.sellRateMinSamples) ? 1 : 0,
+    ventes: rate?.sold ?? 0,
+    encheres: rate?.total ?? 0,
+    quantite: card.quantity,
+    doublons: Math.max(0, card.quantity - 1),
+    vendables: Math.max(0, card.quantity - extra.keepMin),
+    rarete: card.rarity ? RARITY_RANK[card.rarity] : 0,
+    brillante: card.shiny ? 1 : 0,
+  };
+}
+
+/** Prix brut d'un calcul (avant bornes et arrondi) ; null si la formule ne donne pas de nombre. */
+function rawPrice(calc: PriceCalc, base: number, card: Card, ctx: PricingContext, keepMin: number, defaultPrice: () => number | null): number | null {
+  if (calc.mode !== 'formula') return simplePrice(base, ctx.sellRate?.(card), calc);
+  const v = evalFormula(calc.formula, { ...cardVars(card, ctx, base, { trustSales: calc.trustSales, keepMin }), prix_conseille: defaultPrice() });
+  return v != null && Number.isFinite(v) && v > 0 ? v : null;
+}
+
 /**
- * prix = arrondi(prix de référence × % × (1 + ajustement du palier de tdv)).
- * Le plancher et le plafond d'une règle ne bornent PAS ce prix : ils ne servent qu'à classer les cartes
- * (étiquetage automatique, règles « plage de prix »).
+ * Prix de départ = calcul de la règle (ou calcul par défaut), borné par son prix minimum et maximum, puis arrondi.
+ * Le plancher et le plafond d'une étiquette ne bornent PAS ce prix : ils ne servent qu'à classer les cartes
+ * (étiquetage automatique, paliers de prix).
  */
 export function computePrice(card: Card, rule: TagRule, ctx: PricingContext, peers: Card[] = []): PriceResult {
   const base = basePrice(card, ctx, peers);
@@ -226,16 +255,25 @@ export function computePrice(card: Card, rule: TagRule, ctx: PricingContext, pee
     base.source === 'history' ? statLabel :
     base.source === 'estimate' && base.group ? `estimation ${base.group}` :
     SOURCE_LABEL[base.source];
-  // Palier de taux de vente : seulement si le tdv porte sur assez d'enchères (sinon 1 vente sur 1 = 100 %).
-  const tiers = ctx.settings.sellRateTiersOn === false ? [] : rule.sale?.sellRateRules ?? ctx.settings.sellRateRules;
-  const rate = tiers.length ? reliableRate(ctx.sellRate?.(card), ctx.settings.sellRateMinSamples) : null;
-  const tier = rate ? rateRuleFor(rate.pct, tiers) : null;
-  const pricePct = tier?.pricePct ?? 100;
-  const adjust = pricePct !== 100;
-  const price = roundTo(((base.value * rule.pct) / 100) * (pricePct / 100), ctx.settings.rounding);
+  const value = base.value;
+  const def = ctx.settings.defaultCalc;
+  const calc = effectiveCalc(rule.calc, def);
+  const defaultPrice = () => {
+    const v = rawPrice(def.mode === 'formula' ? { ...def, mode: 'simple' } : def, value, card, ctx, rule.keepMin, () => null);
+    return v == null ? null : roundTo(clampPrice(v, def), ctx.settings.rounding);
+  };
+  const raw = rawPrice(calc, value, card, ctx, rule.keepMin, defaultPrice);
   const samples = base.source === 'history' || base.source === 'rarity' ? ` (${base.samples} ventes)` : base.group ? ` (${base.samples})` : '';
-  const rateText = rate && adjust ? ` × ${pricePct} % (tdv ${rate.pct} %)` : '';
-  const detail = `${label} ${Math.round(base.value)}${samples} × ${rule.pct} %${rateText} = ${price}`;
-  const durationMin = durationFor(price, rule.sale?.durationRules ?? ctx.settings.durationRules);
-  return { price, base, detail, estimate: base.source === 'estimate', durationMin, ...(rate && adjust ? { rateAdjust: { pct: rate.pct, pricePct } } : {}) };
+  const head = `${label} ${Math.round(value)}${samples}`;
+  if (raw == null) return { price: null, base, detail: `${head} : la formule ne donne pas de prix`, estimate: base.source === 'estimate', durationMin: null };
+  const clamped = clampPrice(raw, calc);
+  const price = roundTo(clamped, ctx.settings.rounding);
+  const rate = ctx.sellRate?.(card) ?? null;
+  const bonus = calc.mode === 'simple' ? rateBonus(rate, calc) : 1;
+  const rateText = calc.mode === 'simple' && Math.abs(bonus - 1) >= 0.005 ? ` × ${Math.round(bonus * 100)} % (tdv ${rate!.pct} % sur ${rate!.total})` : '';
+  const how = calc.mode === 'formula' ? ' → formule' : ` × ${calc.pct} %${rateText}`;
+  const bound = clamped !== raw ? (clamped > raw ? ` → minimum ${calc.minPrice}` : ` → maximum ${calc.maxPrice}`) : '';
+  const detail = `${head}${how}${bound} = ${price}`;
+  const durationMin = rule.durationMin ?? durationFor(price, ctx.settings.durationRules);
+  return { price, base, detail, estimate: base.source === 'estimate', durationMin, ...(rateText ? { rateAdjust: { pct: rate!.pct, pricePct: Math.round(bonus * 100) } } : {}) };
 }

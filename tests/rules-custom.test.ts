@@ -2,19 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { adviceForCard, allocate, cardMatchesRule, makeContext } from '../src/lib/allocation';
 import { planAutoTags } from '../src/lib/autotag';
 import { conditionsSummary, EMPTY_CONDITIONS } from '../src/lib/conditions';
-import { DEFAULT_SETTINGS } from '../src/lib/defaults';
 import { newFamily } from '../src/lib/families';
 import { evalFormula, formulaError } from '../src/lib/formula';
 import { rateOf, type SellRate } from '../src/lib/sellrate';
-import type { Card, RuleConditions, RuleSale, TagRule } from '../src/lib/types';
+import type { Card, RuleConditions, TagRule } from '../src/lib/types';
 import { validateOptions } from '../src/ui/options-logic';
-import { NOW, card, cardsById, input } from './helpers';
+import { NOW, TEST_SETTINGS, card, cardsById, input, pctCalc } from './helpers';
 
 const rate = (sold: number, total: number): SellRate => rateOf({ rate: { sold, total } })!;
 const rates = (byId: Record<string, SellRate>) => (c: Card) => byId[c.id] ?? null;
-const rule = (tag: string, over: Partial<TagRule> = {}): TagRule => ({ id: `r-${tag}`, tag, quota: 1, pct: 100, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', ...over });
+const rule = (tag: string, over: Partial<TagRule> = {}): TagRule => ({ id: `r-${tag}`, tag, quota: 1, calc: pctCalc(100), floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', ...over });
 const when = (over: Partial<RuleConditions>): RuleConditions => ({ ...EMPTY_CONDITIONS, ...over });
-const sale = (over: Partial<RuleSale>): RuleSale => ({ minSellRate: null, sellRateRules: [], durationRules: [], sort: 'desc', score: '', ...over });
 
 describe('formules de score', () => {
   it('calcule avec variables, priorités, fonctions et comparaisons', () => {
@@ -85,7 +83,7 @@ describe('cartes de mes familles protégées de la vente', () => {
   const films = newFamily('Films', [], [{ siteId: 's-titanic', title: 'Titanic (film)', rarity: 'R', category: null, imageUrl: null, wikipediaUrl: null, atk: null, def: null }], NOW);
   const cards = cardsById(card('titanic', { name: 'Titanic (film)', siteId: 's-titanic', tags: ['20-50'], sitePrice: 40, quantity: 2 }));
   const proposed = (rules: TagRule[], protectFamilies: boolean) =>
-    allocate(input({ cards, rules, myFamilies: [films], settings: { ...DEFAULT_SETTINGS, slots: 1, protectFamilies } }), NOW).free.map((f) => f.proposal?.card.id ?? null);
+    allocate(input({ cards, rules, myFamilies: [films], settings: { ...TEST_SETTINGS, slots: 1, protectFamilies } }), NOW).free.map((f) => f.proposal?.card.id ?? null);
 
   it('jamais proposées par défaut, sauf si l\'étiquette vise cette famille ou si la protection est coupée', () => {
     expect(proposed([rule('20-50')], true)).toEqual([null]);
@@ -96,46 +94,35 @@ describe('cartes de mes familles protégées de la vente', () => {
 
 describe('réglages de vente par étiquette', () => {
   const cheap = (id: string, over: Partial<Card> = {}) => card(id, { tags: ['20-50'], sitePrice: 40, ...over });
-  const rules20 = (s?: RuleSale) => [rule('20-50', { quota: 3, pct: 50, sale: s })];
-  const proposed = (cards: Record<string, Card>, s: RuleSale | undefined, sellRate = rates({})) =>
-    allocate(input({ cards, rules: rules20(s), sellRate, settings: { ...DEFAULT_SETTINGS, rounding: 1 } }), NOW).free.map((f) => f.proposal?.card.id ?? null);
+  const rules20 = (over: Partial<TagRule> = {}) => [rule('20-50', { quota: 3, calc: pctCalc(50), ...over })];
 
-  it('tdv minimum propre à l\'étiquette, à la place du global', () => {
-    const cards = cardsById(cheap('a'), cheap('b'));
-    const sellRate = rates({ a: rate(1, 10), b: rate(9, 10) });
-    expect(proposed(cards, sale({ minSellRate: 20 }), sellRate)).toEqual(['b', null, null]);
-    expect(proposed(cards, undefined, sellRate).sort()).toEqual(['a', 'b', null].sort());
-  });
-
-  it('ordre « meilleur taux de vente » et « formule de score »', () => {
-    const cards = cardsById(cheap('a', { sitePrice: 45 }), cheap('b', { sitePrice: 25 }), cheap('c', { sitePrice: 30, quantity: 3 }));
-    const sellRate = rates({ a: rate(2, 10), b: rate(9, 10), c: rate(5, 10) });
-    // Doublons d'abord, puis le meilleur tdv.
-    expect(proposed(cards, sale({ sort: 'rate' }), sellRate)).toEqual(['c', 'b', 'a']);
-    // Score = prix × tdv : a 9, b 22.5, c 15.
-    expect(proposed(cards, sale({ sort: 'score', score: '{prix} * {tdv} / 100' }), sellRate)).toEqual(['b', 'c', 'a']);
-    // Formule invalide : cartes classées par nom.
-    expect(proposed(cards, sale({ sort: 'score', score: '{prix' }), sellRate)).toEqual(['a', 'b', 'c']);
-  });
-
-  it('paliers de prix et de durée propres à l\'étiquette', () => {
+  it('calcul, minimum et durée propres à l\'étiquette', () => {
     const cards = cardsById(cheap('a'));
-    const s = sale({ sellRateRules: [{ from: null, to: 30, pricePct: 50 }], durationRules: [{ from: null, to: 15, minutes: 10 }] });
-    const advice = adviceForCard(input({ cards, rules: rules20(s), sellRate: () => rate(1, 10), settings: { ...DEFAULT_SETTINGS, rounding: 1 } }), 'a', NOW)!;
-    expect(advice.pricing).toMatchObject({ price: 10, durationMin: 10 });
-    const global = adviceForCard(input({ cards, rules: rules20(), sellRate: () => rate(1, 10), settings: { ...DEFAULT_SETTINGS, rounding: 1 } }), 'a', NOW)!;
-    expect(global.pricing).toMatchObject({ price: 20, durationMin: null });
+    const advice = (over: Partial<TagRule>) => adviceForCard(input({ cards, rules: rules20(over), settings: { ...TEST_SETTINGS, rounding: 1 } }), 'a', NOW)!.pricing;
+    expect(advice({})).toMatchObject({ price: 20, durationMin: null });
+    expect(advice({ calc: { ...pctCalc(50), minPrice: 25 }, durationMin: 10 })).toMatchObject({ price: 25, durationMin: 10 });
+    expect(advice({ calc: { ...pctCalc(50), mode: 'formula', formula: '{prix} / 4' } })).toMatchObject({ price: 10 });
   });
 
-  it('validation : conditions et réglages de l\'étiquette', () => {
+  it('priorité « ma formule » : le score le plus haut d\'abord, formule invalide par nom', () => {
+    const cards = cardsById(cheap('a', { sitePrice: 45 }), cheap('b', { sitePrice: 25 }), cheap('c', { sitePrice: 30 }));
+    const sellRate = rates({ a: rate(2, 10), b: rate(9, 10), c: rate(5, 10) });
+    const proposed = (formula: string) =>
+      allocate(input({ cards, rules: rules20(), sellRate, settings: { ...TEST_SETTINGS, rounding: 1, priority: 'formula', priorityFormula: formula } }), NOW).free.map((f) => f.proposal?.card.id ?? null);
+    // Score = prix moyen × tdv : a 9, b 22.5, c 15.
+    expect(proposed('{prix} * {tdv} / 100')).toEqual(['b', 'c', 'a']);
+    expect(proposed('{prix')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('validation : conditions et calcul de l\'étiquette', () => {
     const errors = validateOptions(
-      [rule('X', { when: when({ rateMin: 60, rateMax: 40 }), sale: sale({ sort: 'score', score: '{prix} +', durationRules: [{ from: 0, to: 20, minutes: 10 }, { from: 10, to: 30, minutes: 60 }] }) })],
-      DEFAULT_SETTINGS,
+      [rule('X', { when: when({ rateMin: 60, rateMax: 40 }), calc: { ...pctCalc(50), mode: 'formula', formula: '{prix} +', minPrice: 30, maxPrice: 20 } })],
+      TEST_SETTINGS,
     ).map((e) => e.message);
     expect(errors).toEqual([
       '« X » : taux de vente : « de » dépasse « à ».',
-      '« X » : Les paliers de durée 1 et 2 se chevauchent.',
-      '« X » : formule de score : formule incomplète (caractère 9).',
+      '« X » : formule : formule incomplète (caractère 9).',
+      '« X » : le prix minimum dépasse le maximum.',
     ]);
   });
 });

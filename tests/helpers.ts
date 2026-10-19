@@ -1,6 +1,7 @@
 import type { AllocationInput } from '../src/lib/allocation';
 import { DEFAULT_RULES, DEFAULT_SETTINGS } from '../src/lib/defaults';
-import type { Card, MyAuction, PriceObs } from '../src/lib/types';
+import { DEFAULT_CALC } from '../src/lib/salecalc';
+import type { Card, MyAuction, PriceCalc, PriceObs, Settings } from '../src/lib/types';
 
 export const NOW = Date.UTC(2026, 9, 3, 12, 0, 0);
 export const DAY = 86_400_000;
@@ -17,10 +18,18 @@ export function auction(id: string, cardId: string, over: Partial<MyAuction> = {
   return { id, cardId, cardName: cardId, tag: null, startPrice: 30, currentPrice: 30, endsAt: NOW + 3_600_000, seenAt: NOW, ...over };
 }
 
+/** Calcul simple sans influence du taux de vente : mise de départ seule (comportement d'avant la 1.0). */
+export function pctCalc(pct: number): PriceCalc {
+  return { ...DEFAULT_CALC, mode: 'simple', pct, tdvWeight: 0 };
+}
+
+/** Réglages des tests du moteur : mode « par étiquette », 70 % sans taux de vente, le plus cher d'abord. */
+export const TEST_SETTINGS: Settings = { ...DEFAULT_SETTINGS, allocationMode: 'quota', defaultCalc: pctCalc(70), priority: 'value' };
+
 export function input(over: Partial<AllocationInput> = {}): AllocationInput {
   return {
     rules: structuredClone(DEFAULT_RULES),
-    settings: { ...DEFAULT_SETTINGS },
+    settings: { ...TEST_SETTINGS },
     cards: {},
     priceObs: [],
     myAuctions: [],

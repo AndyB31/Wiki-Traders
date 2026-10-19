@@ -179,3 +179,27 @@ button.link.error { color: var(--danger); }
 .embed #app > header { display: none; }
 .embed .sticky { border-radius: 12px 12px 0 0; }
 .feature-extra { margin-top: 10px; }
+
+/* Calcul du prix : A / B1 / B2 */
+.calc { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.segmented { display: inline-flex; align-self: flex-start; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.segmented button { border: 0; background: transparent; border-radius: 7px; padding: 4px 12px; font-weight: 600; color: var(--muted); }
+.segmented button.is-on { background: var(--accent); color: #fff; }
+.calc-example { margin: 0; }
+.calc-example:empty { display: none; }
+.rule-card .calc { border-top: 1px dashed var(--border); padding-top: 8px; }
+.tier-title { font-size: 14px; }
+
+/* Cartes à vendre : étiquettes à cocher */
+.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tag-chip { border-radius: 999px; padding: 3px 12px; }
+.tag-chip.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-dark); font-weight: 600; }
+
+/* Priorité */
+.priorities { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 10px; }
+
+/* Aperçu */
+.preview { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; counter-reset: p; }
+.preview li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 4px 10px; align-items: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; }
+.preview .detail { grid-column: 2 / -1; }
+.preview .num { min-width: 48px; text-align: right; }

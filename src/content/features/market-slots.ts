@@ -309,7 +309,7 @@ export function openSellModal(ctx: FeatureContext, slot: FreeSlot | null, deps: 
 
   const head = node('div', 'part', 'wiky-sell-head');
   const titles = node('div', 'part');
-  titles.append(node('div', 'part', 'wiky-sell-kicker', `Slot libre${slot ? ` · étiquette ${slot.rule.tag}` : ''}`), node('h2', 'part', '', 'Vendre une carte'));
+  titles.append(node('div', 'part', 'wiky-sell-kicker', `Slot libre${slot ? ` · ${slot.rule.tier ? 'palier' : 'étiquette'} ${slot.rule.tag}` : ''}`), node('h2', 'part', '', 'Vendre une carte'));
   const x = node('button', 'part', 'wiky-f-x', '×');
   x.type = 'button';
   x.setAttribute('aria-label', 'Fermer');
@@ -415,7 +415,7 @@ export function openSellModal(ctx: FeatureContext, slot: FreeSlot | null, deps: 
     sec.append(label, search, results);
     sections.push(sec);
   }
-  // Carte au hasard dans une étiquette.
+  // Carte au hasard dans une étiquette (ou un palier de prix).
   const tags = randomTags(input);
   if (tags.length) {
     const sec = node('section', 'part');
@@ -423,7 +423,7 @@ export function openSellModal(ctx: FeatureContext, slot: FreeSlot | null, deps: 
     const line = node('div', 'part', 'wiky-sell-line');
     const select = node('select', 'part');
     select.id = 'wiky-sell-random-tag';
-    select.setAttribute('aria-label', 'Étiquette de la carte au hasard');
+    select.setAttribute('aria-label', 'Groupe de la carte au hasard');
     for (const t of tags) {
       const o = node('option', 'part', '', t);
       o.value = t;
@@ -433,7 +433,7 @@ export function openSellModal(ctx: FeatureContext, slot: FreeSlot | null, deps: 
     const roll = button('Carte au hasard', () => {
       const c = randomCandidate(input, select.value, Math.random, Date.now(), choice ? [choice.card.id] : []);
       if (c) pick(choiceFrom(c, select.value, settings));
-      else error.textContent = `Aucune carte vendable dans l'étiquette ${select.value} (favorites, déjà en vente ou à garder).`;
+      else error.textContent = `Aucune carte vendable dans « ${select.value} » (favorites, déjà en vente ou à garder).`;
     }, 'ghost');
     roll.dataset.act = 'random';
     line.append(select, roll);

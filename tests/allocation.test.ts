@@ -62,7 +62,7 @@ describe('allocate', () => {
     expect(order.slice(0, 3)).toEqual(['cheap3', 'rich2', 'mid2']);
 
     const asc = input({ cards });
-    asc.settings.sortPrice = 'asc';
+    asc.settings.priority = 'clear';
     const order2 = allocate(asc, NOW).free.filter((s) => s.rule.tag === '20-50').map((s) => s.proposal?.card.id);
     expect(order2.slice(0, 3)).toEqual(['cheap3', 'mid2', 'rich2']);
   });
@@ -135,11 +135,12 @@ describe('explications', () => {
   });
 });
 
-describe('« À doublons égaux » : aléatoire', () => {
+describe('Critère « hasard »', () => {
   const many = () => cardsById(small('dup', { quantity: 5 }), ...Array.from({ length: 12 }, (_, i) => small(`c${i}`, { sitePrice: 20 + i })));
   const order = (seed: number) => {
     const base = input({ cards: many() });
-    base.settings.sortPrice = 'random';
+    base.settings.priority = 'custom';
+    base.settings.sortCriteria = [{ key: 'hasard', dir: 'desc' }];
     base.settings.randomSeed = seed;
     base.settings.slots = 8;
     base.rules = base.rules.map((r) => (r.tag === '20-50' ? { ...r, quota: 8 } : { ...r, active: false }));

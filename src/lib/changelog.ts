@@ -37,7 +37,7 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
           {
             title: 'Ventes et étiquetage séparés',
-            text: 'Une étiquette se règle en deux endroits : comment tu la vends (slots, mise de départ, garder) dans Ventes, quelles cartes y vont (plage de prix, famille, conditions) dans Étiquettes.',
+            text: 'Les étiquettes (plages de prix, familles, conditions de l\'étiquetage automatique) se règlent dans Étiquettes, sans rien changer à la vente.',
           },
           {
             title: 'Enregistrement automatique',
@@ -51,27 +51,32 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
-        title: 'Taux de vente',
-        items: [
-          {
-            title: 'Paliers en « % du prix »',
-            text: '81 veut maintenant dire 81 % du prix conseillé (100 = inchangé, 50 = moitié prix). Avant, c\'était un ajustement (+81 % !). Tes paliers ont été convertis pour donner le même prix qu\'avant : vérifie-les.',
-            where: 'Réglages → Ventes → Taux de vente.',
-          },
-          {
-            title: 'Interrupteur et seuil réglable',
-            text: 'Coupe les paliers sans les supprimer, et choisis à partir de combien d\'enchères terminées le taux de vente compte (5 par défaut).',
-            where: 'Réglages → Ventes → Taux de vente.',
-          },
-        ],
-      },
-      {
         title: 'Ventes',
         items: [
           {
+            title: 'Meilleures cartes, par paliers de prix',
+            text: 'Par défaut, tes slots reçoivent tes meilleures cartes. Les étiquettes ne servent plus qu\'à choisir quelles cartes vendre (seulement celles-ci, ou toutes sauf celles-là). Le prix se règle par paliers (ex. jusqu\'à 20 W, 21–100 W, 101 W et +), chacun avec son calcul, son prix minimum et sa durée. Le mode « par étiquette » reste au choix.',
+            where: 'Réglages → Ventes.',
+          },
+          {
+            title: 'Calcul du prix : par défaut, simple ou avancé',
+            text: 'Simple : prix moyen × mise de départ, ajusté par le taux de vente selon le nombre d\'enchères (1 vente sur 2 ne compte presque pas). Avancé : ta propre formule avec les variables de la carte. Tes anciens réglages sont convertis pour donner les mêmes prix.',
+            where: 'Réglages → Ventes → Calcul du prix par défaut, et chaque palier.',
+          },
+          {
+            title: 'Ordre de priorité',
+            text: 'Équilibrée (prix × chance de vente), rapporter le plus, vendre vite, écouler, tes critères ou ta formule. Un aperçu montre tout de suite les prochaines ventes.',
+            where: 'Réglages → Ventes → Ordre de priorité.',
+          },
+          {
             title: 'Cartes de tes familles jamais vendues',
-            text: 'Une carte d\'une de tes familles n\'est plus proposée à la vente, sauf pour une étiquette qui vise justement cette famille.',
+            text: 'Une carte d\'une de tes familles n\'est plus proposée à la vente.',
             where: 'Réglages → Ventes → Jamais vendu (activé par défaut).',
+          },
+          {
+            title: 'Seuil du taux de vente réglable',
+            text: 'Choisis à partir de combien d\'enchères terminées le taux de vente est fiable (5 par défaut) pour le minimum et la priorité « vendre vite ».',
+            where: 'Réglages → Ventes → Taux de vente.',
           },
         ],
       },

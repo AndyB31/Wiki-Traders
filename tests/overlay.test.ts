@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { updateOverlay } from '../src/content/overlay';
 import { DEFAULT_SELECTORS } from '../src/content/parsers/selectors';
-import { card, cardsById, input } from './helpers';
+import { card, cardsById, input, pctCalc } from './helpers';
 
 function mountRealTile(id: string): Element {
   const wrap = document.createElement('div');
@@ -74,8 +74,8 @@ describe('fenêtre de vente : un seul prix, celui de la proposition', () => {
       <label>Mise de départ</label><input type="number" aria-label="Mise de départ" value="10"><button>Mettre aux enchères</button></div></div>`;
     const base = input({ cards: cardsById(card('zico', { name: 'Zico', tags: ['A', 'B'], sitePrice: 25 })) });
     base.rules = [
-      { id: 'a', tag: 'A', quota: 1, pct: 100, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' },
-      { id: 'b', tag: 'B', quota: 1, pct: 84, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' },
+      { id: 'a', tag: 'A', quota: 1, calc: pctCalc(100), floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' },
+      { id: 'b', tag: 'B', quota: 1, calc: pctCalc(84), floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' },
     ];
     base.settings.prefill = prefill;
     const store = { ...base, pendingFocus: { cardId: 'zico', cardName: 'Zico', price: 21, detail: 'moyenne site 25 × 84 % = 21', at: Date.now(), durationMin: null } };

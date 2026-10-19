@@ -1,19 +1,20 @@
-import { computePrice, indexObs, referencePrice, reliableBase, type PriceResult, type PricingContext } from './pricing';
-import { hasRange, ruleStatus } from './conditions';
+import { cardVars, computePrice, indexObs, referencePrice, reliableBase, type PriceResult, type PricingContext } from './pricing';
+import { hasRange, rangeStatus, ruleStatus } from './conditions';
+import { sellChance, tierRule } from './salecalc';
 import { durationFor } from './duration';
 import { familiesOf, familyIndex, RARITY_ORDER } from './families';
 import { evalFormula } from './formula';
 import { reliableRate, type SellRate } from './sellrate';
 import { normalize, sameTag } from './text';
 import { DEFAULT_CRITERIA } from './sorting';
-import type { CandidateSort, Card, CardFamily, MyAuction, SortCriterion, StoreShape, TagRule } from './types';
+import type { Card, CardFamily, MyAuction, Priority, Settings, SortCriterion, StoreShape, TagRule } from './types';
 
 export interface Candidate {
   card: Card;
   pricing: PriceResult;
   /** Exemplaires vendables (quantité − garderMin − déjà en vente). */
   sellable: number;
-  /** Score de la formule de l'étiquette (ordre « score »). */
+  /** Score de priorité (le plus haut d'abord). */
   score?: number | null;
 }
 
@@ -54,9 +55,9 @@ export function protectedByFamily(card: Card, ctx: PricingContext, rule?: TagRul
   return !target || !mine.some((f) => normalize(f.name) === target);
 }
 
-/** Tdv fiable sous le minimum (de l'étiquette, sinon global) : la carte n'est pas proposée (elle reste vendable à la main). */
-export function belowMinRate(card: Card, ctx: PricingContext, rule?: TagRule): boolean {
-  const min = rule?.sale ? rule.sale.minSellRate : ctx.settings.minSellRate;
+/** Tdv fiable sous le minimum : la carte n'est pas proposée (elle reste vendable à la main). */
+export function belowMinRate(card: Card, ctx: PricingContext): boolean {
+  const min = ctx.settings.minSellRate;
   if (min == null) return false;
   const rate = reliableRate(ctx.sellRate?.(card), ctx.settings.sellRateMinSamples);
   return !!rate && rate.pct < min;
@@ -74,7 +75,7 @@ export function exclusions(rule: TagRule, ctx: PricingContext, onSale: Map<strin
     else if (protectedByFamily(card, ctx, rule)) out.family++;
     else if ((onSale.get(card.id) ?? 0) > 0 && !ctx.settings.allowDuplicateListing) out.onSale++;
     else if (card.quantity - rule.keepMin <= 0) out.keep++;
-    else if (belowMinRate(card, ctx, rule)) out.lowRate++;
+    else if (belowMinRate(card, ctx)) out.lowRate++;
   }
   return out;
 }
@@ -130,11 +131,36 @@ export function makeContext(input: AllocationInput, now: number): PricingContext
 
 /** Une carte relève-t-elle de cette règle ? */
 export function cardMatchesRule(card: Card, rule: TagRule, ctx: PricingContext): boolean {
+  if (rule.tier) {
+    // Palier de prix : filtre d'étiquettes des ventes, puis prix moyen dans la plage (sans plage : toutes les cartes).
+    if (!passesSaleTags(card, ctx.settings)) return false;
+    return !hasRange(rule) || rangeStatus(rule, referencePrice(card, ctx)) === 'yes';
+  }
   if (rule.match === 'price') {
     // Plage de prix et conditions (texte, famille, taux de vente) ; sans plage, le prix n'est pas nécessaire.
     return ruleStatus(card, rule, hasRange(rule) ? referencePrice(card, ctx) : null, ctx) === 'yes';
   }
   return card.tags.some((t) => sameTag(t, rule.tag));
+}
+
+/** Filtre d'étiquettes du mode « meilleures cartes ». */
+export function passesSaleTags(card: Card, settings: Settings): boolean {
+  const { mode, tags } = settings.saleTags;
+  if (!tags.length) return mode === 'exclude';
+  const has = card.tags.some((t) => tags.some((x) => sameTag(t, x)));
+  return mode === 'include' ? has : !has;
+}
+
+/**
+ * Groupes de vente : les étiquettes (mode « par étiquette ») ou les paliers de prix (mode « meilleures cartes », un
+ * seul groupe « toutes les cartes » sans palier), présentés au reste du moteur comme des règles.
+ */
+export function saleRules(input: Pick<AllocationInput, 'rules' | 'settings'>): TagRule[] {
+  const { settings } = input;
+  if (settings.allocationMode !== 'pool') return input.rules;
+  const tiers = settings.priceTiers.filter((t) => t.active);
+  if (!tiers.length) return [tierRule({ id: 'all', active: true, from: null, to: null, slots: settings.slots, calc: { ...settings.defaultCalc, mode: 'default' }, durationMin: null }, settings.keepMin)];
+  return tiers.map((t) => tierRule(t, settings.keepMin));
 }
 
 /** Règle d'une enchère en cours : étiquette lue sur l'enchère, sinon celle de la carte. */
@@ -176,12 +202,10 @@ export function rankCandidates(
     if (listed > 0 && !settings.allowDuplicateListing) continue;
     const sellable = card.quantity - rule.keepMin - listed;
     if (sellable <= 0) continue;
-    if (belowMinRate(card, ctx, rule)) continue;
+    if (belowMinRate(card, ctx)) continue;
     out.push({ card, sellable, pricing: computePrice(card, rule, ctx, peers) });
   }
-  const sort = rule.sale?.sort ?? settings.sortPrice;
-  const criteria = rule.sale ? rule.sale.sortCriteria ?? [] : settings.sortCriteria;
-  return sortCandidates(out, sort, ctx, { criteria, score: rule.sale?.score ?? '' });
+  return sortCandidates(out, ctx);
 }
 
 /** Valeur d'un critère de tri pour une carte (null : inconnue, toujours en dernier). */
@@ -207,77 +231,74 @@ export function criterionValue(c: Candidate, key: SortCriterion['key'], ctx: Pri
   }
 }
 
-/** Trie des cartes candidates selon un ordre (global ou d'une étiquette). */
-export function sortCandidates(
-  out: Candidate[],
-  sort: CandidateSort,
-  ctx: PricingContext,
-  opts: { criteria?: SortCriterion[]; score?: string } = {},
-): Candidate[] {
-  const { settings } = ctx;
-  if (sort === 'score') {
-    // Formule de l'étiquette : le score le plus haut d'abord (score invalide en dernier).
-    for (const c of out) c.score = evalFormula(opts.score ?? '', scoreVars(c, ctx));
-    return out.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity) || a.card.name.localeCompare(b.card.name));
-  }
-  if (sort === 'custom') {
-    // Critères dans l'ordre ; une valeur inconnue passe après les connues, quel que soit le sens.
-    const criteria = opts.criteria?.length ? opts.criteria : DEFAULT_CRITERIA;
-    const values = new Map(out.map((c) => [c, criteria.map((k) => criterionValue(c, k.key, ctx))]));
-    return out.sort((a, b) => {
-      const va = values.get(a)!;
-      const vb = values.get(b)!;
-      for (const [i, k] of criteria.entries()) {
-        const x = va[i];
-        const y = vb[i];
-        if (x === y) continue;
-        if (x == null) return 1;
-        if (y == null) return -1;
-        return (x - y) * (k.dir === 'asc' ? 1 : -1);
-      }
-      return a.card.name.localeCompare(b.card.name);
-    });
-  }
-  const rateOfCard = (c: Candidate) => reliableRate(ctx.sellRate?.(c.card), ctx.settings.sellRateMinSamples)?.pct ?? -1;
-  const dir = sort === 'asc' ? 1 : -1;
-  out.sort((a, b) => {
-    const dup = b.card.quantity - a.card.quantity;
-    if (dup) return dup;
-    // « Aléatoire » : tirage stable tant que la graine ne change pas (pas de clignotement à chaque rendu).
-    if (sort === 'random') return shuffleRank(a.card.id, settings.randomSeed) - shuffleRank(b.card.id, settings.randomSeed);
-    // « Meilleur taux de vente » : tdv fiable le plus haut d'abord, puis la plus chère.
-    if (sort === 'rate' && rateOfCard(a) !== rateOfCard(b)) return rateOfCard(b) - rateOfCard(a);
-    const pa = a.pricing.price;
-    const pb = b.pricing.price;
-    if (pa == null && pb == null) return a.card.name.localeCompare(b.card.name);
-    if (pa == null) return 1;
-    if (pb == null) return -1;
-    return (pa - pb) * dir || a.card.name.localeCompare(b.card.name);
-  });
-  return out;
-}
-
-/** Variables d'une carte pour la formule de score (voir lib/formula.ts). */
-export function scoreVars(c: Candidate, ctx: PricingContext): Record<string, number | null> {
+/** Score de priorité d'une carte (le plus haut d'abord ; null = inconnu, en dernier). */
+export function priorityScore(c: Candidate, priority: Priority, ctx: PricingContext): number | null {
+  const price = c.pricing.price;
   const rate = ctx.sellRate?.(c.card) ?? null;
-  return {
-    prix: c.pricing.base.value,
-    prix_conseille: c.pricing.price,
-    tdv: rate?.pct ?? 0,
-    ventes: rate?.sold ?? 0,
-    encheres: rate?.total ?? 0,
-    quantite: c.card.quantity,
-    doublons: Math.max(0, c.card.quantity - 1),
-    vendables: c.sellable,
-    rarete: c.card.rarity ? RARITY_ORDER[c.card.rarity] + 1 : 0,
-    brillante: c.card.shiny ? 1 : 0,
-  };
+  switch (priority) {
+    case 'balanced':
+      return price == null ? null : price * sellChance(rate, ctx.settings.defaultCalc.trustSales);
+    case 'value':
+      return price;
+    case 'formula':
+      return evalFormula(ctx.settings.priorityFormula, scoreVars(c, ctx));
+    default:
+      return null;
+  }
 }
 
-/** F1–F3 – répartition des slots libres entre les étiquettes. */
+/** Critères équivalents aux priorités « vendre vite » et « écouler ». */
+const PRIORITY_CRITERIA: Partial<Record<Priority, SortCriterion[]>> = {
+  fast: [{ key: 'tdv', dir: 'desc' }, { key: 'prix', dir: 'desc' }],
+  clear: [{ key: 'doublons', dir: 'desc' }, { key: 'prix', dir: 'asc' }],
+};
+
+/** Trie des cartes candidates selon la priorité réglée (doublons d'abord si demandé). */
+export function sortCandidates(out: Candidate[], ctx: PricingContext): Candidate[] {
+  const { settings } = ctx;
+  const priority = settings.priority;
+  const criteria = priority === 'custom' ? (settings.sortCriteria.length ? settings.sortCriteria : DEFAULT_CRITERIA) : PRIORITY_CRITERIA[priority];
+  const keys = new Map(
+    out.map((c) => {
+      c.score = criteria ? null : priorityScore(c, priority, ctx);
+      // Chaque clé : valeur où le plus grand passe d'abord (null = inconnu, en dernier).
+      const parts: (number | null)[] = criteria ? criteria.map((k) => { const v = criterionValue(c, k.key, ctx); return v == null ? null : k.dir === 'asc' ? -v : v; }) : [c.score];
+      // Doublons d'abord : le plus d'exemplaires en premier.
+      if (settings.duplicatesFirst) parts.unshift(c.card.quantity);
+      return [c, parts];
+    }),
+  );
+  return out.sort((a, b) => {
+    const ka = keys.get(a)!;
+    const kb = keys.get(b)!;
+    for (let i = 0; i < ka.length; i++) {
+      const x = ka[i];
+      const y = kb[i];
+      if (x === y) continue;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return y - x;
+    }
+    return a.card.name.localeCompare(b.card.name);
+  });
+}
+
+/** Variables d'une carte pour la formule de priorité (voir lib/formula.ts). */
+export function scoreVars(c: Candidate, ctx: PricingContext): Record<string, number | null> {
+  return { ...cardVars(c.card, ctx, c.pricing.base.value, { trustSales: ctx.settings.defaultCalc.trustSales, keepMin: c.card.quantity - c.sellable }), prix_conseille: c.pricing.price, vendables: c.sellable };
+}
+
+/**
+ * F1–F3 – répartition des slots libres.
+ * Par étiquette : chaque étiquette remplit ses slots réservés. Meilleures cartes : les paliers qui réservent des slots
+ * (si l'option est activée) les remplissent d'abord, puis les slots restants reçoivent les cartes les mieux classées,
+ * tous paliers confondus.
+ */
 export function allocate(input: AllocationInput, now = Date.now()): AllocationResult {
   const ctx = makeContext(input, now);
-  const { settings, rules } = input;
+  const { settings } = input;
+  const rules = saleRules(input);
+  const pool = settings.allocationMode === 'pool';
   const active = input.myAuctions.filter((a) => isActive(a, now)).sort((a, b) => (a.endsAt ?? Infinity) - (b.endsAt ?? Infinity));
 
   const busy: BusySlot[] = active.map((auction) => ({ auction, rule: ruleForAuction(auction, rules, ctx) }));
@@ -288,24 +309,10 @@ export function allocate(input: AllocationInput, now = Date.now()): AllocationRe
   const reserved = new Map<string, number>();
   const free: FreeSlot[] = [];
   const ignored = new Set(input.ignoredSlots);
-  const fallback = settings.fallbackTag ? rules.find((r) => r.active && sameTag(r.tag, settings.fallbackTag)) ?? null : null;
+  const fallback = !pool && settings.fallbackTag ? rules.find((r) => r.active && sameTag(r.tag, settings.fallbackTag)) ?? null : null;
 
-  if (settings.allocationMode === 'pool') {
-    const pool = poolSlots(input, ctx, onSale, freeCount, ignored);
-    const ends = active.map((a) => a.endsAt).filter((e): e is number => e != null);
-    return {
-      slots: settings.slots,
-      busy,
-      free: pool.free,
-      unassigned: freeCount - pool.free.length,
-      nextEnd: ends.length ? Math.min(...ends) : null,
-      ctx,
-      pool: { size: pool.size, offset: pool.offset },
-    };
-  }
-
-  const ordered = rules.filter((r) => r.active && r.quota > 0).sort((a, b) => b.quota - a.quota);
-  for (const rule of ordered) {
+  const quotas = !pool || settings.reserveTierSlots ? rules.filter((r) => r.active && r.quota > 0).sort((a, b) => b.quota - a.quota) : [];
+  for (const rule of quotas) {
     const current = busy.filter((b) => b.rule?.id === rule.id).length;
     const missing = Math.max(0, rule.quota - current);
     for (let i = 0; i < missing && freeCount > 0; i++) {
@@ -328,46 +335,44 @@ export function allocate(input: AllocationInput, now = Date.now()): AllocationRe
   }
 
   const ends = active.map((a) => a.endsAt).filter((e): e is number => e != null);
-  return {
-    slots: settings.slots,
-    busy,
-    free,
-    unassigned: freeCount,
-    nextEnd: ends.length ? Math.min(...ends) : null,
-    ctx,
-  };
+  const result: AllocationResult = { slots: settings.slots, busy, free, unassigned: freeCount, nextEnd: ends.length ? Math.min(...ends) : null, ctx };
+  if (!pool) return result;
+  const rest = poolSlots(input, rules, ctx, onSale, reserved, freeCount, ignored);
+  result.free.push(...rest.free);
+  result.unassigned = freeCount - rest.free.length;
+  result.pool = { size: rest.size, offset: rest.offset };
+  return result;
 }
 
 /**
- * Mode « meilleures cartes » : sans quota par étiquette, toutes les cartes vendables des règles actives (une carte
- * prend le prix de la première règle qui la couvre) forment une seule liste, triée par l'ordre global ; les slots
- * libres reçoivent les cartes à partir du rang `poolOffset` (« Suivant » avance d'une page, en boucle).
+ * Meilleures cartes : toutes les cartes vendables des paliers (une carte prend le calcul du premier palier qui la
+ * couvre) forment une seule liste triée par priorité ; les slots libres reçoivent les cartes à partir du rang
+ * `poolOffset` (« Suivant » avance d'une page, en boucle).
  */
-function poolSlots(input: AllocationInput, ctx: PricingContext, onSale: Map<string, number>, freeCount: number, ignored: Set<string>) {
-  const rules = input.rules.filter((r) => r.active);
+function poolSlots(input: AllocationInput, rules: TagRule[], ctx: PricingContext, onSale: Map<string, number>, reserved: Map<string, number>, freeCount: number, ignored: Set<string>) {
+  const active = rules.filter((r) => r.active);
   const all: Candidate[] = [];
   const ruleOf = new Map<string, TagRule>();
-  for (const rule of rules) {
-    for (const c of rankCandidates(rule, ctx, onSale, new Map())) {
+  for (const rule of active) {
+    for (const c of rankCandidates(rule, ctx, onSale, reserved)) {
       if (ruleOf.has(c.card.id)) continue;
       ruleOf.set(c.card.id, rule);
       all.push(c);
     }
   }
-  const { settings } = ctx;
-  // La formule de score est propre à une étiquette : la liste commune suit l'ordre global.
-  sortCandidates(all, settings.sortPrice, ctx, { criteria: settings.sortCriteria });
+  sortCandidates(all, ctx);
   const offset = all.length ? ((input.poolOffset ?? 0) % all.length + all.length) % all.length : 0;
   const page = [...all.slice(offset), ...all.slice(0, offset)];
   const taken = new Set<string>();
   const free: FreeSlot[] = [];
-  if (!rules.length) return { free, size: 0, offset: 0 };
+  if (!active.length) return { free, size: 0, offset: 0 };
   for (let i = 0; i < freeCount; i++) {
     const key = `pool:${i}`;
     const overrideId = input.slotOverrides[key];
     const proposal = page.find((c) => c.card.id === overrideId && !taken.has(c.card.id)) ?? page.find((c) => !taken.has(c.card.id)) ?? null;
     if (proposal) taken.add(proposal.card.id);
-    free.push({ key, rule: proposal ? ruleOf.get(proposal.card.id)! : rules[0], fromRule: null, proposal, candidates: page, ignored: ignored.has(key), excluded: null, pool: true });
+    const rule = proposal ? ruleOf.get(proposal.card.id)! : active[0];
+    free.push({ key, rule, fromRule: null, proposal, candidates: page, ignored: ignored.has(key), excluded: proposal ? null : exclusions(rule, ctx, onSale), pool: true });
   }
   return { free, size: all.length, offset };
 }
@@ -377,7 +382,7 @@ export function adviceForCard(input: AllocationInput, cardId: string, now = Date
   const ctx = makeContext(input, now);
   const card = ctx.cards[cardId];
   if (!card) return null;
-  const active = input.rules.filter((r) => r.active);
+  const active = saleRules(input).filter((r) => r.active);
   const rule = active.find((r) => r.match === 'tag' && cardMatchesRule(card, r, ctx)) ?? active.find((r) => cardMatchesRule(card, r, ctx));
   if (!rule) return null;
   const peers = Object.values(ctx.cards).filter((c) => cardMatchesRule(c, rule, ctx));
@@ -391,14 +396,14 @@ export function adviceForCard(input: AllocationInput, cardId: string, now = Date
 export function sellAdvice(input: AllocationInput, cardId: string, now = Date.now()): { price: number | null; detail: string; durationMin: number | null } {
   const advice = adviceForCard(input, cardId, now);
   if (advice?.pricing.price != null) {
-    return { price: advice.pricing.price, detail: `${advice.pricing.detail} · étiquette ${advice.rule.tag}`, durationMin: advice.pricing.durationMin ?? null };
+    return { price: advice.pricing.price, detail: `${advice.pricing.detail} · ${advice.rule.tier ? 'palier' : 'étiquette'} ${advice.rule.tag}`, durationMin: advice.pricing.durationMin ?? null };
   }
   const ctx = makeContext(input, now);
   const card = ctx.cards[cardId];
   const base = card ? reliableBase(card, ctx).value : null;
   if (base == null) return { price: null, detail: 'Aucun prix connu pour cette carte : saisis-le.', durationMin: null };
   const price = Math.max(1, Math.round(base));
-  return { price, detail: `prix moyen ${price} (aucune règle d'étiquette pour cette carte)`, durationMin: durationFor(price, input.settings.durationRules) };
+  return { price, detail: `prix moyen ${price} (carte hors de tes ventes)`, durationMin: durationFor(price, input.settings.durationRules) };
 }
 
 /** Cartes vendables selon les règles (pour les pastilles sur la collection). */
@@ -407,7 +412,7 @@ export function sellableCards(input: AllocationInput, now = Date.now()): Map<str
   const onSale = new Map<string, number>();
   for (const a of input.myAuctions.filter((x) => isActive(x, now))) onSale.set(a.cardId, (onSale.get(a.cardId) ?? 0) + 1);
   const out = new Map<string, { rule: TagRule; price: number | null }>();
-  for (const rule of input.rules.filter((r) => r.active)) {
+  for (const rule of saleRules(input).filter((r) => r.active)) {
     for (const c of rankCandidates(rule, ctx, onSale, new Map())) {
       if (!out.has(c.card.id)) out.set(c.card.id, { rule, price: c.pricing.price });
     }

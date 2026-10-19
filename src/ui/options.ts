@@ -1,15 +1,19 @@
 import './common.css';
 import './options.css';
 import { ext } from '../lib/browser';
-import { DEFAULT_RULES, DEFAULT_SETTINGS, SITE_ORIGIN } from '../lib/defaults';
+import { CARD_PRICES_KEY, DEFAULT_RULES, DEFAULT_SETTINGS, SITE_ORIGIN } from '../lib/defaults';
 import { DURATIONS } from '../lib/duration';
 import { clearAll, loadAll, migrateRules, migrateSettings, save } from '../lib/storage';
 import { formatPrice, RARITIES } from '../lib/text';
 import { conditionsSummary, EMPTY_CONDITIONS } from '../lib/conditions';
 import { FORMULA_VARS, formulaError } from '../lib/formula';
-import { DEFAULT_RATE_TIERS, pricePctLabel } from '../lib/sellrate';
+import { sellRateOfCache, type RateEntry } from '../lib/sellrate';
+import { allocate } from '../lib/allocation';
+import { catalogPriceOf, type CatalogPriceEntry } from '../lib/autotag';
+import { roundTo } from '../lib/pricing';
+import { clampPrice, DEFAULT_CALC, defaultTiers, inheritCalc, newTier, PRIORITIES, simplePrice, tierLabel } from '../lib/salecalc';
 import { DEFAULT_CRITERIA, SORT_KEYS } from '../lib/sorting';
-import type { CandidateSort, DurationRule, SellRateRule, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
+import type { DurationRule, PriceCalc, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { updatePanel } from './update-panel';
@@ -19,10 +23,8 @@ import {
   DEFAULT_DURATION_TIERS,
   isDirty,
   nextTier,
-  pctExample,
   quickStartChecks,
   quotaSummary,
-  rateTierExample,
   roundingExamples,
   snapshot,
   tiersPreviewParts,
@@ -97,8 +99,13 @@ const ui = {
   tagRules: null as unknown as HTMLElement,
   durations: null as unknown as HTMLElement,
   rateTiers: null as unknown as HTMLElement,
-  criteria: null as unknown as HTMLElement,
   tiers: null as unknown as HTMLElement,
+  priceTiers: null as unknown as HTMLElement,
+  saleTags: null as unknown as HTMLElement,
+  priority: null as unknown as HTMLElement,
+  preview: null as unknown as HTMLElement,
+  tierTitles: [] as { el: HTMLElement; tier: PriceTier }[],
+  calcExamples: [] as { el: HTMLElement; calc: () => PriceCalc }[],
   manual: null as unknown as HTMLElement,
   rounding: null as unknown as HTMLElement,
   autoTagMode: null as unknown as HTMLElement,
@@ -109,8 +116,6 @@ const ui = {
   errorBoxes: [] as { key: OptionsSection; box: HTMLElement }[],
   /** Champs repérés par clé (« slots », « rule:<id>:tag »…) pour y afficher les erreurs. */
   fields: new Map<string, HTMLElement>(),
-  pctExamples: new Map<TagRule, HTMLElement>(),
-  rateExamples: [] as { el: HTMLElement; row: () => SellRateRule | undefined }[],
   /** Champs « nom de l'étiquette » (onglets Ventes et Étiquettes), tenus synchronisés. */
   tagInputs: new Map<string, HTMLInputElement[]>(),
   /** Mentions « nécessite … », visibles seulement quand l'accès manque. */
@@ -506,6 +511,7 @@ function quickFix(c: QuickCheck): Child {
     case 'api':
       return h('button', { type: 'button', class: 'small', onclick: () => void setAccess('read') }, 'Activer la lecture via l\'API…');
     case 'rules':
+      if (pool()) return h('button', { type: 'button', class: 'small', onclick: () => scrollToSection('cartes-a-vendre') }, 'Choisir les cartes à vendre');
       return rules.length
         ? h('button', { type: 'button', class: 'small', onclick: () => scrollToSection('ventes') }, 'Voir mes étiquettes')
         : h(
@@ -578,8 +584,10 @@ function homePanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Ventes : slots et étiquettes à vendre
+// Ventes : mode, cartes à vendre, étiquettes (mode « par étiquette »)
 // ---------------------------------------------------------------------------
+
+const pool = () => settings.allocationMode === 'pool';
 
 function refreshQuota(): void {
   if (settings.allocationMode === 'pool') {
@@ -591,6 +599,7 @@ function refreshQuota(): void {
   ui.quota.className = `quota-summary ${q.status}`;
   mount(ui.quota, h('strong', null, q.text), h('span', null, ` — ${q.status === 'ok' ? '✓ ' : '⚠ '}${q.message}`));
 }
+
 
 /** Champ « nom de l'étiquette », synchronisé entre les onglets Ventes et Étiquettes. */
 function tagInput(rule: TagRule, registered: boolean) {
@@ -642,19 +651,18 @@ function activeSwitch(rule: TagRule) {
   );
 }
 
+
 const MATCH_TEXT: Record<TagRule['match'], string> = {
   tag: 'cartes qui portent l\'étiquette sur le site',
   price: 'cartes dont le prix moyen est dans la plage',
 };
 
-/** Carte d'une étiquette dans l'onglet Ventes : combien de slots, à quel prix, combien en garder. */
+/** Carte d'une étiquette dans l'onglet Ventes (mode « par étiquette ») : slots, exemplaires gardés, calcul, durée. */
 function saleCard(rule: TagRule) {
   const bind = <K extends keyof TagRule>(key: K, parse: (v: string) => TagRule[K]) => (e: Event) => {
     rule[key] = parse((e.target as HTMLInputElement).value);
     onEdit();
   };
-  const example = h('span', { class: 'muted small example' }, pctExample(rule.pct, settings.rounding));
-  ui.pctExamples.set(rule, example);
   return h(
     'div',
     { class: `rule-card${rule.active ? '' : ' inactive'}`, 'data-rule': rule.id },
@@ -666,19 +674,12 @@ function saleCard(rule: TagRule) {
       h(
         'label',
         { class: 'inline' },
-        'Mise de départ',
-        reg(`rule:${rule.id}:pct`, h('input', { type: 'number', min: '1', max: '500', value: rule.pct, 'aria-label': '% du prix moyen', oninput: bind('pct', (v) => num(v, 0)!) })),
-        '% du prix moyen',
-        example,
-      ),
-      h(
-        'label',
-        { class: 'inline' },
         'Garder',
         h('input', { type: 'number', min: '0', value: rule.keepMin, 'aria-label': 'Exemplaires gardés', oninput: bind('keepMin', (v) => num(v, 1)!) }),
         'exemplaire(s)',
         hint('Exemplaires jamais vendus : avec 1, ton dernier exemplaire reste toujours dans ta collection ; seuls les doublons partent.'),
       ),
+      durationSelect(() => rule.durationMin ?? null, (v) => (rule.durationMin = v)),
     ),
     h(
       'div',
@@ -686,25 +687,8 @@ function saleCard(rule: TagRule) {
       `Cartes proposées : ${MATCH_TEXT[rule.match]}. `,
       h('button', { type: 'button', class: 'link', onclick: () => scrollToSection(`etiquette-${rule.id}`) }, 'Changer dans Étiquettes →'),
     ),
-    saleDetails(rule),
+    calcEditor(() => rule.calc ?? inheritCalc(), (c) => (rule.calc = c), `rule:${rule.id}:`, true),
   );
-}
-
-/** Réglages de vente propres à une étiquette, repliés. */
-function saleDetails(rule: TagRule) {
-  const summary = h('span', { class: 'muted small' }, rule.sale ? `propres à cette étiquette (${SORT_LABELS[rule.sale.sort]})` : 'réglages généraux');
-  const details = h(
-    'details',
-    {
-      class: 'rule-extra',
-      open: openRuleDetails.has(`sale:${rule.id}`),
-      ontoggle: (e: Event) => ((e.target as HTMLDetailsElement).open ? openRuleDetails.add(`sale:${rule.id}`) : openRuleDetails.delete(`sale:${rule.id}`)),
-    },
-    h('summary', null, h('span', null, 'Ordre, taux de vente et durée'), ' · ', summary),
-    ruleSaleBox(rule),
-  );
-  details.addEventListener('change', () => (summary.textContent = rule.sale ? `propres à cette étiquette (${SORT_LABELS[rule.sale.sort]})` : 'réglages généraux'));
-  return details;
 }
 
 /** Étiquettes vues dans la collection et pas encore couvertes par une règle. */
@@ -725,7 +709,7 @@ function detectedTagsBlock() {
           class: 'small',
           title: 'Suivre cette étiquette (garder 0 : l\'étiquette désigne les cartes à vendre)',
           onclick: () => {
-            rules.push({ id: newId(), tag, quota: 1, pct: 100, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' });
+            rules.push({ id: newId(), tag, quota: 1, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag' });
             renderRules();
             onEdit();
           },
@@ -742,7 +726,7 @@ function addRuleButton() {
     {
       type: 'button',
       onclick: () => {
-        const rule: TagRule = { id: newId(), tag: '', quota: 1, pct: 70, floor: null, ceiling: null, keepMin: 1, active: true, match: 'tag' };
+        const rule: TagRule = { id: newId(), tag: '', quota: 1, floor: null, ceiling: null, keepMin: 1, active: true, match: 'tag' };
         rules.push(rule);
         renderRules();
         onEdit();
@@ -753,8 +737,8 @@ function addRuleButton() {
   );
 }
 
+
 function renderRules(): void {
-  ui.pctExamples.clear();
   ui.tagInputs.clear();
   mount(
     ui.rules,
@@ -765,17 +749,9 @@ function renderRules(): void {
   renderTagRules();
 }
 
-/** Panneaux « Conditions et vente » ouverts (gardés ouverts quand le tableau est redessiné). */
-const openRuleDetails = new Set<string>();
 
-const SORT_LABELS: Record<CandidateSort, string> = {
-  desc: 'doublons, puis la plus chère',
-  asc: 'doublons, puis la moins chère (écouler)',
-  random: 'doublons, puis au hasard',
-  rate: 'doublons, puis meilleur taux de vente',
-  custom: 'selon mes critères (tri multi-critères)',
-  score: 'formule de score (avancé)',
-};
+/** Panneaux repliés ouverts (gardés ouverts quand une liste est redessinée). */
+const openRuleDetails = new Set<string>();
 
 /**
  * Éditeur de critères de tri : chaque ligne départage les égalités de la précédente (ex. prix ↓, puis tdv ↓,
@@ -827,114 +803,543 @@ function criteriaEditor(list: SortCriterion[], prefix: string): HTMLElement {
   return box;
 }
 
-/** Réglages de vente propres à une étiquette (activés par la case, copiés des réglages globaux). */
-function ruleSaleBox(rule: TagRule): HTMLElement {
-  const box = h('div', { class: 'rule-sale' });
-  const prefix = `rule:${rule.id}:`;
+
+// ---------------------------------------------------------------------------
+// Calcul du prix : option A (par défaut), B1 (simple), B2 (formule)
+// ---------------------------------------------------------------------------
+
+const CALC_MODES: { mode: PriceCalcMode; label: string; help: string }[] = [
+  { mode: 'default', label: 'Par défaut', help: 'Suit le calcul du prix par défaut.' },
+  { mode: 'simple', label: 'Simple', help: 'Prix moyen × mise de départ, ajusté par le taux de vente.' },
+  { mode: 'formula', label: 'Avancé', help: 'Ta propre formule, avec les variables de la carte.' },
+];
+
+/** Exemple du calcul simple : carte à 40 W qui se vend bien, mal, ou presque jamais mise en vente. */
+function simpleExamples(c: PriceCalc): string {
+  const at = (sold: number, total: number) => {
+    const rate = total ? { sold, total, pct: Math.round((sold / total) * 100) } : null;
+    return `${formatPrice(roundTo(clampPrice(simplePrice(40, rate, c), c), settings.rounding))} W`;
+  };
+  return `Carte à 40 W : ${at(16, 20)} si elle se vend 16 fois sur 20 · ${at(4, 20)} si 4 sur 20 · ${at(1, 2)} si 1 sur 2 (trop peu pour compter).`;
+}
+
+/**
+ * Éditeur d'un calcul de prix. `allowDefault` : option A (palier ou étiquette) ; `prefix` : clés des champs pour
+ * les erreurs. Change de mode sans perdre les valeurs saisies dans l'autre.
+ */
+function calcEditor(get: () => PriceCalc, set: (c: PriceCalc) => void, prefix: string, allowDefault: boolean): HTMLElement {
+  const box = h('div', { class: 'calc' });
   const draw = () => {
-    const s = rule.sale;
-    const toggle = toggleField(
-      'Réglages de vente propres à cette étiquette',
-      !!s,
-      (input) => {
-        if (input.checked) {
-          rule.sale = {
-            minSellRate: settings.minSellRate,
-            sellRateRules: settings.sellRateRules.map((t) => ({ ...t })),
-            durationRules: settings.durationRules.map((t) => ({ ...t })),
-            sort: settings.sortPrice,
-            sortCriteria: (settings.sortCriteria.length ? settings.sortCriteria : DEFAULT_CRITERIA).map((c) => ({ ...c })),
-            score: '{prix} * {tdv} / 100 + {doublons} * 10',
-          };
-        } else delete rule.sale;
-        draw();
-        onEdit();
-      },
-      'Sinon, l\'étiquette suit les réglages généraux de cet onglet (Prix de départ, Taux de vente, Durée des enchères).',
-    );
-    if (!s) return mount(box, toggle);
-    const formulaState = h('div', { class: 'small formula-state', 'aria-live': 'polite' });
-    const checkFormula = () => {
-      const err = s.score.trim() ? formulaError(s.score) : 'formule vide';
-      formulaState.className = `small formula-state ${err ? 'bad' : 'ok'}`;
-      formulaState.textContent = err ? `⚠ ${err}` : '✓ formule valide : la carte au score le plus haut est proposée en premier';
-    };
+    const c = get();
+    const example = h('p', { class: 'muted small calc-example' }, c.mode === 'simple' ? simpleExamples(c) : '');
+    ui.calcExamples.push({ el: example, calc: get });
+    const numField = (key: 'pct' | 'tdvWeight' | 'trustSales' | 'minPrice' | 'maxPrice', label: string, attrs: Record<string, string>, help: string, nullable = false) =>
+      field(
+        label,
+        reg(
+          `${prefix}${key}`,
+          h('input', {
+            type: 'number',
+            ...attrs,
+            'aria-label': label,
+            value: c[key] ?? '',
+            placeholder: nullable ? 'aucun' : '',
+            oninput: (e: Event) => {
+              const v = num((e.target as HTMLInputElement).value);
+              (c as unknown as Record<string, number | null>)[key] = nullable ? v : v ?? (DEFAULT_CALC[key] as number);
+              set(c);
+              onEdit();
+            },
+          }),
+        ),
+        help,
+      );
     const formula = reg(
-      `${prefix}score`,
+      `${prefix}formula`,
       h('textarea', {
         rows: 2,
         class: 'formula',
         spellcheck: 'false',
-        'aria-label': 'Formule de score',
+        'aria-label': 'Formule de prix',
         oninput: (e: Event) => {
-          s.score = (e.target as HTMLTextAreaElement).value;
+          c.formula = (e.target as HTMLTextAreaElement).value;
+          set(c);
           checkFormula();
           onEdit();
         },
       }),
     ) as HTMLTextAreaElement;
-    formula.value = s.score;
-    checkFormula();
-    const insert = (name: string) => {
-      const at = formula.selectionStart ?? formula.value.length;
-      formula.value = `${formula.value.slice(0, at)}{${name}}${formula.value.slice(formula.selectionEnd ?? at)}`;
-      formula.dispatchEvent(new Event('input'));
-      formula.focus();
+    formula.value = c.formula;
+    const formulaState = h('div', { class: 'small formula-state', 'aria-live': 'polite' });
+    const checkFormula = () => {
+      const err = c.formula.trim() ? formulaError(c.formula) : 'formule vide';
+      formulaState.className = `small formula-state ${err ? 'bad' : 'ok'}`;
+      formulaState.textContent = err ? `⚠ ${err}` : '✓ formule valide';
     };
+    checkFormula();
     mount(
       box,
-      toggle,
       h(
         'div',
-        { class: 'grid' },
-        field(
-          'Taux de vente minimum (%)',
-          reg(`${prefix}minSellRate`, h('input', { type: 'number', min: '0', max: '100', value: s.minSellRate ?? '', placeholder: 'aucun', oninput: (e: Event) => ((s.minSellRate = num((e.target as HTMLInputElement).value)), onEdit()) })),
-          'Sous ce taux, une carte de l\'étiquette n\'est plus proposée.',
-        ),
-        field(
-          'Ordre de choix des cartes',
+        { class: 'segmented', role: 'radiogroup', 'aria-label': 'Calcul du prix' },
+        CALC_MODES.filter((m) => allowDefault || m.mode !== 'default').map((m) =>
           h(
-            'select',
+            'button',
             {
-              onchange: (e: Event) => {
-                s.sort = (e.target as HTMLSelectElement).value as CandidateSort;
+              type: 'button',
+              role: 'radio',
+              'aria-checked': String(c.mode === m.mode),
+              title: m.help,
+              class: c.mode === m.mode ? 'is-on' : undefined,
+              onclick: () => {
+                if (c.mode === m.mode) return;
+                set({ ...c, mode: m.mode });
                 draw();
                 onEdit();
               },
             },
-            (Object.keys(SORT_LABELS) as CandidateSort[]).map((k) => h('option', { value: k, selected: s.sort === k }, SORT_LABELS[k])),
+            m.label,
           ),
-          'Quelle carte de l\'étiquette est proposée en premier pour un slot libre.',
         ),
       ),
-      s.sort === 'custom' ? criteriaEditor((s.sortCriteria ??= DEFAULT_CRITERIA.map((c) => ({ ...c }))), prefix) : null,
-      s.sort === 'score'
-        ? h(
-            'div',
-            { class: 'formula-box' },
-            h('div', { class: 'field-label' }, 'Formule de score'),
-            formula,
-            formulaState,
+      c.mode === 'default'
+        ? h('p', { class: 'muted small' }, `Calcul par défaut : ${calcSummary(settings.defaultCalc)}.`)
+        : [
+            c.mode === 'simple'
+              ? h(
+                  'div',
+                  { class: 'grid' },
+                  numField('pct', 'Mise de départ (% du prix moyen)', { min: '1', max: '500' }, '70 = 70 % du prix moyen de la carte.'),
+                  numField('tdvWeight', 'Influence du taux de vente (%)', { min: '0', max: '100', step: '5' }, '0 = aucune. 50 : une carte vendue à 80 % part 15 % plus haut, à 20 % 15 % plus bas.'),
+                  numField('trustSales', 'Enchères pour être sûr', { min: '1' }, 'En dessous, le taux de vente compte en partie : 1 vente sur 2 enchères ne fait pas un vrai 50 %.'),
+                )
+              : h(
+                  'div',
+                  { class: 'formula-box' },
+                  formula,
+                  formulaState,
+                  h(
+                    'div',
+                    { class: 'row wrap formula-vars' },
+                    h('span', { class: 'muted small' }, 'Variables :'),
+                    FORMULA_VARS.map((v) =>
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          class: 'chip',
+                          title: v.help,
+                          onclick: () => {
+                            const at = formula.selectionStart ?? formula.value.length;
+                            formula.value = `${formula.value.slice(0, at)}{${v.name}}${formula.value.slice(formula.selectionEnd ?? at)}`;
+                            formula.dispatchEvent(new Event('input'));
+                            formula.focus();
+                          },
+                        },
+                        `{${v.name}}`,
+                      ),
+                    ),
+                  ),
+                  h('p', { class: 'muted small' }, 'Le résultat est le prix de départ (W). Opérations + − * / ^, comparaisons, && ||, si(condition, alors, sinon), min, max, arrondi… Ex. : {prix} * 0.7 * si({tdv} < 20, 0.8, 1).'),
+                ),
+            example,
             h(
               'div',
-              { class: 'row wrap formula-vars' },
-              h('span', { class: 'muted small' }, 'Variables :'),
-              FORMULA_VARS.map((v) => h('button', { type: 'button', class: 'chip', title: v.help, onclick: () => insert(v.name) }, `{${v.name}}`)),
+              { class: 'grid' },
+              numField('minPrice', 'Prix minimum (W)', { min: '1' }, 'En dessous, le prix devient ce minimum (ex. 25).', true),
+              numField('maxPrice', 'Prix maximum (W)', { min: '1' }, 'Au-dessus, le prix devient ce maximum.', true),
             ),
-            h('p', { class: 'muted small' }, 'Opérations + − * / % ^, comparaisons (< > <= >= == !=, vrai = 1), && || !, parenthèses, fonctions min, max, abs, arrondi, plancher, plafond, racine, log, si(condition, alors, sinon). Décimales avec un point : 1.5. Ex. : si({tdv} < 20, 0, {prix} * {tdv} / 100).'),
-          )
-        : null,
-      h('h4', null, 'Prix selon le taux de vente'),
-      rateTiers(s.sellRateRules, prefix),
-      h('h4', null, 'Durée des enchères'),
-      durationTiers(s.durationRules, prefix),
+          ],
     );
   };
   draw();
   return box;
 }
 
+/** « 70 % du prix moyen, taux de vente 50 %, minimum 25 W ». */
+function calcSummary(c: PriceCalc): string {
+  const parts = c.mode === 'formula' ? ['formule'] : [`${c.pct} % du prix moyen`, c.tdvWeight ? `taux de vente ${c.tdvWeight} %` : 'sans taux de vente'];
+  if (c.minPrice != null) parts.push(`minimum ${c.minPrice} W`);
+  if (c.maxPrice != null) parts.push(`maximum ${c.maxPrice} W`);
+  return parts.join(', ');
+}
+
+/** Durée de l'enchère d'un palier ou d'une étiquette (vide = paliers de durée généraux). */
+function durationSelect(get: () => number | null, set: (v: number | null) => void) {
+  return h(
+    'label',
+    { class: 'inline' },
+    'Durée',
+    h(
+      'select',
+      { 'aria-label': 'Durée de l\'enchère', onchange: (e: Event) => (set((e.target as HTMLSelectElement).value ? Number((e.target as HTMLSelectElement).value) : null), onEdit()) },
+      h('option', { value: '', selected: get() == null }, 'selon la mise (Durée des enchères)'),
+      DURATIONS.map((d) => h('option', { value: d.minutes, selected: d.minutes === get() }, d.label)),
+    ),
+  );
+}
+
+function calcSection() {
+  const s = settings;
+  ui.rounding = h('span', { class: 'muted small' });
+  ui.fallback = h('select', { onchange: (e: Event) => ((s.fallbackTag = (e.target as HTMLSelectElement).value || null), onEdit()) });
+  ui.fallbackKey = '';
+  refreshFallback();
+  return section(
+    'prix',
+    'Calcul du prix par défaut',
+    pool() ? 'Le prix de départ de chaque carte, sauf pour un palier qui a son propre calcul.' : 'Le prix de départ de chaque carte, sauf pour une étiquette qui a son propre calcul.',
+    [
+      calcEditor(() => s.defaultCalc, (c) => (s.defaultCalc = c), 'calc:', false),
+      h(
+        'div',
+        { class: 'grid' },
+        field(
+          'Arrondi (W)',
+          h('input', { type: 'number', min: '0', value: s.rounding, oninput: (e: Event) => ((s.rounding = num((e.target as HTMLInputElement).value, 0)!), onEdit()) }),
+          h('span', { class: 'small' }, h('span', { class: 'muted' }, '0 = automatique. '), ui.rounding),
+          'Pas d\'arrondi du prix de départ. Automatique : à l\'unité sous 20 W, à 5 sous 100, à 10 sous 1 000.',
+        ),
+      ),
+      fine(
+        'Réglages fins : calcul du prix moyen' + (pool() ? '' : ', étiquette de secours'),
+        h(
+          'div',
+          { class: 'grid' },
+          field(
+            'Statistique',
+            h(
+              'select',
+              { onchange: (e: Event) => ((s.stat = (e.target as HTMLSelectElement).value as Settings['stat']), onEdit()) },
+              h('option', { value: 'median', selected: s.stat === 'median' }, 'médiane (conseillé)'),
+              h('option', { value: 'mean', selected: s.stat === 'mean' }, 'moyenne'),
+            ),
+            'Médiane : le prix du milieu des ventes, qu\'une vente exceptionnelle ne fausse pas.',
+          ),
+          field('Période observée (jours)', h('input', { type: 'number', min: '1', max: '90', value: s.windowDays, oninput: (e: Event) => ((s.windowDays = num((e.target as HTMLInputElement).value, 7)!), onEdit()) }), 'Seules les ventes de ces derniers jours comptent.'),
+          pool() ? null : field('Étiquette de secours', ui.fallback, 'Quand une étiquette n\'a plus aucune carte à vendre, son slot reçoit une carte de celle-ci.'),
+        ),
+        h('div', { class: 'toggles' }, settingToggle('includeListings', 'Compter les enchères en cours dans le prix moyen', 'Par défaut, seules les ventes terminées comptent : une enchère en cours peut encore monter.')),
+      ),
+    ],
+    { errKey: 'pricing' },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Meilleures cartes : filtre d'étiquettes et paliers de prix
+// ---------------------------------------------------------------------------
+
+/** Étiquettes connues : celles de la collection, plus celles déjà choisies. */
+function knownTags(): string[] {
+  const set = new Map<string, string>();
+  for (const c of Object.values(store.cards)) for (const t of c.tags) set.set(t.toLowerCase(), t);
+  for (const t of settings.saleTags.tags) set.set(t.toLowerCase(), t);
+  for (const r of rules) if (r.tag.trim()) set.set(r.tag.trim().toLowerCase(), r.tag.trim());
+  return [...set.values()].sort((a, b) => a.localeCompare(b));
+}
+
+function renderSaleTags(): void {
+  const st = settings.saleTags;
+  const tags = knownTags();
+  const has = (t: string) => st.tags.some((x) => x.toLowerCase() === t.toLowerCase());
+  mount(
+    ui.saleTags,
+    tags.length
+      ? h(
+          'div',
+          { class: 'tag-chips', role: 'group', 'aria-label': 'Étiquettes' },
+          tags.map((t) =>
+            h(
+              'button',
+              {
+                type: 'button',
+                class: `tag-chip${has(t) ? ' is-on' : ''}`,
+                'aria-pressed': String(has(t)),
+                onclick: () => {
+                  st.tags = has(t) ? st.tags.filter((x) => x.toLowerCase() !== t.toLowerCase()) : [...st.tags, t];
+                  renderSaleTags();
+                  onEdit();
+                },
+              },
+              has(t) ? `✓ ${t}` : t,
+            ),
+          ),
+        )
+      : h('p', { class: 'muted small' }, 'Aucune étiquette connue : ouvre ta collection sur le site pour que Wiki-Traders la relève.'),
+    h(
+      'p',
+      { class: 'muted small' },
+      st.mode === 'include'
+        ? st.tags.length
+          ? `Seules les cartes avec ${st.tags.length > 1 ? 'une de ces étiquettes' : 'cette étiquette'} sont proposées.`
+          : '⚠ Aucune étiquette choisie : rien ne sera proposé.'
+        : st.tags.length
+          ? `Toutes tes cartes sont proposées, sauf celles avec ${st.tags.length > 1 ? 'une de ces étiquettes' : 'cette étiquette'}.`
+          : 'Toutes tes cartes peuvent être proposées.',
+    ),
+  );
+}
+
+function saleFilterSection() {
+  const st = settings.saleTags;
+  ui.saleTags = h('div');
+  renderSaleTags();
+  return section(
+    'cartes-a-vendre',
+    'Quelles cartes vendre',
+    'C\'est le seul endroit où les étiquettes comptent pour la vente : le reste se règle par prix.',
+    [
+      h(
+        'div',
+        { class: 'grid' },
+        field(
+          'Cartes proposées',
+          h(
+            'select',
+            {
+              onchange: (e: Event) => {
+                st.mode = (e.target as HTMLSelectElement).value as Settings['saleTags']['mode'];
+                renderSaleTags();
+                onEdit();
+              },
+            },
+            h('option', { value: 'exclude', selected: st.mode === 'exclude' }, 'toutes, sauf celles avec ces étiquettes'),
+            h('option', { value: 'include', selected: st.mode === 'include' }, 'seulement celles avec ces étiquettes'),
+          ),
+        ),
+        field(
+          'Exemplaires gardés',
+          h('input', { type: 'number', min: '0', value: settings.keepMin, oninput: (e: Event) => ((settings.keepMin = Math.max(0, num((e.target as HTMLInputElement).value, 1)!)), onEdit()) }),
+          '1 = ton dernier exemplaire reste toujours dans ta collection ; seuls les doublons partent.',
+        ),
+      ),
+      ui.saleTags,
+    ],
+  );
+}
+
+function tierCard(t: PriceTier, i: number) {
+  const bound = (key: 'from' | 'to', placeholder: string, label: string) =>
+    reg(`tier:${t.id}:${key}`, h('input', { type: 'number', min: '0', value: t[key] ?? '', placeholder, 'aria-label': label, oninput: (e: Event) => ((t[key] = num((e.target as HTMLInputElement).value)), refreshTierTitles(), onEdit()) }));
+  const list = settings.priceTiers;
+  const title = h('strong', { class: 'tier-title' }, tierLabel(t));
+  ui.tierTitles.push({ el: title, tier: t });
+  return h(
+    'div',
+    { class: `rule-card${t.active ? '' : ' inactive'}`, 'data-tier': t.id },
+    h(
+      'div',
+      { class: 'row rule-head' },
+      switchInput(t.active, (box) => ((t.active = box.checked), box.closest('.rule-card')?.classList.toggle('inactive', !box.checked), onEdit()), `Palier ${tierLabel(t)} actif`),
+      title,
+      h('span', { class: 'grow' }),
+      h('button', { type: 'button', class: 'small', title: 'Monter', disabled: i === 0, onclick: () => (list.splice(i - 1, 0, ...list.splice(i, 1)), renderTiers(), onEdit()) }, '▲'),
+      h('button', { type: 'button', class: 'small', title: 'Descendre', disabled: i === list.length - 1, onclick: () => (list.splice(i + 1, 0, ...list.splice(i, 1)), renderTiers(), onEdit()) }, '▼'),
+      h('button', { type: 'button', class: 'danger', title: 'Supprimer ce palier', 'aria-label': `Supprimer le palier ${tierLabel(t)}`, onclick: () => (list.splice(i, 1), renderTiers(), onEdit()) }, '✕'),
+    ),
+    h(
+      'div',
+      { class: 'rule-line' },
+      h('label', { class: 'inline' }, 'Prix moyen de', bound('from', '0', 'Palier : de'), 'à', bound('to', '∞', 'Palier : à'), 'W'),
+      settings.reserveTierSlots
+        ? h('label', { class: 'inline' }, 'Réserve', reg(`tier:${t.id}:slots`, h('input', { type: 'number', min: '0', value: t.slots, 'aria-label': 'Slots réservés', oninput: (e: Event) => ((t.slots = num((e.target as HTMLInputElement).value, 0)!), onEdit()) })), 'slot(s)')
+        : null,
+      durationSelect(() => t.durationMin, (v) => (t.durationMin = v)),
+    ),
+    calcEditor(() => t.calc, (c) => (t.calc = c), `tier:${t.id}:`, true),
+  );
+}
+
+function refreshTierTitles(): void {
+  for (const x of ui.tierTitles) x.el.textContent = tierLabel(x.tier);
+}
+
+function renderTiers(): void {
+  ui.tierTitles = [];
+  const list = settings.priceTiers;
+  mount(
+    ui.priceTiers,
+    list.length
+      ? h('div', { class: 'rule-cards' }, list.map(tierCard))
+      : h('p', { class: 'muted' }, 'Aucun palier : toutes les cartes suivent le calcul par défaut. Ajoute des paliers pour régler le prix (et le minimum) selon la valeur des cartes.'),
+    h(
+      'div',
+      { class: 'row wrap', style: 'margin-top:10px' },
+      h(
+        'button',
+        {
+          type: 'button',
+          onclick: () => {
+            const last = list.at(-1);
+            const from = last?.to != null ? last.to + 1 : null;
+            list.push(newTier(from, null));
+            renderTiers();
+            onEdit();
+          },
+        },
+        '+ Ajouter un palier',
+      ),
+      list.length
+        ? null
+        : h('button', { type: 'button', onclick: () => (list.push(...defaultTiers()), renderTiers(), onEdit()) }, 'Proposition : jusqu\'à 20 W · 21–100 W · 101 W et +'),
+    ),
+  );
+}
+
+function tiersSection() {
+  ui.priceTiers = h('div');
+  renderTiers();
+  return section(
+    'paliers',
+    'Paliers de prix',
+    'Chaque palier regroupe les cartes selon leur prix moyen et peut avoir son propre calcul, son prix minimum et sa durée. Une carte prend le premier palier qui la contient ; une carte hors de tous les paliers n\'est pas proposée.',
+    [
+      h(
+        'div',
+        { class: 'toggles' },
+        toggleField(
+          'Réserver des slots par palier',
+          settings.reserveTierSlots,
+          (box) => {
+            settings.reserveTierSlots = box.checked;
+            renderTiers();
+            onEdit();
+          },
+          'Ex. 2 slots toujours pour les cartes de plus de 100 W. Les slots non réservés vont aux meilleures cartes, tous paliers confondus.',
+        ),
+      ),
+      ui.priceTiers,
+    ],
+    { errKey: 'tiers' },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Priorité et aperçu
+// ---------------------------------------------------------------------------
+
+function renderPriority(): void {
+  const s = settings;
+  const formula = reg(
+    'priorityFormula',
+    h('textarea', { rows: 2, class: 'formula', spellcheck: 'false', 'aria-label': 'Formule de priorité', oninput: (e: Event) => ((s.priorityFormula = (e.target as HTMLTextAreaElement).value), onEdit()) }),
+  ) as HTMLTextAreaElement;
+  formula.value = s.priorityFormula;
+  mount(
+    ui.priority,
+    h(
+      'div',
+      { class: 'priorities', role: 'radiogroup', 'aria-label': 'Priorité' },
+      PRIORITIES.map((p) =>
+        h(
+          'label',
+          { class: `level${s.priority === p.id ? ' is-on' : ''}` },
+          h('input', {
+            type: 'radio',
+            name: 'priority',
+            value: p.id,
+            checked: s.priority === p.id,
+            onchange: () => {
+              s.priority = p.id;
+              if (p.id === 'custom' && !s.sortCriteria.length) s.sortCriteria = DEFAULT_CRITERIA.map((c) => ({ ...c }));
+              renderPriority();
+              onEdit();
+            },
+          }),
+          h('span', { class: 'level-text' }, h('strong', null, p.label, p.id === 'balanced' ? h('span', { class: 'badge ok' }, 'conseillé') : null), h('span', { class: 'muted small' }, p.help)),
+        ),
+      ),
+    ),
+    s.priority === 'custom' ? criteriaEditor(s.sortCriteria, '') : null,
+    s.priority === 'formula'
+      ? h(
+          'div',
+          { class: 'formula-box' },
+          formula,
+          h('p', { class: 'muted small' }, `Variables : ${FORMULA_VARS.map((v) => `{${v.name}}`).join(' ')}. {prix_conseille} est ici le prix de départ calculé.`),
+        )
+      : null,
+    h('div', { class: 'toggles' }, settingToggle('duplicatesFirst', 'Doublons d\'abord', 'Les cartes que tu as en plus d\'exemplaires passent avant les autres ; la priorité départage le reste.')),
+  );
+}
+
+function prioritySection() {
+  ui.priority = h('div');
+  renderPriority();
+  return section(
+    'priorite',
+    'Ordre de priorité',
+    'Quelle carte est proposée en premier quand un slot se libère. « Suivant » dans la popup passe aux cartes suivantes.',
+    [ui.priority],
+    { errKey: 'priority' },
+  );
+}
+
+/** Cache des prix lus via l'API (pour l'aperçu) ; null tant qu'il n'est pas chargé ou s'il est vide. */
+let cardPrices: Record<string, CatalogPriceEntry & RateEntry> | null = null;
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Aperçu des prochaines ventes avec les réglages en cours (recalculé peu après chaque saisie). */
+function refreshPreview(): void {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(drawPreview, 150);
+}
+
+function drawPreview(): void {
+  if (!ui.preview?.isConnected && !ui.preview) return;
+  if (errors.length) return mount(ui.preview, h('p', { class: 'muted small' }, 'Corrige les erreurs pour voir l\'aperçu.'));
+  const result = allocate(
+    {
+      rules,
+      settings: { ...settings, slots: Math.max(settings.slots, 1) },
+      cards: store.cards,
+      priceObs: store.priceObs,
+      myAuctions: [],
+      manualPrices,
+      slotOverrides: {},
+      ignoredSlots: [],
+      myFamilies: store.myFamilies,
+      catalogPrice: catalogPriceOf(cardPrices),
+      sellRate: sellRateOfCache(cardPrices),
+    },
+    Date.now(),
+  );
+  const shown = result.free.filter((f) => f.proposal);
+  const count = Object.keys(store.cards).length;
+  mount(
+    ui.preview,
+    !count
+      ? h('p', { class: 'muted small' }, 'Ouvre ta collection sur le site pour voir l\'aperçu avec tes cartes.')
+      : shown.length
+        ? h(
+            'ol',
+            { class: 'preview' },
+            shown.map((f) =>
+              h(
+                'li',
+                null,
+                h('span', { class: `rarity ${f.proposal!.card.rarity ?? ''}` }),
+                h('strong', { class: 'grow ellipsis' }, f.proposal!.card.name),
+                h('span', { class: 'pill' }, f.rule.tag),
+                h('strong', { class: 'num' }, f.proposal!.pricing.price != null ? `${formatPrice(f.proposal!.pricing.price)} W` : '?'),
+                h('span', { class: 'muted small detail' }, f.proposal!.pricing.detail),
+              ),
+            ),
+          )
+        : h('p', { class: 'muted small' }, 'Aucune carte à proposer avec ces réglages.'),
+    result.pool ? h('p', { class: 'muted small' }, `${result.pool.size} carte(s) vendable(s) au total. Aperçu sans tes enchères en cours : ${settings.slots} slot(s) libres.`) : null,
+  );
+}
+
+function previewSection() {
+  ui.preview = h('div', { 'aria-live': 'polite' });
+  return section('apercu', 'Aperçu : tes prochaines ventes', 'Avec tes réglages actuels, voici les cartes que Wiki-Traders proposerait si tous tes slots étaient libres.', [ui.preview]);
+}
+
+// ---------------------------------------------------------------------------
+// Ventes : mode, jamais vendu, taux de vente
+// ---------------------------------------------------------------------------
 
 function slotsSection() {
   const s = settings;
@@ -943,33 +1348,49 @@ function slotsSection() {
   return section(
     'ventes',
     'Mes slots',
-    'Chaque étiquette du site réserve des slots d\'enchères. Ex. : 1 slot pour « 50-100 » et 4 pour « 20-50 » ; Wiki-Traders propose une carte de l\'étiquette pour chaque slot libre.',
+    null,
     [
       h(
         'div',
         { class: 'grid' },
         field('Nombre de slots', reg('slots', h('input', { type: 'number', min: '1', max: '50', value: s.slots, oninput: (e: Event) => ((s.slots = num((e.target as HTMLInputElement).value, 5)!), onEdit()) })), 'Enchères que tu peux avoir en même temps sur le site.'),
         field(
-          'Répartition des slots',
+          'Mode',
           h(
             'select',
             {
               onchange: (e: Event) => {
                 s.allocationMode = (e.target as HTMLSelectElement).value as Settings['allocationMode'];
                 onEdit();
+                render();
               },
             },
-            h('option', { value: 'quota', selected: s.allocationMode === 'quota' }, 'par étiquette (slots réservés)'),
-            h('option', { value: 'pool', selected: s.allocationMode === 'pool' }, 'meilleures cartes, toutes étiquettes'),
+            h('option', { value: 'pool', selected: s.allocationMode === 'pool' }, 'meilleures cartes (conseillé)'),
+            h('option', { value: 'quota', selected: s.allocationMode === 'quota' }, 'par étiquette'),
           ),
-          undefined,
-          'Meilleures cartes : pas de slots réservés ; les slots libres reçoivent les meilleures cartes de toutes tes étiquettes actives, et « Suivant » passe aux suivantes.',
+          pool() ? 'Les slots libres reçoivent tes meilleures cartes, réglées par paliers de prix.' : 'Chaque étiquette réserve ses slots et a son propre calcul.',
         ),
       ),
-      ui.quota,
-      ui.rules,
+      pool() ? null : [ui.quota, ui.rules],
     ],
     { errKey: 'rules' },
+  );
+}
+
+function protectSection() {
+  return section(
+    'protection',
+    'Jamais vendu',
+    'Ces cartes ne sont jamais proposées à la vente (tu peux toujours les vendre à la main). Les cartes en favori ★ sur le site sont toujours protégées.',
+    [
+      h(
+        'div',
+        { class: 'toggles' },
+        settingToggle('protectFamilies', 'Cartes de mes familles', 'Une carte d\'une de tes familles n\'est jamais proposée' + (pool() ? '.' : ', sauf pour une étiquette qui vise justement cette famille (Étiquettes → conditions).')),
+        settingToggle('allowDuplicateListing', 'Proposer une carte déjà en vente', 'Autorise à mettre en vente un autre exemplaire d\'une carte déjà aux enchères.'),
+      ),
+      blacklistBlock(),
+    ],
   );
 }
 
@@ -990,26 +1411,6 @@ function blacklistBlock() {
   );
 }
 
-function protectSection() {
-  return section(
-    'protection',
-    'Jamais vendu',
-    'Ces cartes ne sont jamais proposées à la vente (tu peux toujours les vendre à la main). Les cartes en favori ★ sur le site sont toujours protégées.',
-    [
-      h(
-        'div',
-        { class: 'toggles' },
-        settingToggle('protectFamilies', 'Cartes de mes familles', 'Une carte d\'une de tes familles n\'est jamais proposée, sauf pour une étiquette qui vise justement cette famille (Étiquettes → conditions).'),
-        settingToggle('allowDuplicateListing', 'Proposer une carte déjà en vente', 'Autorise à mettre en vente un autre exemplaire d\'une carte déjà aux enchères.'),
-      ),
-      blacklistBlock(),
-    ],
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Ventes : prix de départ
-// ---------------------------------------------------------------------------
 
 function refreshFallback(): void {
   const tags = rules.map((r) => r.tag.trim()).filter(Boolean);
@@ -1025,194 +1426,28 @@ function refreshFallback(): void {
   );
 }
 
-/** Critères de tri généraux, affichés seulement pour l'ordre « selon mes critères ». */
-function renderCriteria(): void {
-  mount(ui.criteria, settings.sortPrice === 'custom' ? [h('h3', null, 'Critères de tri'), criteriaEditor(settings.sortCriteria, '')] : null);
-}
-
-function pricingSection() {
-  const s = settings;
-  const set = <K extends keyof Settings>(key: K, parse: (v: string) => Settings[K]) => (e: Event) => {
-    s[key] = parse((e.target as HTMLInputElement).value);
-    onEdit();
-  };
-  ui.rounding = h('span', { class: 'muted small' });
-  ui.criteria = h('div');
-  renderCriteria();
-  ui.fallback = h('select', { onchange: set('fallbackTag', (v) => v || null) });
-  ui.fallbackKey = '';
-  refreshFallback();
-  return section(
-    'prix',
-    'Prix de départ',
-    'Le prix de départ conseillé = prix moyen de la carte × la mise de départ de son étiquette, ajusté par le taux de vente si tu l\'as réglé, puis arrondi.',
-    [
-      h(
-        'div',
-        { class: 'grid' },
-        field(
-          'Ordre des cartes proposées',
-          h(
-            'select',
-            {
-              onchange: (e: Event) => {
-                s.sortPrice = (e.target as HTMLSelectElement).value as Settings['sortPrice'];
-                if (s.sortPrice === 'random') s.randomSeed = Date.now() % 2_147_483_647;
-                if (s.sortPrice === 'custom' && !s.sortCriteria.length) s.sortCriteria = DEFAULT_CRITERIA.map((c) => ({ ...c }));
-                renderCriteria();
-                onEdit();
-              },
-            },
-            h('option', { value: 'desc', selected: s.sortPrice === 'desc' }, 'doublons, puis la plus chère'),
-            h('option', { value: 'asc', selected: s.sortPrice === 'asc' }, 'doublons, puis la moins chère (écouler)'),
-            h('option', { value: 'random', selected: s.sortPrice === 'random' }, 'doublons, puis au hasard'),
-            h('option', { value: 'custom', selected: s.sortPrice === 'custom' }, 'selon mes critères (tri multi-critères)'),
-          ),
-          'Quelle carte est proposée en premier pour un slot libre.',
-        ),
-        field(
-          'Arrondi (W)',
-          h('input', { type: 'number', min: '0', value: s.rounding, oninput: set('rounding', (v) => num(v, 0)!) }),
-          h('span', { class: 'small' }, h('span', { class: 'muted' }, '0 = automatique. '), ui.rounding),
-          'Pas d\'arrondi de la mise conseillée. Automatique : à l\'unité sous 20 W, à 5 sous 100, à 10 sous 1 000.',
-        ),
-      ),
-      ui.criteria,
-      fine(
-        'Réglages fins : calcul du prix moyen, étiquette de secours',
-        h(
-          'div',
-          { class: 'grid' },
-          field(
-            'Statistique',
-            h(
-              'select',
-              { onchange: set('stat', (v) => v as Settings['stat']) },
-              h('option', { value: 'median', selected: s.stat === 'median' }, 'médiane (conseillé)'),
-              h('option', { value: 'mean', selected: s.stat === 'mean' }, 'moyenne'),
-            ),
-            'Médiane : le prix du milieu des ventes, qu\'une vente exceptionnelle ne fausse pas.',
-          ),
-          field('Période observée (jours)', h('input', { type: 'number', min: '1', max: '90', value: s.windowDays, oninput: set('windowDays', (v) => num(v, 7)!) }), 'Seules les ventes de ces derniers jours comptent.'),
-          field('Étiquette de secours', ui.fallback, 'Quand une étiquette n\'a plus aucune carte à vendre, son slot reçoit une carte de celle-ci.'),
-        ),
-        h('div', { class: 'toggles' }, settingToggle('includeListings', 'Compter les enchères en cours dans le prix moyen', 'Par défaut, seules les ventes terminées comptent : une enchère en cours peut encore monter.')),
-      ),
-    ],
-    { errKey: 'pricing' },
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Ventes : taux de vente et durée
-// ---------------------------------------------------------------------------
-
-/** Éditeur de paliers de taux de vente ; `prefix` comme pour les paliers de durée. */
-function rateTiers(rows: SellRateRule[], prefix: string): HTMLElement {
-  const box = h('div');
-  const set = (i: number, key: 'from' | 'to' | 'pricePct', v: number | null) => {
-    rows[i] = { ...rows[i], [key]: key === 'pricePct' ? v ?? 100 : v };
-    onEdit();
-  };
-  const pct = (i: number, key: 'from' | 'to', placeholder: string) =>
-    reg(
-      `${prefix}tdv:${i}:${key}`,
-      h('input', { type: 'number', min: '0', max: '100', value: rows[i][key] ?? '', placeholder, 'aria-label': `Palier ${i + 1} : ${key === 'from' ? 'de' : 'à'}`, oninput: (e: Event) => set(i, key, num((e.target as HTMLInputElement).value)) }),
-    );
-  const draw = () => {
-    ui.rateExamples = ui.rateExamples.filter((x) => x.el.isConnected);
-    mount(
-      box,
-      rows.length
-        ? h(
-            'ol',
-            { class: 'tiers' },
-            rows.map((r, i) => {
-              const example = h('span', { class: 'muted small' }, rateTierExample(r.pricePct, settings.rounding));
-              ui.rateExamples.push({ el: example, row: () => rows[i] });
-              return h(
-                'li',
-                { class: 'row tier' },
-                h('span', { class: 'muted small tier-num' }, `Palier ${i + 1}`),
-                'Taux de vente de',
-                pct(i, 'from', '0'),
-                'à',
-                pct(i, 'to', '100'),
-                '% → départ à',
-                reg(`${prefix}tdv:${i}:pricePct`, h('input', { type: 'number', min: '1', max: '500', step: '5', value: r.pricePct, 'aria-label': `Palier ${i + 1} : % du prix`, oninput: (e: Event) => set(i, 'pricePct', num((e.target as HTMLInputElement).value, 100)) })),
-                '% du prix conseillé',
-                example,
-                h(
-                  'button',
-                  { type: 'button', class: 'danger', title: 'Supprimer ce palier', 'aria-label': `Supprimer le palier ${i + 1}`, onclick: () => (rows.splice(i, 1), draw(), onEdit()) },
-                  '✕',
-                ),
-              );
-            }),
-          )
-        : null,
-      h(
-        'div',
-        { class: 'row wrap', style: 'margin-top:8px' },
-        h('button', { type: 'button', onclick: () => (rows.push({ from: null, to: null, pricePct: 100 }), draw(), onEdit()) }, '+ Ajouter un palier'),
-        h(
-          'button',
-          {
-            type: 'button',
-            title: DEFAULT_RATE_TIERS.map(tierText).join(' · '),
-            onclick: () => {
-              if (rows.length && !confirm(`Remplacer tes paliers par la proposition par défaut ?\n\n${DEFAULT_RATE_TIERS.map(tierText).join('\n')}`)) return;
-              rows.splice(0, rows.length, ...DEFAULT_RATE_TIERS.map((t) => ({ ...t })));
-              draw();
-              onEdit();
-            },
-          },
-          'Proposition par défaut',
-        ),
-      ),
-    );
-  };
-  draw();
-  return box;
-}
-
-function renderRateTiers(): void {
-  mount(ui.rateTiers, rateTiers(settings.sellRateRules, ''));
-}
-
-function tierText(r: SellRateRule): string {
-  return `taux de vente ${r.from ?? 0}–${r.to ?? 100} % → ${pricePctLabel(r.pricePct)}`;
-}
 
 function sellRateSection() {
-  ui.rateTiers = h('div');
-  renderRateTiers();
   const s = settings;
   return section(
     'tdv',
     'Taux de vente',
-    'Le taux de vente d\'une carte, c\'est la part de ses enchères terminées qui ont trouvé un acheteur (affiché « 17 / 20 vendues » sur tes cartes). Sur trop peu d\'enchères, il ne veut rien dire : il est alors ignoré partout (minimum, paliers, conditions, tri).',
+    'Le taux de vente d\'une carte, c\'est la part de ses enchères terminées qui ont trouvé un acheteur (« 17 / 20 vendues » sur tes cartes). Le calcul simple en tient compte selon le nombre d\'enchères ; ici, les seuils pour le reste.',
     [
       h(
         'div',
         { class: 'grid' },
         field(
-          'Compter à partir de (enchères terminées)',
+          'Fiable à partir de (enchères terminées)',
           reg('sellRateMinSamples', h('input', { type: 'number', min: '1', max: '1000', value: s.sellRateMinSamples, oninput: (e: Event) => ((s.sellRateMinSamples = num((e.target as HTMLInputElement).value, 5)!), onEdit()) })),
-          'Ex. 5 : une carte vendue 1 fois sur 2 enchères n\'a pas de taux de vente pris en compte.',
+          'Pour le minimum ci-contre, la priorité « vendre vite », les conditions des étiquettes et {tdv_fiable}.',
         ),
         field(
           'Taux de vente minimum (%)',
           reg('minSellRate', h('input', { type: 'number', min: '0', max: '100', value: s.minSellRate ?? '', placeholder: 'aucun', oninput: (e: Event) => ((s.minSellRate = num((e.target as HTMLInputElement).value)), onEdit()) })),
-          'Une carte sous ce taux n\'est plus proposée. Vide = aucun minimum.',
+          'Une carte sous ce taux (fiable) n\'est plus proposée. Vide = aucun minimum.',
         ),
       ),
-      h(
-        'div',
-        { class: 'toggles' },
-        settingToggle('sellRateTiersOn', 'Ajuster le prix selon le taux de vente', 'Une carte qui part toute seule peut partir plus haut, une carte qui ne se vend pas doit baisser. 100 % = prix inchangé, 50 % = moitié prix. Le premier palier qui correspond l\'emporte.'),
-      ),
-      h('div', { class: 'rate-tiers' }, ui.rateTiers),
     ],
     { errKey: 'sellRate' },
   );
@@ -1238,6 +1473,7 @@ function durationsSection() {
     { errKey: 'durations' },
   );
 }
+
 
 /** Éditeur de paliers de durée ; `prefix` : préfixe des champs (« » global, « rule:<id>: » par étiquette). */
 function durationTiers(rows: DurationRule[], prefix: string): HTMLElement {
@@ -1360,7 +1596,9 @@ function sellHelpSection() {
 }
 
 function salesPanel() {
-  return panel('ventes', slotsSection(), protectSection(), pricingSection(), sellRateSection(), durationsSection(), sellHelpSection());
+  return pool()
+    ? panel('ventes', slotsSection(), saleFilterSection(), calcSection(), tiersSection(), prioritySection(), previewSection(), protectSection(), sellRateSection(), durationsSection(), sellHelpSection())
+    : panel('ventes', slotsSection(), calcSection(), prioritySection(), previewSection(), protectSection(), sellRateSection(), durationsSection(), sellHelpSection());
 }
 
 // ---------------------------------------------------------------------------
@@ -1402,7 +1640,9 @@ function tagCard(rule: TagRule) {
         'W',
         hint('Prix moyen des cartes de l\'étiquette. Ne change pas le prix conseillé.'),
       ),
-      h(
+      pool()
+        ? null
+        : h(
         'label',
         { class: 'inline' },
         'Pour les ventes, prendre les',
@@ -1475,7 +1715,7 @@ function tagRulesSection() {
     [
       'Ici, tu décides quelles cartes vont dans chaque étiquette : une plage de prix (ex. « 20-50 » = cartes entre 20 et 50 W) et, si tu veux, des conditions. ',
       h('strong', null, 'Ça sert à l\'étiquetage automatique'),
-      ' ; les slots et les prix se règlent dans Ventes.',
+      pool() ? ' ; les ventes, elles, se règlent par paliers de prix dans Ventes.' : ' ; les slots et les prix se règlent dans Ventes.',
     ],
     [ui.tagRules],
     { errKey: 'rules' },
@@ -1811,16 +2051,16 @@ function refreshLive(): void {
   refreshTiers();
   refreshFallback();
   ui.rounding.textContent = `ex. ${roundingExamples(settings.rounding)}`;
-  for (const [rule, el] of ui.pctExamples) el.textContent = pctExample(rule.pct, settings.rounding);
-  for (const x of ui.rateExamples) {
-    const row = x.row();
-    if (row) x.el.textContent = rateTierExample(row.pricePct, settings.rounding);
+  ui.calcExamples = ui.calcExamples.filter((x) => x.el.isConnected);
+  for (const x of ui.calcExamples) {
+    const c = x.calc();
+    x.el.textContent = c.mode === 'simple' ? simpleExamples(c) : '';
   }
   for (const n of ui.needs) n.el.hidden = settings[n.key];
   for (const d of ui.dependents) d.el.disabled = !d.enabled();
-  document.querySelector('.rate-tiers')?.classList.toggle('off', !settings.sellRateTiersOn);
   errors = validateOptions(rules, settings, { selectorsInvalid });
   showErrors();
+  refreshPreview();
 }
 
 function onEdit(): void {
@@ -1906,7 +2146,8 @@ function render(): void {
   ui.needs = [];
   ui.dependents = [];
   ui.risky = {};
-  ui.rateExamples = [];
+  ui.calcExamples = [];
+  ui.tierTitles = [];
   ui.tabs.clear();
   ui.errorBoxes = [];
   ui.status = h('span', { class: 'status muted', role: 'status', 'aria-live': 'polite' });
@@ -1941,6 +2182,11 @@ async function load(): Promise<void> {
   selectorsInvalid = false;
   baseline = snapshot({ rules, settings, manualPrices });
   undoPoint = null;
+  try {
+    cardPrices = ((await ext.storage.local.get(CARD_PRICES_KEY))[CARD_PRICES_KEY] as typeof cardPrices) ?? null;
+  } catch {
+    cardPrices = null;
+  }
   render();
   const anchor = location.hash.slice(1);
   if (anchor) {
