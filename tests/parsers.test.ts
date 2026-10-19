@@ -83,6 +83,16 @@ describe('parseCollection', () => {
     expect(byId['origami'].tags).toEqual(['50-100']);
   });
 
+  it('description sous le titre lue comme catégorie (conditions texte des règles), badges de l\'extension ignorés', () => {
+    document.body.innerHTML = `<main><div class="grid"><div class="glow-l relative rounded-2xl overflow-hidden">
+      <img alt="" src="/rarity/legendaire.webp"><div class="absolute top-0 left-0 right-0 h-[45%]"><div class="relative h-full w-full"><img alt="Quentin Dupieux" src="https://thumb.wikimedia.org/q.jpg"></div></div>
+      <div class="absolute top-2 left-2">L</div>
+      <div class="absolute top-[45%] left-0 right-0 bottom-0 flex flex-col p-3"><h3>Quentin Dupieux</h3><span data-wiky="avg">Moy. 720 W</span>
+        <p class="line-clamp-3 text-[9px]">réalisateur, scénariste et  musicien français</p></div></div></div></main>`;
+    const { cards } = parseCollection(document.body, cfg, [], NOW);
+    expect(cards.find((c) => c.name === 'Quentin Dupieux')?.category).toBe('réalisateur, scénariste et musicien français');
+  });
+
   it('ignore logo et avatar', () => {
     const { cards } = parseCollection(document.body, cfg, tags, NOW);
     expect(cards.map((c) => c.name)).not.toContain('Mon avatar');
