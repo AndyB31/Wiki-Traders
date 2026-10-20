@@ -55,7 +55,7 @@ function icon(name: string, size = 20): string {
  * `feature` : masquée si cette fonctionnalité est désactivée.
  */
 const ITEMS: { view: View; label: string; title: string; icon: string; page?: string; wide?: boolean; native?: boolean; feature?: FeatureKey }[] = [
-  { view: 'sell', label: 'Vendre', title: 'Slots à remplir', icon: 'tag' },
+  { view: 'sell', label: 'Vendre', title: 'Slots à remplir', icon: 'tag', wide: true },
   { view: 'running', label: 'Mes ventes', title: 'Mes ventes en cours', icon: 'hourglass' },
   { view: 'bids', label: 'Mes mises', title: 'Mes mises', icon: 'bid' },
   { view: 'cards', label: 'Cartes & prix', title: 'Cartes & prix', icon: 'layers', page: '/collection' },

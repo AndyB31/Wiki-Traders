@@ -120,3 +120,14 @@ button.tag-switch:disabled { opacity: .4; }
 .stat .up { color: var(--ok); }
 .stat .down { color: var(--danger); }
 .sale-tags { gap: 4px; }
+
+/* Fenêtre « Slots à remplir » du site (large) : fiches côte à côte, image plus grande. */
+@media (min-width: 640px) {
+  .embed .panel:has(> .sale-card) { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; align-items: start; }
+  .embed .panel:has(> .sale-card) > :not(.slot) { grid-column: 1 / -1; }
+  .embed .sale-body { grid-template-columns: 96px minmax(0, 1fr); }
+  .embed .sale-img { width: 96px; height: 128px; }
+  .embed .sale-card .actions { flex-wrap: wrap; }
+  .embed .sale-card .actions select { flex-basis: 100%; }
+  .embed .sale-card .detail.ellipsis { white-space: normal; overflow: visible; }
+}

@@ -24,6 +24,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-20',
+    title: 'Fenêtre « Slots à remplir » plus large',
+    sections: [
+      {
+        title: 'Vendre',
+        items: [
+          {
+            title: 'Plus de place pour chaque carte',
+            text: 'La fenêtre « Slots à remplir » s\'ouvre en grand : les fiches des cartes à vendre s\'affichent côte à côte, avec une image plus grande et le détail du prix en entier.',
+            where: 'Bloc Wiki-Traders de la barre latérale → Vendre.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-19f',
     title: 'Version 1.0 : des réglages plus simples',
     intro: 'Les réglages sont rangés par ce que tu veux faire, et non plus par niveau de risque. Rien de ce que tu avais réglé n\'est perdu.',
