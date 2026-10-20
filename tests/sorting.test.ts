@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { allocate } from '../src/lib/allocation';
-import { newTier } from '../src/lib/salecalc';
+import { newTier, sellChance } from '../src/lib/salecalc';
 import { rateOf, type SellRate } from '../src/lib/sellrate';
 import { criteriaSummary } from '../src/lib/sorting';
 import type { Card, Settings, SortCriterion, TagRule } from '../src/lib/types';
@@ -79,6 +79,17 @@ describe('mode « meilleures cartes »', () => {
     const sellRate = rates({ p: rate(1, 10), q: rate(9, 10) });
     expect(ids(run({ priority: 'balanced' }, 0, sellRate)).slice(0, 2)).toEqual(['q', 'a']);
     expect(ids(run({ priority: 'value' }, 0, sellRate)).slice(0, 2)).toEqual(['p', 'q']);
+  });
+
+  it('la chance de vente tient compte du nombre de ventes : 90 % sur 900 passe devant 100 % sur 1', () => {
+    expect(sellChance({ sold: 810, total: 900 })).toBeGreaterThan(0.87);
+    expect(sellChance({ sold: 1, total: 1 })).toBeLessThan(0.35);
+    expect(sellChance(null)).toBeLessThan(sellChance({ sold: 1, total: 1 }));
+    const two = cardsById(c('vol', 'T', 40), c('one', 'T', 40));
+    const order = (priority: Settings['priority']) =>
+      allocate(input({ cards: two, sellRate: rates({ vol: rate(810, 900), one: rate(1, 1) }), settings: settings({ allocationMode: 'pool', keepMin: 0, priority, slots: 2 }) }), NOW).free.map((f) => f.proposal?.card.id);
+    expect(order('balanced')).toEqual(['vol', 'one']);
+    expect(order('fast')).toEqual(['vol', 'one']);
   });
 
   it('les quotas des étiquettes ne bloquent pas l\'enregistrement en mode meilleures cartes', () => {

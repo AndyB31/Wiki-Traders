@@ -2,7 +2,7 @@ import { MIN_RARITY_SAMPLES, MIN_SALES } from './defaults';
 import { durationFor } from './duration';
 import type { FamilyIndex } from './families';
 import { evalFormula } from './formula';
-import { clampPrice, confidence, effectiveCalc, rateBonus, simplePrice } from './salecalc';
+import { clampPrice, confidence, effectiveCalc, rateBonus, sellChance, simplePrice } from './salecalc';
 import { reliableRate, type SellRate } from './sellrate';
 import { RARITIES } from './text';
 import type { Card, PriceCalc, PriceObs, Settings, TagRule } from './types';
@@ -221,6 +221,7 @@ export function cardVars(card: Card, ctx: PricingContext, base: number | null, e
     prix: base,
     tdv: rate?.total ? rate.pct : 50,
     confiance: confidence(rate, extra.trustSales),
+    chance: sellChance(rate),
     tdv_fiable: reliableRate(rate, ctx.settings.sellRateMinSamples) ? 1 : 0,
     ventes: rate?.sold ?? 0,
     encheres: rate?.total ?? 0,

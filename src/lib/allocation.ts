@@ -221,6 +221,8 @@ export function criterionValue(c: Candidate, key: SortCriterion['key'], ctx: Pri
       return c.pricing.base.value;
     case 'tdv':
       return reliableRate(rate, ctx.settings.sellRateMinSamples)?.pct ?? null;
+    case 'chance':
+      return Math.round(sellChance(rate) * 1000) / 10;
     case 'ventes':
       return rate?.sold ?? null;
     case 'encheres':
@@ -240,7 +242,7 @@ export function priorityScore(c: Candidate, priority: Priority, ctx: PricingCont
   const rate = ctx.sellRate?.(c.card) ?? null;
   switch (priority) {
     case 'balanced':
-      return price == null ? null : price * sellChance(rate, ctx.settings.defaultCalc.trustSales);
+      return price == null ? null : price * sellChance(rate);
     case 'value':
       return price;
     case 'formula':
@@ -252,7 +254,7 @@ export function priorityScore(c: Candidate, priority: Priority, ctx: PricingCont
 
 /** Critères équivalents aux priorités « vendre vite » et « écouler ». */
 const PRIORITY_CRITERIA: Partial<Record<Priority, SortCriterion[]>> = {
-  fast: [{ key: 'tdv', dir: 'desc' }, { key: 'prix', dir: 'desc' }],
+  fast: [{ key: 'chance', dir: 'desc' }, { key: 'prix', dir: 'desc' }],
   clear: [{ key: 'doublons', dir: 'desc' }, { key: 'prix', dir: 'asc' }],
 };
 

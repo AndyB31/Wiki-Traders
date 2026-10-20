@@ -300,17 +300,45 @@ function freeSlotView(slot: FreeSlot) {
           h('span', { class: 'muted small' }, 'prix moyen à saisir'),
         );
 
+  const cached = p.card.siteId ? (catalogPrices?.[p.card.siteId] as CachedPrice | undefined) : undefined;
+  const rate = rateOf(cached);
+  const mean = p.card.siteId ? catalogPriceOf(catalogPrices)(p.card) : undefined;
+  const minSamples = store.settings.sellRateMinSamples;
+  const rateClass = !rate ? '' : rate.total < minSamples ? 'muted' : rate.pct <= 15 ? 'down' : rate.pct >= 70 ? 'up' : '';
+  const stat = (label: string, value: Node | string, title?: string) => h('div', { class: 'stat', title }, h('span', { class: 'muted small' }, label), h('strong', null, value));
+  const doubles = Math.max(0, p.card.quantity - 1);
   return h(
     'div',
-    { class: 'slot free card' },
+    { class: 'slot free card sale-card' },
     header,
     h(
       'div',
-      { class: 'row main' },
-      rarityDot(p.card.rarity),
-      h('strong', { class: 'grow ellipsis', title: p.card.name }, p.card.name),
-      h('span', { class: 'muted small' }, `×${p.card.quantity}`),
-      priceBlock,
+      { class: 'sale-body' },
+      cardImage(p.card),
+      h(
+        'div',
+        { class: 'sale-info' },
+        h('div', { class: 'row main' }, rarityDot(p.card.rarity), h('strong', { class: 'grow sale-title', title: p.card.name }, `${p.card.name}${p.card.shiny ? ' ✨' : ''}`), priceBlock),
+        h(
+          'div',
+          { class: 'muted small sale-sub' },
+          [p.card.category, p.card.rarity ? RARITIES[p.card.rarity].label : null, `×${p.card.quantity}${doubles ? ` (${doubles} doublon${doubles > 1 ? 's' : ''})` : ''}`].filter(Boolean).join(' · '),
+        ),
+        h(
+          'div',
+          { class: 'stats' },
+          stat('Prix moyen', mean != null ? `${formatPrice(mean)} W` : p.pricing.base.value != null ? `${formatPrice(p.pricing.base.value)} W` : '—', 'Moyenne des ventes de la carte dans sa rareté'),
+          stat(
+            'Taux de vente',
+            rate ? h('span', { class: rateClass }, `${rate.pct} %`) : '—',
+            rate ? `${rate.sold} vendue(s) sur ${rate.total} enchère(s) terminée(s)${rate.total < minSamples ? ` : moins de ${minSamples}, peu fiable` : ''}` : 'Pas encore lu',
+          ),
+          stat('Ventes', rate ? h('span', null, h('span', { class: 'up' }, String(rate.sold)), ` / ${rate.total}`) : cached ? String(cached.count) : '—', 'Enchères conclues / enchères terminées'),
+          stat('Médiane', cached?.median != null ? `${formatPrice(cached.median)} W` : '—', cached?.min != null && cached.max != null ? `min ${formatPrice(cached.min)} W · max ${formatPrice(cached.max)} W` : undefined),
+          stat('Durée', p.pricing.durationMin != null ? durationLabel(p.pricing.durationMin) : 'du site'),
+        ),
+        p.card.tags.some((t) => t !== slot.rule.tag) ? h('div', { class: 'row wrap sale-tags' }, p.card.tags.filter((t) => t !== slot.rule.tag).map((t) => h('span', { class: 'pill muted' }, t))) : null,
+      ),
     ),
     slotDetail(slot),
     h(
@@ -326,6 +354,51 @@ function freeSlotView(slot: FreeSlot) {
       slot.candidates.length > 1 ? select : null,
     ),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Images des cartes (catalogue du site, demandées au site pour les seules cartes affichées)
+// ---------------------------------------------------------------------------
+
+const IMAGES_KEY = 'wiky-card-images';
+let images: Record<string, string | null> = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(IMAGES_KEY) ?? '{}') as Record<string, string | null>;
+  } catch {
+    return {};
+  }
+})();
+const imagesAsked = new Set<string>();
+
+function cardImage(card: Card) {
+  const url = card.siteId ? images[card.siteId] : null;
+  if (card.siteId && !(card.siteId in images)) wantImage(card.siteId);
+  return url
+    ? h('img', { class: 'sale-img', src: url, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' })
+    : h('div', { class: `sale-img placeholder ${card.rarity ?? ''}`, 'aria-hidden': 'true' }, card.name.slice(0, 1));
+}
+
+let imagesTimer: ReturnType<typeof setTimeout> | undefined;
+function wantImage(siteId: string): void {
+  if (imagesAsked.has(siteId) || !store.settings.apiRead) return;
+  imagesAsked.add(siteId);
+  clearTimeout(imagesTimer);
+  imagesTimer = setTimeout(() => void loadImages(), 50);
+}
+
+/** Une seule demande groupée pour toutes les cartes affichées sans image connue. */
+async function loadImages(): Promise<void> {
+  const ids = [...imagesAsked].filter((id) => !(id in images));
+  if (!ids.length || !(await siteTab())) return;
+  const res = (await sendToTab({ type: 'api', op: 'cardImages', ids })) as { ok: boolean; images?: Record<string, string | null> } | null;
+  if (!res?.ok || !res.images) return;
+  images = { ...images, ...res.images };
+  try {
+    localStorage.setItem(IMAGES_KEY, JSON.stringify(images));
+  } catch {
+    /* préférence d'affichage seulement */
+  }
+  render();
 }
 
 /** Justification du prix sur une ligne ; les explications se déplient avec « ? ». */
@@ -1345,7 +1418,8 @@ function render(): void {
   ];
   const current = panes.find((t) => t.id === currentTab) ?? panes[0];
   const top = tops.find((t) => t.id === TOP_OF[current.id]);
-  const openTop = (t: (typeof tops)[number]) => goTo(asTab(localStorage.getItem(`wiky-sub-${t.id}`)) ?? t.sub?.[0][0] ?? (t.id as PopupTab));
+  // Vue ouverte par un onglet : la dernière sous-vue choisie, sinon la première (l'onglet Historique ouvre la vue « sold »).
+  const openTop = (t: (typeof tops)[number]) => goTo(asTab(localStorage.getItem(`wiky-sub-${t.id}`)) ?? t.sub?.[0][0] ?? POPUP_TABS.find((p) => TOP_OF[p] === t.id)!);
 
   // Un seul onglet, dans une fenêtre ou une page du site : le résumé est déjà dans la barre latérale.
   if (view) {

@@ -10,6 +10,8 @@ Regroupe des cartes en **familles** (une série, un thème, un pays…), suis ta
 
 Menu **Wiki-Traders → Familles** dans la barre latérale (page `/collection?wiky=families`). Nécessite l'option *Intégration au site*.
 
+Tous les réglages des familles sont dans **Réglages → Familles** : les fonctionnalités *Familles* et *Familles sur les cartes*, l'étiquette posée sur chaque famille et la protection à la vente.
+
 ## Tes familles d'une autre extension
 
 Au premier lancement, toutes les familles enregistrées par l'autre extension sont **importées automatiquement** (cartes, couverture, une couleur chacune). Le bouton **Importer depuis une autre extension** fusionne à nouveau par nom, sans doublon. Ensuite, Wiki-Traders garde ses familles dans son propre stockage : l'autre extension peut être désactivée.
@@ -58,10 +60,20 @@ Le bouton **Famille** à côté du titre ajoute la carte ouverte à une famille.
 
 Option *Familles sur les cartes* : un point de couleur par famille, en bas à gauche de l'image, sur les cartes de la collection, de « Toutes les cartes » et du marché. Survol : noms des familles ; clic : ouvre la famille.
 
+## Une étiquette par famille
+
+Réglages → Familles → **Une étiquette par famille** : « Les cartes de **Films** reçoivent l'étiquette **Cinéma** ». C'est l'[étiquetage automatique](Etiquettes.md#étiquetage-automatique) qui pose l'étiquette (à la demande ou en continu). Avec *Retirer les autres étiquettes suivies*, une carte qui quitte la famille perd l'étiquette. Chaque ligne s'active ou se coupe sans être supprimée.
+
+Les anciennes conditions « Dans la famille » des étiquettes (avant la 1.0) ont été converties en lignes de ce type.
+
+## Jamais vendues
+
+Réglages → Familles → **Ne jamais vendre les cartes de mes familles** (activé par défaut) : une carte d'une de tes familles n'est jamais proposée à la vente ; tu peux toujours la vendre à la main. En mode de vente « par étiquette », l'étiquette posée sur une famille (ci-dessus) peut quand même vendre ses cartes.
+
 ## Marché des manquantes
 
 Dans une famille, **Marché des manquantes** liste les enchères en cours de chaque carte manquante (la moins chère d'abord, jusqu'à 4 par carte, ✨ brillantes), avec le prix, le temps restant et le total pour tout compléter au moins cher. Une seule requête pour 150 cartes.
 
 ## Sans la lecture via l'API
 
-La recherche dans le catalogue, les prix et le marché des manquantes demandent la *lecture via l'API* (Réglages → Automatisations) ; un message l'indique. L'ajout de tes propres cartes et l'import fonctionnent sans.
+La recherche dans le catalogue, les prix et le marché des manquantes demandent la *lecture via l'API* (Réglages → Accès au site) ; un message l'indique. L'ajout de tes propres cartes et l'import fonctionnent sans.

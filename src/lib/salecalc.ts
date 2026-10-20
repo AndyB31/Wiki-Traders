@@ -59,16 +59,23 @@ export function clampPrice(value: number, calc: Pick<PriceCalc, 'minPrice' | 'ma
   return v;
 }
 
-/** Chance de vente (0 à 1) pour la priorité équilibrée. */
-export function sellChance(rate: SellRate | null | undefined, trustSales: number): number {
-  if (!rate?.total) return 0.5;
-  return 0.5 + (rate.pct / 100 - 0.5) * confidence(rate, trustSales);
+/**
+ * Chance de vente (0 à 1) d'après l'historique : borne basse de Wilson (confiance ~80 %) du taux de vente, avec un
+ * a priori neutre (une vente et un invendu fictifs). Le nombre d'enchères compte autant que le taux : 900 ventes sur
+ * 1 000 (≈ 0,88) passent loin devant 1 sur 1 (≈ 0,33) ; une carte jamais mise en vente vaut ≈ 0,17.
+ */
+export function sellChance(rate: Pick<SellRate, 'sold' | 'total'> | null | undefined): number {
+  const n = (rate?.total ?? 0) + 2;
+  const p = ((rate?.sold ?? 0) + 1) / n;
+  const z = 1.28;
+  const z2 = z * z;
+  return (p + z2 / (2 * n) - z * Math.sqrt((p * (1 - p) + z2 / (4 * n)) / n)) / (1 + z2 / n);
 }
 
 export const PRIORITIES: { id: Priority; label: string; help: string }[] = [
-  { id: 'balanced', label: 'Équilibrée', help: 'Ce qui rapporte le plus en moyenne : prix de départ × chance de vente.' },
+  { id: 'balanced', label: 'Équilibrée', help: 'Ce qui rapporte le plus en moyenne : prix de départ × chance de vente. La chance tient compte du nombre de ventes : 90 % sur 900 ventes passe devant 100 % sur 1 vente.' },
   { id: 'value', label: 'Rapporter le plus', help: 'Le prix de départ le plus haut d\'abord.' },
-  { id: 'fast', label: 'Vendre vite', help: 'Le meilleur taux de vente d\'abord, puis le prix le plus haut.' },
+  { id: 'fast', label: 'Vendre vite', help: 'La meilleure chance de vente d\'abord (taux de vente et nombre de ventes), puis le prix le plus haut.' },
   { id: 'clear', label: 'Écouler', help: 'Le plus d\'exemplaires en trop d\'abord, puis le prix le plus bas.' },
   { id: 'custom', label: 'Mes critères', help: 'Tes critères, dans l\'ordre (chacun départage les égalités du précédent).' },
   { id: 'formula', label: 'Ma formule', help: 'Ta formule : le score le plus haut d\'abord.' },

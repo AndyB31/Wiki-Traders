@@ -1,6 +1,6 @@
 # Wiki-Traders
 
-Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : l'extension garde tes slots d'enchères remplis selon tes règles, calcule le bon prix et la bonne durée… et te laisse cliquer.
+Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : l'extension garde tes slots d'enchères remplis avec tes meilleures cartes, calcule le bon prix et la bonne durée… et te laisse cliquer. Documentation de la **version 1.0.0**.
 
 ![Wiki-Traders dans WikiMasters](../screenshots/site-sidebar.png)
 
@@ -15,13 +15,13 @@ Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : l'extens
 | Page | Contenu |
 | --- | --- |
 | [Fonctionnalités](Fonctionnalites.md) | Prix sur les cartes, classement, paquets, échanges, mises… |
-| [Familles](Familles.md) | Regrouper des cartes, ajout par sélection multiple, progression, marché des manquantes |
+| [Familles](Familles.md) | Regrouper des cartes, ajout par sélection multiple, progression, une étiquette par famille, marché des manquantes |
 | [Intégration au site](Integration-au-site.md) | Barre latérale compacte, bloc Wiki-Traders, fenêtres, pages, onglet Paramètres |
-| [Vendre](Vendre.md) | Slots, cartes proposées, prix et durée conseillés, fenêtre de vente, Mode enchère |
-| [Prix conseillé](Prix-conseille.md) | D'où vient le prix de référence, comment le % et l'arrondi s'appliquent |
+| [Vendre](Vendre.md) | Slots, meilleures cartes ou par étiquette, paliers de prix, ordre de priorité, fenêtre de vente, Mode enchère |
+| [Prix conseillé](Prix-conseille.md) | D'où vient le prix de référence, calcul simple ou avancé, taux de vente, minimum et arrondi |
 | [Mises et ventes](Mises-et-ventes.md) | Mes mises, ventes en cours, ventes conclues, journal |
-| [Étiquettes](Etiquettes.md) | Règles par étiquette, pastilles sur les cartes, étiquetage automatique |
-| [Référence des réglages](Reglages.md) | Chaque option, sa valeur par défaut et son effet |
+| [Étiquettes](Etiquettes.md) | Plages de prix et conditions, pastilles sur les cartes, étiquetage automatique (à la demande ou en continu) |
+| [Référence des réglages](Reglages.md) | Les 7 onglets des réglages, chaque option et sa valeur par défaut |
 | [Automatisations et risques](Automatisations-et-risques.md) | Ce que font les options facultatives, et pourquoi elles sont risquées |
 | [Dépannage](Depannage.md) | Problèmes courants, diagnostic, FAQ |
 | [Développement](Developpement.md) | Construire, tester, contribuer |

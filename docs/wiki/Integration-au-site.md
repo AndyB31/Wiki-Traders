@@ -52,7 +52,7 @@ Juste au-dessus de *Paramètres* :
 | Vendre | fenêtre (clic sur le récapitulatif) | Les slots à remplir : carte, prix, durée — voir [Vendre](Vendre.md) |
 | Familles | page | Voir [Familles](Familles.md) |
 | Cartes & prix | page | Ta collection par famille, étiquette, catégorie ou rareté, et les enchères en cours de chaque carte |
-| Étiquettes | fenêtre (bouton à côté de « Plus chères » sur la collection) | Étiquetage automatique — voir [Étiquettes](Etiquettes.md) |
+| Étiquettes | fenêtre (bouton à côté de « Plus chères » sur la collection) | Étiquetage automatique à la demande — voir [Étiquettes](Etiquettes.md) |
 | Outils | fenêtre | Relire la page, diagnostic, journal, bilan des prix |
 | Nouveautés | fenêtre | S'ouvre une fois après chaque mise à jour : les nouveautés expliquées, où les trouver et lesquelles sont à activer. Rouvrable ici ou depuis les Outils. |
 | Réglages Wiki-Traders | page | L'onglet Wiki-Traders de *Paramètres* |
@@ -63,9 +63,22 @@ Les **fenêtres** s'affichent par-dessus la page en cours (Échap ou clic à cô
 
 ## L'onglet Wiki-Traders dans Paramètres
 
-Sur la page *Paramètres* du site, un onglet **Wiki-Traders** ouvre tous les réglages de l'extension, aux couleurs du site. L'onglet **Général** ramène aux réglages du site.
+Sur la page *Paramètres* du site, un onglet **Wiki-Traders** ouvre tous les réglages de l'extension, aux couleurs du site, rangés en onglets (Accueil, Ventes, Étiquettes, Familles, Sur le site, Accès au site, Avancé ; voir [Référence des réglages](Reglages.md)). L'onglet **Général** ramène aux réglages du site. Un lien vers une ancienne section (ex. « Mise à jour disponible ») ouvre le bon onglet.
 
 ![Réglages dans Paramètres](../screenshots/site-settings.png)
+
+## La popup
+
+Hors intégration (ou depuis l'icône ailleurs que sur le site), la popup reprend les mêmes pages en **4 onglets** :
+
+| Onglet | Contenu |
+| --- | --- |
+| Vendre | Les slots à remplir |
+| Enchères | **Mes ventes** (en cours) et **Mes mises** |
+| Historique | Tes ventes terminées |
+| Cartes | **Cartes** (Cartes & prix) et **Étiquetage** (automatique) |
+
+**Outils** (🧰) et **Nouveautés** (🎉) sont dans l'en-tête, à côté de ⚙️ Réglages. L'actualisation automatique garde ta position dans la page.
 
 ## L'icône de l'extension
 
@@ -76,7 +89,8 @@ Sur WikiMasters, l'icône ouvre ou ferme la fenêtre **Vendre**. Ailleurs, elle 
 Les messages de l'extension s'affichent en bas à droite, dans le style du site :
 
 - **Prix conseillé** quand tu ouvres la fenêtre de vente d'une carte (avec un bouton *Copier*) ;
-- **Progression** des automatisations (barre, étapes, bouton *Arrêter*) ; un résumé réussi disparaît après 10 s, une erreur reste affichée.
+- **Progression** des automatisations (barre, étapes, bouton *Arrêter*) ; un résumé réussi disparaît après 10 s, une erreur reste affichée ;
+- **Étiquetage automatique** en continu : les cartes étiquetées à chaque passage.
 
 ## Sans l'intégration
 

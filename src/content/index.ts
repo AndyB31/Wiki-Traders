@@ -1,6 +1,6 @@
 import { ext } from '../lib/browser';
 import { catalogPrice, planAutoTags, type TagChange } from '../lib/autotag';
-import { cardPrices, flushPrices, knownCardPrice, knownCardRate, knownPrice } from './catalog';
+import { cardPrices, cardsByIds, flushPrices, knownCardPrice, knownCardRate, knownPrice } from './catalog';
 import type { SellRate } from '../lib/sellrate';
 import type { DiagnosticResult, ScanMessage, ScannedCard, ToBackground, ToContent } from '../lib/messages';
 // Seules les cartes de la collection sont envoyées comme « possédées » : jamais celles du marché.
@@ -665,6 +665,13 @@ async function autoTagPass(): Promise<void> {
   }
 }
 
+/** Images des cartes (fiches de la popup) : catalogue du site, en un lot, avec le cache du catalogue. */
+async function cardImages(ids: string[]): Promise<{ ok: boolean; error?: string; images?: Record<string, string | null> }> {
+  if (!store?.settings.apiRead) return { ok: false, error: 'Lecture via l\'API désactivée.' };
+  const cards = await cardsByIds(ids.slice(0, 50));
+  return { ok: true, images: Object.fromEntries(ids.map((id) => [id, cards.get(id)?.imageUrl ?? null])) };
+}
+
 async function runAutoTag(plan: TagChange[]): Promise<{ ok: number; failed: number }> {
   if (!store || automating) return { ok: 0, failed: 0 };
   automating = true;
@@ -979,7 +986,10 @@ async function main(): Promise<void> {
       return true;
     }
     if (message.type === 'api') {
-      const job = message.op === 'cardAuctions' ? runCardAuctions(message.siteCardId) : runApi(message.op, !!message.force);
+      const job =
+        message.op === 'cardAuctions' ? runCardAuctions(message.siteCardId) :
+        message.op === 'cardImages' ? cardImages(message.ids) :
+        runApi(message.op, !!message.force);
       void job.then(sendResponse, (e) => sendResponse({ ok: false, error: (e as Error).message }));
       return true;
     }

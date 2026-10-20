@@ -1,8 +1,8 @@
 # Wiki-Traders
 
-> Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : une extension navigateur qui garde tes slots d'enchères remplis selon tes règles, calcule le bon prix… et te laisse cliquer.
+> Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : une extension navigateur qui garde tes slots d'enchères remplis avec tes meilleures cartes, calcule le bon prix… et te laisse cliquer.
 
-![Version](https://img.shields.io/badge/version-0.6-orange)
+![Version](https://img.shields.io/badge/version-1.0.0-orange)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178c6)
 
@@ -38,8 +38,8 @@ Par défaut, Wiki-Traders fait **tout le travail de réflexion** (quel slot est 
 | --- | --- |
 | Lit tes enchères, ta collection et tes étiquettes | Ouvres le site |
 | Détecte les slots libres et l'heure de fin de chaque enchère | Cliques sur la notification |
-| Choisit la carte à vendre selon ta répartition | Valides ou changes la carte proposée |
-| Calcule le prix (prix de référence × % de l'étiquette) | Cliques sur « Mettre aux enchères » |
+| Choisit la carte à vendre selon ta priorité | Valides ou changes la carte proposée |
+| Calcule le prix (prix de référence × mise de départ, ajusté par le taux de vente) | Cliques sur « Mettre aux enchères » |
 
 Quelques options **facultatives et désactivées par défaut** (pré-remplissage, mode enchère, étiquetage automatique, surenchère en un clic, vente depuis le classement, ouverture des paquets, lecture de l'API) vont plus loin : elles demandent une confirmation et sont signalées comme contraires aux règles. Voir [Automatisations et risques](docs/wiki/Automatisations-et-risques.md).
 
@@ -48,14 +48,14 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 | | |
 | --- | --- |
 | **Intégré au site** | Barre latérale rangée en arborescence (Paquets en haut ; menus Collection, Marché, Social, Progression ; pages de l'extension à l'icône orange), **récapitulatif** toujours visible (slots occupés / libres, prochaine fin, gagnées / perdues sur 24 h, synchro) avec la liste des **mises en direct** relue toutes les 2 s, Paramètres tout en bas avec un onglet **Wiki-Traders**. |
-| **Vendre** | Slots par étiquette (quota, % du prix, plancher / plafond, exemplaires à garder, liste noire, favoris jamais proposés), prix et durée conseillés avec le détail du calcul. Dans Marché → **Mes ventes**, un clic sur un slot libre ouvre « Vendre » : carte proposée, autre carte, recherche ou **carte au hasard** d'une étiquette. **Mode enchère** sur la collection : un clic sur une carte ouvre sa mise en vente pré-remplie. |
+| **Vendre** | Par défaut, tes **meilleures cartes** (filtre « toutes sauf / seulement ces étiquettes », exemplaires gardés, liste noire, favoris et familles jamais proposés), réglées par **paliers de prix** : calcul simple (mise de départ ajustée par le taux de vente) ou formule libre, prix minimum, durée ; **ordre de priorité** (équilibrée = prix × chance de vente, rapporter le plus, vendre vite, écouler, critères, formule) et **aperçu** en direct. Ou slots **par étiquette**. Dans Marché → **Mes ventes**, un clic sur un slot libre ouvre « Vendre » : carte proposée, autre carte, recherche ou **carte au hasard**. **Mode enchère** sur la collection : un clic sur une carte ouvre sa mise en vente pré-remplie. |
 | **Marché enrichi** | Sur chaque enchère : **prix moyen de la carte et écart** (vert = bonne affaire). **Mes enchères** : tes mises, en cours ou historique. **Historique** : tes ventes, statistiques, filtres vendues / invendues, écart à la moyenne. |
 | **Page d'une enchère** | **Historique des prix** de la carte : chiffres clés (ventes, moyenne, médiane, extrêmes, tendance 30 j, taux de vente), graphique en **points, bougies ou ligne**, moyenne glissante de 2 j à 1 mois, filtre vendues / sans acheteur ; **autres enchères de la même carte**. |
 | **Prix comme le site** | « Moy. » = moyenne des 200 dernières ventes de la carte dans sa rareté, comme le site, suivie du **taux de vente** (rouge ≤ 15 %, vert ≥ 70 %) et, en bas de la carte, des ventes conclues sur enchères terminées (« 17 / 20 vendues ») ; prix de 150 cartes par requête, toutes les ventes lues (pagination), cache 6 h, bouton **↻ Rafraîchir les prix**. |
-| **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** (mode « Sélectionner » du site) ou recherche au fil de la frappe, marché des manquantes ; import depuis une autre extension. |
-| **Étiquettes** | Pastilles sur les cartes ; **étiquetage automatique** par plage de prix à partir du prix moyen de chaque carte (bouton **Étiquettes** sur la collection) ; option pour **remettre les étiquettes des invendues**. |
+| **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** (mode « Sélectionner » du site) ou recherche au fil de la frappe, marché des manquantes, **une étiquette par famille** ; import depuis une autre extension. |
+| **Étiquettes** | Pastilles sur les cartes ; **étiquetage automatique** par plage de prix, conditions et familles, **à la demande** (bouton **Étiquettes** sur la collection) ou **en continu** ; option pour **remettre les étiquettes des invendues**. |
 | **Échanges** | Valeur de chaque côté et **bilan pour toi** (« −500 W : tu donnes 600 W, tu reçois 100 W »), aperçus des cartes. |
-| **Et aussi** | Classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, récapitulatif et statistiques de paquets, son des notifications, journal des ventes, notifications de fin d'enchère. |
+| **Et aussi** | Classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, récapitulatif de paquets complet (prix, taux de vente, ventes) et statistiques, son des notifications, journal des ventes, notifications de fin d'enchère. |
 | **Mises à jour** | Vérification de la branche `main` (démarrage, toutes les 6 h) et **mise à jour en un clic** depuis les réglages. |
 
 | Barre latérale | Historique des prix | Marché |
@@ -126,30 +126,27 @@ Rien n'apparaît ? Voir [Dépannage](#dépannage).
 
 ### 5. Mettre à jour
 
-**En un clic** : installe une fois le programme d'aide (`make install` le propose, sinon `make updater`). Quand `main` a des nouveautés, le récapitulatif affiche **« ↑ Mise à jour disponible »** ; Réglages → **Mises à jour** → **Mettre à jour** récupère la dernière version, reconstruit, recharge l'extension et les onglets WikiMasters.
+**En un clic** : installe une fois le programme d'aide (`make install` le propose, sinon `make updater`). Quand `main` a des nouveautés, le récapitulatif affiche **« ↑ Mise à jour disponible »** ; Réglages → Avancé → **Mises à jour** → **Mettre à jour** récupère la dernière version, reconstruit, recharge l'extension et les onglets WikiMasters.
 
-**À la main** : `make update` (ou `git pull && npm install && npm run build`). L'extension détecte la nouvelle version dans son dossier en moins d'une minute et **se recharge toute seule**, avec les onglets WikiMasters (ou tout de suite : Réglages → Mises à jour → **Recharger l'extension**). Tes réglages et données sont conservés.
+**À la main** : `make update` (ou `git pull && npm install && npm run build`). L'extension détecte la nouvelle version dans son dossier en moins d'une minute et **se recharge toute seule**, avec les onglets WikiMasters (ou tout de suite : Réglages → Avancé → Mises à jour → **Recharger l'extension**). Tes réglages et données sont conservés.
 
 **Sans le dépôt** : le dernier zip construit est publié à chaque mise à jour de `main` dans la release [« Dernière version »](https://github.com/AndyB31/Wiki-Traders/releases/tag/latest) : décompresse-le dans le **même dossier** qu'avant, puis ↻.
 
 ### 6. Désinstaller
 
-*Supprimer* dans la page des extensions. Pour effacer d'abord les données : Réglages → *Effacer toutes les données*.
+*Supprimer* dans la page des extensions. Pour effacer d'abord les données : Réglages → Avancé → *Effacer toutes les données*.
 
 ## Configuration pas à pas
 
-Les réglages sont dans **Paramètres → onglet Wiki-Traders** sur le site (ou clic droit sur l'icône → *Options*). La page commence par un **Démarrage rapide** qui coche ce qui est prêt et règle le reste en un clic ; chaque section s'explique avec un exemple. **Enregistrer** (ou Ctrl/⌘ + S) quand tu as fini.
+Les réglages sont dans **Paramètres → onglet Wiki-Traders** sur le site (ou clic droit sur l'icône → *Options*), en **7 onglets**. Tout est **enregistré automatiquement** (bouton **Annuler** en bas pour revenir en arrière). Tes réglages d'avant la 1.0 sont convertis automatiquement, avec les mêmes prix.
 
-1. **Règles par étiquette** : une ligne par étiquette de ta collection. Par défaut : 1 slot « 50-100 » et 4 slots « 20-50 », à **70 %** du prix de référence, en gardant 1 exemplaire. Les étiquettes trouvées dans ta collection s'ajoutent en un clic.
-2. **Nombre de slots** : le nombre d'enchères simultanées permises par le site (lu automatiquement dans « Mes ventes (2/5) »).
-3. **Prix** : statistique (*médiane* conseillée), fenêtre (7 jours), arrondi (automatique), ordre à doublons égaux, étiquette de secours.
-4. **Durée des enchères** : ajoute des paliers, ex. ≤ 20 → 10 min, 21–100 → 1 h, > 100 → 3 h.
-5. **Notifications** et **heures silencieuses** (23 h – 8 h par défaut).
-6. **Affichage sur le site** : intégration au site, barre latérale compacte, étiquettes sur les cartes (libellés ou pastilles).
-7. **Liste noire** et **prix saisis à la main** si besoin.
-8. **Fonctionnalités** : coche celles que tu veux (prix sur les cartes, familles, classement, paquets, échanges…) — voir [Fonctionnalités](docs/wiki/Fonctionnalites.md).
-9. **Automatisations** (facultatif, désactivé par défaut, voir l'avertissement) : **lecture via l'API** (nécessaire aux prix, familles, mises, marché…), pré-remplissage, étiquetage automatique.
-10. **Mises à jour** : version installée, nouveautés, bouton « Mettre à jour ».
+1. **Accueil** : le **démarrage rapide** coche ce qui est prêt et règle le reste en un clic ; un **profil** (Prudent, Confort, Complet) règle d'un coup ce que l'extension a le droit de faire.
+2. **Ventes** : nombre de slots (lu automatiquement dans « Mes ventes (2/5) ») et mode **meilleures cartes** (par défaut) ou **par étiquette** ; **quelles cartes vendre** ; **calcul du prix par défaut** (70 % du prix moyen, ajusté par le taux de vente, ou ta formule), prix minimum, arrondi ; **paliers de prix** ; **ordre de priorité** ; **aperçu** ; jamais vendu, taux de vente, **durée des enchères** (ex. ≤ 20 → 10 min, 21–100 → 1 h, > 100 → 3 h), aide à la vente.
+3. **Étiquettes** : plages de prix et conditions de l'étiquetage automatique, lancement **à la demande** ou **en continu**, étiquettes sur les cartes (libellés ou pastilles).
+4. **Familles** : fonctionnalités Familles, une étiquette par famille, ne jamais vendre les cartes de tes familles.
+5. **Sur le site** : intégration au site, barre latérale compacte, **fonctionnalités** (prix sur les cartes, classement, paquets, échanges… — voir [Fonctionnalités](docs/wiki/Fonctionnalites.md)), **notifications** et heures silencieuses (23 h – 8 h par défaut).
+6. **Accès au site** (facultatif, voir l'avertissement) : niveau **Aucun accès**, **Lecture** (API : prix, familles, mises, marché…) ou **Lecture et étiquettes**, et la liste des actions à ta place.
+7. **Avancé** : pages du site, sélecteurs, prix saisis à la main, données, **mises à jour**, sauvegarde.
 
 Enfin, **ouvre ta collection** puis l'onglet **Historique** du Marché une fois : l'extension apprend tes cartes et les prix réels.
 
@@ -162,34 +159,37 @@ Le détail de chaque option est dans la documentation : [Premiers pas](docs/wiki
 - **Marché → Parcourir** : la moyenne et l'écart sur chaque enchère montrent les bonnes affaires ; sur la page d'une enchère, l'**historique des prix** et les autres enchères de la carte.
 - Dans la fenêtre « Mettre aux enchères » du site, un **toast** rappelle le prix conseillé ; dessous, les enchères en cours de la même carte.
 - Sur la **collection** : **Mode enchère** (un clic sur une carte ouvre sa mise en vente), **Plus chères**, **Étiquettes**.
-- L'icône de l'extension ouvre ou ferme **Vendre** sur le site ; le **journal** (Outils → 📒) aide à ajuster tes pourcentages.
+- L'icône de l'extension ouvre ou ferme **Vendre** sur le site ; la popup a 4 onglets (Vendre, Enchères, Historique, Cartes) ; le **journal** (Outils → 📒) aide à ajuster ta mise de départ.
 
 Guide complet : [Vendre](docs/wiki/Vendre.md), [Mises et ventes](docs/wiki/Mises-et-ventes.md), [Intégration au site](docs/wiki/Integration-au-site.md).
 
 ## Référence des réglages
 
-| Réglage | Défaut | Description |
+| Onglet | Réglage | Défaut |
 | --- | --- | --- |
-| Nombre de slots | 5 | Enchères simultanées (mis à jour par le site) |
-| Fenêtre du prix moyen | 7 jours | Période des ventes prises en compte |
-| Statistique du prix conseillé | médiane | Résiste aux ventes énormes ; les badges « Moy. » affichent la moyenne de la carte, comme le site |
-| Arrondi | automatique | Unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà (ou pas fixe) |
-| À doublons égaux | prix le plus haut | Ou le plus bas (écouler), ou aléatoire |
-| Étiquette de secours | aucune | Reprend le slot d'une étiquette sans carte vendable |
-| Proposer une carte déjà en vente | non | |
-| Enchères en cours dans le prix moyen | non | Par défaut seules les ventes terminées comptent |
-| Durée des enchères | durée du site | Paliers prix → durée |
-| Notifications / heures silencieuses | oui / 23 h – 8 h | |
-| Intégration au site | oui | Barre latérale, fenêtres, pages, onglet Paramètres |
-| Barre latérale compacte | oui | Menus Social et Progression |
-| Étiquettes visibles sur les cartes | oui, libellés | Ou pastilles de couleur |
-| Fenêtre de vente : résumé du marché / liste des enchères / historique des prix | oui | Nécessite la lecture via l'API |
-| Lecture via l'API | **non** | Mises, ventes conclues, marché, ventes en cours relues chaque minute |
-| V4 – pré-remplissage (et Mode enchère) | **non** | Ouvre la vente, remplit prix et durée |
-| Étiquetage automatique / par l'API | **non** | Range les cartes par plage de prix |
-| Remettre les étiquettes des invendues | **non** | Nécessite l'étiquetage par l'API et un onglet du site ouvert |
-| Fonctionnalités | voir la page | Une case par fonctionnalité ; les automatisations sont désactivées par défaut |
-| Mises à jour | vérification automatique | Toutes les 6 h ; « Mettre à jour » nécessite le programme d'aide |
+| Accueil | Profil | Prudent (aucun accès au site) |
+| Ventes | Nombre de slots | 5 (mis à jour par le site) |
+| Ventes | Mode | meilleures cartes (ou par étiquette) |
+| Ventes | Quelles cartes vendre / exemplaires gardés | toutes / 1 |
+| Ventes | Calcul du prix par défaut | simple : 70 % du prix moyen, influence du taux de vente 50 %, 10 enchères pour être sûr ; sans minimum |
+| Ventes | Arrondi | automatique (unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà) |
+| Ventes | Statistique / période observée | médiane / 7 jours |
+| Ventes | Paliers de prix / slots réservés par palier | aucun / non |
+| Ventes | Ordre de priorité / doublons d'abord | équilibrée / oui |
+| Ventes | Proposer une carte déjà en vente | non |
+| Ventes | Taux de vente fiable à partir de / minimum | 5 enchères / aucun |
+| Ventes | Durée des enchères | durée du site (paliers mise → durée) |
+| Ventes | Fenêtre de vente : résumé du marché / enchères de la carte / historique des prix | oui (nécessite la lecture via l'API) |
+| Ventes | Pré-remplissage (et Mode enchère) | **non** |
+| Étiquettes | Étiquetage automatique / lancement | **non** / à la demande |
+| Étiquettes | Remettre les étiquettes des invendues | **non** (nécessite l'étiquetage par l'API) |
+| Étiquettes | Étiquettes visibles sur les cartes | oui, libellés (ou pastilles) |
+| Familles | Ne jamais vendre les cartes de mes familles | oui |
+| Sur le site | Intégration au site / barre latérale compacte | oui / oui |
+| Sur le site | Notifications / heures silencieuses | oui / 23 h – 8 h |
+| Sur le site | Fonctionnalités | voir la page ; les automatisations sont désactivées par défaut |
+| Accès au site | Niveau d'accès | **aucun** (lecture via l'API, étiquetage par l'API désactivés) |
+| Avancé | Mises à jour | vérification toutes les 6 h ; « Mettre à jour » nécessite le programme d'aide |
 
 Les réglages s'exportent et s'importent en JSON (Réglages → Avancé).
 
@@ -205,7 +205,7 @@ Les réglages s'exportent et s'importent en JSON (Réglages → Avancé).
 | Prix « — » ou faux | « ↻ Rafraîchir les prix » (Étiquettes, Plus chères, légende de la collection) ; « Jamais vendue » = aucune vente connue. |
 | Peu de cartes étiquetées | Active la lecture via l'API : l'étiquetage utilise alors le prix moyen de chaque carte (seules les cartes jamais vendues restent sans prix). |
 | « Mettre à jour » grisé | Installe le programme d'aide (`make updater`) puis recharge l'extension. « Dépôt introuvable » : le dépôt GitHub est privé. |
-| Page « non reconnue » | Outils → **Diagnostic** exporte la structure de la page ; ajuste Réglages → Données → *Sélecteurs avancés* ou ouvre une issue avec le fichier. |
+| Page « non reconnue » | Outils → **Diagnostic** exporte la structure de la page ; ajuste Réglages → Avancé → *Sélecteurs avancés* ou ouvre une issue avec le fichier. |
 
 Plus de cas : [Dépannage (documentation)](docs/wiki/Depannage.md).
 

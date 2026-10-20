@@ -7,7 +7,7 @@ Le menu **Marché** de la barre latérale ouvre directement les onglets du site,
 | Onglet | Ce que Wiki-Traders ajoute |
 | --- | --- |
 | **Parcourir** | Sur chaque enchère, sous son prix : la **moyenne de la carte** et l'**écart** du prix actuel — vert sous la moyenne (≥ 10 % moins cher : bonne affaire), rouge au-dessus, gris au prix ; « Jamais vendue » sans référence. Aussi dans les autres onglets du Marché. |
-| **Mes ventes** | Tes slots : les ventes du site et, à côté, une carte « Slot libre » par slot vide. Clic sur un slot libre : **Vendre** intégré (carte proposée, autre carte du slot, recherche, **carte au hasard** d'une étiquette, prix et durée modifiables). Avec l'option *Vendre depuis le classement*, mise en vente directe après confirmation ; sinon la carte s'ouvre avec prix et durée pré-remplis. |
+| **Mes ventes** | Tes slots : les ventes du site et, à côté, une carte « Slot libre » par slot vide. Clic sur un slot libre : **Vendre** intégré (carte proposée, autre carte du slot, recherche, **carte au hasard** d'un palier ou d'une étiquette, prix et durée modifiables). Avec l'option *Vendre depuis le classement*, mise en vente directe après confirmation ; sinon la carte s'ouvre avec prix et durée pré-remplis. |
 | **Mes enchères** | Tes mises avec filtres **En cours / Historique / Toutes**, statut, ta mise, prix actuel ou final, temps restant, prix de la carte et écart ; relues à l'ouverture de l'onglet |
 | **Historique** | Tes ventes terminées : statistiques en haut (vendues, invendues, taux de vente, total encaissé, gain moyen, écart moyen au prix de la carte, meilleure vente), filtres **Toutes / Vendues / Invendues**, recherche, tri ; pour chaque vente le prix de départ, le prix final, la moyenne de la carte et l'écart. « Liste du site » réaffiche la liste d'origine. |
 
@@ -32,7 +32,7 @@ Sous l'historique des mises, la section **Historique des prix** (dépliable, ét
 
 ## Mes ventes en cours
 
-Fenêtre **Mes ventes** : chaque enchère avec sa carte, sa règle, son prix actuel et le temps restant.
+Popup → **Enchères → Mes ventes** (ou fenêtre **Mes ventes**) : chaque enchère avec sa carte, son palier ou son étiquette, son prix actuel et le temps restant.
 
 Elles sont relues :
 
@@ -44,7 +44,7 @@ Une vente qui disparaît de la liste est comptée comme terminée (journal, prix
 
 ## Mes mises
 
-*Nécessite la lecture via l'API.* Fenêtre **Mes mises** : les enchères des autres joueurs où tu as misé.
+*Nécessite la lecture via l'API.* Popup → **Enchères → Mes mises** (ou fenêtre **Mes mises**) : les enchères des autres joueurs où tu as misé.
 
 | Statut | Sens |
 | --- | --- |
@@ -61,7 +61,7 @@ Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant e
 
 ## Ventes conclues
 
-*Nécessite la lecture via l'API.* Page **Ventes conclues** : tes ventes terminées, avec :
+*Nécessite la lecture via l'API.* Popup → **Historique** (page **Ventes conclues**) : tes ventes terminées, avec :
 
 - le prix de départ et le prix final (gain en %) ;
 - l'écart au **prix de la carte** (médiane de ses autres ventes) ou à la médiane de sa rareté ;
@@ -71,10 +71,10 @@ Pour chaque mise : ta mise maximale, le prix actuel ou final, le temps restant e
 
 ## Cartes & prix
 
-Page **Cartes & prix** : ta collection groupée par **famille**, **étiquette**, **catégorie** ou **rareté**, avec recherche. Un clic sur une carte affiche ses **enchères en cours**, de la moins chère à la plus chère (*Ouvrir* mène à la moins chère). Les cartes manquantes d'une famille apparaissent en premier.
+Popup → **Cartes** (page **Cartes & prix**) : ta collection groupée par **famille**, **étiquette**, **catégorie** ou **rareté**, avec recherche. Un clic sur une carte affiche ses **enchères en cours**, de la moins chère à la plus chère (*Ouvrir* mène à la moins chère). Les cartes manquantes d'une famille apparaissent en premier.
 
 ## Journal
 
-Outils → **📒 Journal** : toutes les ventes **proposées**, **créées** et **terminées**, avec par étiquette la part des ventes parties au prix de départ et un conseil pour ajuster ton %.
+Outils (🧰 dans l'en-tête de la popup) → **📒 Journal** : toutes les ventes **proposées**, **créées** et **terminées**, avec par palier ou étiquette la part des ventes parties au prix de départ et un conseil pour ajuster ta mise de départ.
 
 ![Journal](../screenshots/journal.png)
