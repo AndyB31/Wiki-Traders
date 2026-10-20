@@ -2,87 +2,86 @@
 
 # Référence des réglages
 
-Réglages : **Paramètres → onglet Wiki-Traders** sur le site, ou page d'options de l'extension. La page commence par un **Démarrage rapide** (ce qui est prêt, ce qui manque, réglable en un clic) ; chaque section s'ouvre sur une explication avec un exemple, les « ? » détaillent chaque champ. **Enregistrer** (ou Ctrl/⌘ + S) n'est actif que s'il y a des modifications ; les erreurs s'affichent à côté du champ. Les réglages rares sont dans **Avancé**, replié.
+Réglages : **Paramètres → onglet Wiki-Traders** sur le site, ou page d'options de l'extension. Depuis la **version 1.0.0**, ils sont rangés en **7 onglets**, par ce que tu veux faire. Chaque section s'ouvre sur une explication avec un exemple, les « ? » détaillent chaque champ.
 
-## Règles par étiquette
+**Enregistrement automatique** : chaque modification est enregistrée aussitôt (Ctrl/⌘ + S force l'enregistrement). Le bandeau du bas affiche « ✓ Enregistré » avec un bouton **Annuler** qui revient à l'état d'avant tes dernières modifications. Une saisie invalide n'est pas enregistrée : l'erreur s'affiche à côté du champ.
 
-| Colonne | Défaut | Description |
-| --- | --- | --- |
-| Étiquette | `50-100`, `20-50` | Nom de l'étiquette du site |
-| Quota | 1, 4 | Slots réservés |
-| % du prix moyen | 70 % | Prix conseillé = référence × % |
-| Plancher / Plafond | 50–100, 20–50 | Plage de prix (étiquetage automatique, appartenance par prix) |
-| Garder | 1 | Exemplaires jamais proposés |
-| Appartenance | étiquette du site | Ou plage de prix moyen |
-| Active | oui | |
-| Conditions et vente | aucune / réglages globaux | Panneau sous la règle : conditions d'étiquetage (texte, famille, taux de vente) et réglages de vente propres (tdv minimum, ordre de choix ou formule de score, paliers de prix et de durée). Voir [Étiquettes](Etiquettes.md#conditions-et-vente-par-étiquette) |
+Tes réglages d'avant la 1.0 ont été convertis automatiquement pour donner les mêmes prix et le même ordre de vente.
 
-## Prix et notifications
+## Accueil
 
-| Réglage | Défaut | Description |
-| --- | --- | --- |
-| Nombre de slots | 5 | Enchères simultanées ; mis à jour par le site |
-| Fenêtre du prix moyen (jours) | 7 | Ventes prises en compte |
-| Statistique | médiane | Ou moyenne |
-| Arrondi | 0 (automatique) | Ou pas fixe |
-| Répartition des slots | par étiquette | Ou « meilleures cartes, toutes étiquettes » (quotas ignorés, bouton Suivant) |
-| Ordre des cartes proposées | doublons, puis la plus chère | La moins chère, au hasard, ou **selon mes critères** (tri multi-critères : prix, tdv, ventes, doublons, rareté…) |
-| Étiquette de secours | aucune | Reprend les slots d'une étiquette vide |
-| Proposer une carte déjà en vente | non | |
-| Compter les enchères en cours dans le prix moyen | non | |
-| Notifications | oui | Fin d'enchère, slot libéré |
-| Heures silencieuses | 23:00 – 08:00 | Pas de notification |
-| Intégration au site | oui | Voir [Intégration au site](Integration-au-site.md) |
-| Barre latérale compacte | oui | Menus Social et Progression |
-| Étiquettes visibles sur les cartes | oui | |
-| Style des étiquettes sur les cartes | libellés détaillés | Ou pastilles de couleur |
-| Page « mes enchères » | automatique | Chemin, ex. `/marketplace?tab=mine` |
-| Page ouverte par « Ouvrir » | `/collection` | |
+- **Démarrage rapide** : ce qui est prêt, ce qui manque, réglable en un clic.
+- **Profil** : règle d'un coup ce que Wiki-Traders a le droit de faire sur le site. Tu peux ensuite tout ajuster onglet par onglet.
 
-## Fonctionnalités
-
-Une case par fonctionnalité, par groupe (collection et familles, affichage des cartes, marché, paquets, échanges, automatisations) : voir [Fonctionnalités](Fonctionnalites.md). Les automatisations demandent une confirmation.
-
-## Durée des enchères
-
-Paliers **De – À → Durée** (10 min, 30 min, 1 h, 3 h, 6 h, 12 h). Le premier palier qui contient le prix l'emporte ; sans palier, la durée du site (1 h). Les paliers qui se chevauchent sont signalés.
-
-## Taux de vente
-
-| Réglage | Par défaut | Effet |
-| --- | --- | --- |
-| Taux de vente minimum | aucun | Une carte sous ce % n'est plus proposée pour un slot (à partir de 5 enchères terminées) |
-| Prix selon le taux de vente | aucun palier | Paliers **Tdv de – à % → prix ± %** ; « Proposition par défaut » : 80 %+ → +30 %, 50–79 → inchangé, 20–49 → −20 %, < 20 → −50 % |
-
-Voir [Prix conseillé](Prix-conseille.md#le-taux-de-vente).
-
-## Liste noire
-
-Une carte par ligne : jamais proposée à la vente.
-
-## Automatisations
-
-Toutes désactivées par défaut, avec confirmation à l'activation. Voir [Automatisations et risques](Automatisations-et-risques.md).
-
-| Option | Effet |
+| Profil | Effet |
 | --- | --- |
-| V4 – Ouvrir la vente et pré-remplir le prix | « Ouvrir » ouvre la carte et sa fenêtre de vente, remplit prix et durée. Requise par le Mode enchère. |
-| Lecture via l'API du site | Mises, ventes conclues, ventes du marché, collection complète, ventes en cours relues chaque minute |
-| Fenêtre de vente : résumé du marché | Offres en cours de la carte (nombre, min, médiane, max) |
-| Fenêtre de vente : liste des enchères de la carte | Sous la fenêtre de vente |
-| Fenêtre de vente : historique des prix | À droite de la fenêtre de vente : ventes passées de la carte, graphique, taux de vente |
-| Étiquetage par l'API | L'étiquetage automatique écrit les étiquettes directement (plus fiable) |
-| Étiquetage automatique sur le site | Range les cartes par plage de prix |
-| Retirer les autres étiquettes gérées | Une seule plage par carte |
-| Remettre les étiquettes des invendues | Une carte dont l'enchère se termine sans acheteur retrouve ses étiquettes (nécessite l'étiquetage par l'API) |
+| Prudent | Aucun accès au site : conseils à partir des pages que tu ouvres. Aucun risque. |
+| Confort | Lecture via l'API : prix, mises et ventes à jour. Rien n'est fait à ta place. |
+| Complet | Lecture et étiquetage par l'API, étiquetage automatique activé. La mise en vente reste à toi. |
 
-## Prix saisis à la main
+Les profils Confort et Complet demandent une confirmation (risque de bannissement).
 
-Un prix de référence fixe pour une carte (prioritaire sur la médiane de la rareté).
+## Ventes
 
-## Données
+Voir [Prix conseillé](Prix-conseille.md) pour le détail des calculs et [Vendre](Vendre.md) pour l'usage.
 
-- Cartes connues, dernière lecture de la collection et des ventes.
+| Section | Réglages | Défaut |
+| --- | --- | --- |
+| Mes slots | Nombre de slots ; **mode** « meilleures cartes » ou « par étiquette » | 5 ; meilleures cartes |
+| Quelles cartes vendre *(meilleures cartes)* | « toutes, sauf celles avec ces étiquettes » ou « seulement celles avec ces étiquettes », étiquettes à cocher ; exemplaires gardés | toutes ; 1 |
+| Mes étiquettes *(par étiquette)* | Pour chaque étiquette : slots réservés, exemplaires gardés, durée, calcul du prix (A / B1 / B2) | — |
+| Calcul du prix par défaut | Simple (mise de départ, influence du taux de vente, enchères pour être sûr) ou Avancé (formule) ; prix minimum et maximum ; arrondi ; réglages fins (statistique, période observée, étiquette de secours, enchères en cours) | 70 % · 50 % · 10 ; arrondi automatique ; médiane, 7 jours |
+| Paliers de prix *(meilleures cartes)* | Par palier de prix moyen : calcul A / B1 / B2, prix minimum et maximum, durée ; option **Réserver des slots par palier** | aucun palier ; option coupée |
+| Ordre de priorité | Équilibrée, Rapporter le plus, Vendre vite, Écouler, Mes critères, Ma formule ; **Doublons d'abord** | Équilibrée ; doublons d'abord |
+| Aperçu | Tes prochaines ventes avec les réglages en cours, recalculées pendant la saisie | — |
+| Jamais vendu | Proposer une carte déjà en vente ; liste noire (une carte par ligne). Favoris ★ toujours protégés ; cartes des familles : voir Familles | non ; vide |
+| Taux de vente | Fiable à partir de N enchères terminées ; taux de vente minimum | 5 ; aucun |
+| Durée des enchères | Paliers **Mise de – à → Durée** (10 min à 12 h) ; le premier qui correspond l'emporte ; sans palier, la durée du site (1 h) | aucun palier |
+| Aide à la vente | Fenêtre de vente du site (résumé du marché, enchères en cours de la carte, historique des prix) ; actions à ta place ⚠ (pré-remplissage, Vendre depuis les ventes conseillées, Vendre depuis le classement) | voir [Automatisations et risques](Automatisations-et-risques.md) |
+
+## Étiquettes
+
+| Section | Réglages |
+| --- | --- |
+| Mes étiquettes | Pour chaque étiquette : nom, **plage de prix**, **conditions en plus** (le nom ou la catégorie contient, taux de vente). Sert uniquement à l'étiquetage automatique. |
+| Étiquetage automatique ⚠ | Activation ; **Lancement** : à la demande (depuis la popup) ou **en continu** ; retirer les autres étiquettes suivies ; retirer les étiquettes des cartes sans prix connu ; remettre les étiquettes des invendues ; « Tout étiqueter » après ouverture d'un paquet |
+| Sur tes cartes | Étiquettes visibles sur les cartes ; style (libellés ou pastilles) |
+
+Voir [Étiquettes](Etiquettes.md).
+
+## Familles
+
+| Section | Réglages | Défaut |
+| --- | --- | --- |
+| Familles sur le site | Familles ; familles sur les cartes | oui ; oui |
+| Une étiquette par famille | « Les cartes de [famille] reçoivent l'étiquette [étiquette] », posée par l'étiquetage automatique | aucune |
+| Vente | Ne jamais vendre les cartes de mes familles | oui |
+
+Voir [Familles](Familles.md).
+
+## Sur le site
+
+- **Intégration au site** et **barre latérale compacte** : voir [Intégration au site](Integration-au-site.md).
+- **Fonctionnalités** par thème (collection, affichage des cartes, marché et enchères, paquets, échanges) : voir [Fonctionnalités](Fonctionnalites.md). Seuil de confirmation de « Tout défausser » avec les paquets.
+- **Notifications** (fin d'enchère, slot libéré) et **heures silencieuses** (23:00 – 08:00 par défaut).
+
+## Accès au site
+
+Un seul choix de niveau, avec l'avertissement de bannissement :
+
+| Niveau | Effet |
+| --- | --- |
+| Aucun accès (défaut) | Wiki-Traders lit seulement les pages que tu ouvres. |
+| Lecture | Lit les prix, tes mises et les ventes du marché via l'API, avec ta session. |
+| Lecture et étiquettes | En plus, écrit tes étiquettes directement (étiquetage automatique plus fiable, mode continu). |
+
+Dessous, la liste de toutes les **actions à ta place** (activée ou non), avec un lien vers l'endroit où chacune se règle. Partout ailleurs, une option qui a besoin de l'API l'indique (« ⚠ Nécessite la lecture via l'API ») avec un bouton **Activer…**. Voir [Automatisations et risques](Automatisations-et-risques.md).
+
+## Avancé
+
+- **Pages du site** : page « mes enchères » (automatique, ex. `/marketplace?tab=mine`), page ouverte par « Ouvrir » (`/collection`).
 - **Sélecteurs avancés** (JSON) : à ajuster si le site change (voir [Dépannage](Depannage.md#page-non-reconnue)).
-- **Exporter (JSON)** / **Importer** : sauvegarder ou transférer tes réglages.
-- **Effacer toutes les données**.
+- **Prix saisis à la main** : un prix de référence fixe pour une carte (prioritaire sur la médiane de la rareté).
+- **Données** : cartes connues, dernière lecture de la collection.
+- **Mises à jour** : voir [Installation](Installation.md).
+- **Sauvegarde** : **Exporter (JSON)** / **Importer…** pour garder ou transférer tes réglages ; **Effacer toutes les données**.

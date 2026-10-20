@@ -4,7 +4,7 @@
 
 Une fois l'extension [installée](Installation.md), voici la configuration conseillée, dans l'ordre. Compte 10 minutes.
 
-Les réglages sont dans **Paramètres → onglet Wiki-Traders** sur le site (ou bloc Wiki-Traders → *Réglages*, ou clic droit sur l'icône → *Options*). Clique sur **Enregistrer** en bas de page après chaque série de modifications.
+Les réglages sont dans **Paramètres → onglet Wiki-Traders** sur le site (ou bloc Wiki-Traders → *Réglages*, ou clic droit sur l'icône → *Options*). Ils sont rangés en onglets (Accueil, Ventes, Étiquettes, Familles, Sur le site, Accès au site, Avancé) et **enregistrés automatiquement** ; **Annuler**, en bas, revient en arrière. Voir [Référence des réglages](Reglages.md).
 
 ## Étape 1 – Faire connaître ta collection
 
@@ -12,40 +12,30 @@ Les réglages sont dans **Paramètres → onglet Wiki-Traders** sur le site (ou 
 2. L'extension relève tes cartes : nom, rareté, nombre d'exemplaires, favoris, étiquettes.
 3. Si toutes les cartes ne sont pas chargées, parcours les pages de la collection (ou active la [lecture via l'API](#étape-6--facultatif--la-lecture-via-lapi), qui recharge toute la collection d'un coup).
 
-## Étape 2 – Tes règles par étiquette
+L'onglet **Accueil** des réglages montre ce qui est prêt et ce qui manque, réglable en un clic.
 
-Chaque règle réserve des slots à une étiquette du site.
+## Étape 2 – Quelles cartes vendre
 
-| Colonne | Exemple | Sens |
-| --- | --- | --- |
-| Étiquette | `20-50` | Nom exact de l'étiquette sur le site |
-| Quota | 4 | Slots occupés en permanence par cette étiquette |
-| % du prix moyen | 70 | Prix de départ = prix de référence × 70 % |
-| Plancher / Plafond | 20 / 50 | Plage de prix de l'étiquette (sert à l'étiquetage automatique) |
-| Garder | 1 | Exemplaires jamais proposés à la vente |
-| Appartenance | étiquette du site | Ou « plage de prix moyen » si tes cartes ne sont pas étiquetées |
-| Active | ✓ | |
+Onglet **Ventes**. Par défaut, le mode **meilleures cartes** : tes slots libres reçoivent tes meilleures cartes.
 
-Par défaut : **1 slot « 50-100 » + 4 slots « 20-50 »**, à 70 %, en gardant 1 exemplaire. Sous le tableau, les **étiquettes trouvées dans ta collection** s'ajoutent en un clic. La somme des quotas devrait égaler ton nombre de slots.
+- **Nombre de slots** : 5 par défaut ; mis à jour automatiquement quand tu ouvres Marché → *Mes ventes* (« Mes ventes (2/5) »).
+- **Quelles cartes vendre** : toutes, sauf celles qui portent certaines étiquettes (ex. « À garder »), ou seulement celles qui portent certaines étiquettes (ex. « À vendre »). Coche les étiquettes concernées.
+- **Exemplaires gardés** : 1 = ton dernier exemplaire reste toujours ; seuls les doublons partent.
 
-Voir [Étiquettes](Etiquettes.md).
+Tu préfères réserver des slots à chaque étiquette ? Choisis le mode **par étiquette** : chaque étiquette a alors ses slots, son calcul du prix et sa durée. Voir [Vendre](Vendre.md#quelle-carte-est-proposée-).
 
 ## Étape 3 – Le prix
 
-Section **Prix et notifications** :
+- **Calcul du prix par défaut** : **Simple** (prix moyen × mise de départ de 70 %, ajusté par le taux de vente) ou **Avancé** (ta formule). L'exemple sous les réglages se met à jour pendant la saisie.
+- **Prix minimum** (facultatif) : en dessous, le prix devient ce minimum.
+- **Paliers de prix** (facultatif) : par exemple jusqu'à 20 W, 21–100 W, 101 W et +, chacun avec son calcul, son minimum et sa durée. Le bouton **Proposition** les crée en un clic.
+- **Ordre de priorité** : garde **Équilibrée** (ce qui rapporte le plus en moyenne).
 
-- **Nombre de slots** : 5 par défaut ; mis à jour automatiquement quand tu ouvres Marché → *Mes ventes* (« Mes ventes (2/5) »).
-- **Statistique** : garde **médiane** (quelques ventes énormes faussent la moyenne).
-- **Fenêtre du prix moyen** : 7 jours.
-- **Arrondi** : 0 = automatique.
-- **À doublons égaux** : prix le plus haut d'abord, le plus bas (pour écouler), ou aléatoire.
-- **Étiquette de secours** : prend le slot d'une étiquette qui n'a plus de carte vendable.
-
-Puis va une fois sur Marché → onglet **Historique** : ce sont les meilleures données de prix réels. Voir [Prix conseillé](Prix-conseille.md).
+L'**aperçu** montre tes prochaines ventes avec ces réglages. Va ensuite une fois sur Marché → onglet **Historique** : ce sont les meilleures données de prix réels. Voir [Prix conseillé](Prix-conseille.md).
 
 ## Étape 4 – La durée des enchères
 
-Section **Durée des enchères** : ajoute des paliers, par exemple :
+Ventes → **Durée des enchères** : ajoute des paliers, par exemple (ou **Proposition par défaut**) :
 
 | De | À | Durée |
 | --- | --- | --- |
@@ -53,28 +43,31 @@ Section **Durée des enchères** : ajoute des paliers, par exemple :
 | 21 | 100 | 1 h |
 | 101 | | 3 h |
 
-Sans palier, la durée par défaut du site (1 h) est gardée. La durée conseillée s'affiche avec chaque proposition.
+Sans palier, la durée par défaut du site (1 h) est gardée. Un palier de prix peut aussi imposer sa durée. La durée conseillée s'affiche avec chaque proposition.
 
 ## Étape 5 – Notifications et affichage
+
+Onglet **Sur le site** :
 
 - **Notifications** : une alerte à chaque fin d'enchère, sauf pendant les **heures silencieuses** (23 h – 8 h par défaut).
 - **Intégration au site** : le bloc et le menu Wiki-Traders dans la barre latérale (conseillé).
 - **Barre latérale compacte** : regroupe Échanges, Guilde, Amis, Messages, Bataille dans *Social*, et Profil, Succès, Classement dans *Progression*.
-- **Étiquettes visibles sur les cartes** : en libellés ou en simples pastilles de couleur.
+
+Onglet **Étiquettes → Sur tes cartes** : **étiquettes visibles sur les cartes**, en libellés ou en simples pastilles de couleur.
 
 Voir [Intégration au site](Integration-au-site.md).
 
 ## Étape 6 – (Facultatif) La lecture via l'API
 
-Section **Automatisations** → **Lecture via l'API du site**. Elle permet :
+Onglet **Accès au site** → niveau **Lecture** (ou le profil **Confort** dans l'Accueil). Elle permet :
 
 - la relève **automatique** de tes ventes en cours (chaque minute, sans aller sur *Mes ventes*) ;
-- l'onglet **Mises** (tes enchères sur les cartes des autres) et les ventes conclues ;
-- les ventes du marché pour les prix par rareté ;
+- **Enchères → Mes mises** (tes enchères sur les cartes des autres) et les ventes conclues ;
+- les ventes du marché pour les prix par rareté, et le taux de vente de chaque carte ;
 - dans la fenêtre de vente : le résumé du marché de la carte et ses enchères en cours ;
 - le rechargement complet de la collection.
 
-Ce sont des **lectures seules** avec ta session, mais l'option demande une confirmation : lis [Automatisations et risques](Automatisations-et-risques.md).
+Ce sont des **lectures seules** avec ta session, mais le niveau demande une confirmation : lis [Automatisations et risques](Automatisations-et-risques.md).
 
 ## Étape 7 – Vérifier
 

@@ -1345,7 +1345,8 @@ function render(): void {
   ];
   const current = panes.find((t) => t.id === currentTab) ?? panes[0];
   const top = tops.find((t) => t.id === TOP_OF[current.id]);
-  const openTop = (t: (typeof tops)[number]) => goTo(asTab(localStorage.getItem(`wiky-sub-${t.id}`)) ?? t.sub?.[0][0] ?? (t.id as PopupTab));
+  // Vue ouverte par un onglet : la dernière sous-vue choisie, sinon la première (l'onglet Historique ouvre la vue « sold »).
+  const openTop = (t: (typeof tops)[number]) => goTo(asTab(localStorage.getItem(`wiky-sub-${t.id}`)) ?? t.sub?.[0][0] ?? POPUP_TABS.find((p) => TOP_OF[p] === t.id)!);
 
   // Un seul onglet, dans une fenêtre ou une page du site : le résumé est déjà dans la barre latérale.
   if (view) {

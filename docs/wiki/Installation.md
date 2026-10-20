@@ -93,11 +93,11 @@ make updater        # ou : npm run updater:install
 (Installation depuis un zip : `node <dossier de l'extension>/updater/install.mjs`.) Recharge l'extension (↻). Ensuite :
 
 - quand `main` a des nouveautés, le récapitulatif de la barre latérale affiche **« ↑ Mise à jour disponible »** ;
-- Réglages → **Mises à jour** liste les nouveautés ; **Mettre à jour** récupère la dernière version (dépôt : `git pull` + construction ; zip : dernière version publiée sur GitHub), recharge l'extension et les onglets WikiMasters.
+- Réglages → Avancé → **Mises à jour** liste les nouveautés ; **Mettre à jour** récupère la dernière version (dépôt : `git pull` + construction ; zip : dernière version publiée sur GitHub), recharge l'extension et les onglets WikiMasters.
 
 La vérification se fait au démarrage, toutes les 6 h, et à la demande. Pour désinstaller le programme d'aide : `npm run updater:uninstall`.
 
-**Pas besoin de passer par la page des extensions** : après « Mettre à jour », l'extension se recharge d'elle-même ainsi que les onglets WikiMasters. Après une mise à jour à la main (`make update`, `git pull` + construction), elle détecte la nouvelle version dans son dossier en moins d'une minute et se recharge toute seule ; le bouton **Recharger l'extension** (Réglages → Mises à jour) le fait tout de suite.
+**Pas besoin de passer par la page des extensions** : après « Mettre à jour », l'extension se recharge d'elle-même ainsi que les onglets WikiMasters. Après une mise à jour à la main (`make update`, `git pull` + construction), elle détecte la nouvelle version dans son dossier en moins d'une minute et se recharge toute seule ; le bouton **Recharger l'extension** (Réglages → Avancé → Mises à jour) le fait tout de suite.
 
 ### À la main
 
@@ -108,13 +108,13 @@ npm install
 npm run build
 ```
 
-L'extension détecte la nouvelle version en moins d'une minute et se recharge toute seule, avec les onglets WikiMasters (ou bouton **Recharger l'extension** dans Réglages → Mises à jour).
+L'extension détecte la nouvelle version en moins d'une minute et se recharge toute seule, avec les onglets WikiMasters (ou bouton **Recharger l'extension** dans Réglages → Avancé → Mises à jour).
 
 Tes réglages, ta collection connue et ton journal sont conservés.
 
 ## 6. Désinstaller
 
-1. (Facultatif) Réglages → **Effacer toutes les données**.
+1. (Facultatif) Réglages → Avancé → **Effacer toutes les données**.
 2. Page des extensions → **Supprimer**.
 
 Suite : **[Premiers pas](Premiers-pas.md)**.

@@ -6,14 +6,14 @@ Les outils de collection de Wiki-Traders sont pensés pour être rapides : les p
 
 > Si une autre extension WikiMasters propose les mêmes fonctions, désactive-la pour éviter les doublons (prix, « Plus chères », Familles…).
 
-Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles marquées *API* demandent la *lecture via l'API* ; celles marquées ⚠️ agissent sur le site à ta place, sont désactivées par défaut et demandent une confirmation (voir [Automatisations et risques](Automatisations-et-risques.md)).
+Chaque fonctionnalité s'active dans **Réglages → Sur le site → Fonctionnalités**, ou avec ce qu'elle concerne : les familles dans **Familles**, « Tout étiqueter » dans **Étiquettes**, la vente depuis le classement ou les ventes conseillées dans **Ventes → Aide à la vente**. Celles marquées *API* demandent la *lecture via l'API* (Réglages → Accès au site) ; celles marquées ⚠️ agissent sur le site à ta place, sont désactivées par défaut et demandent une confirmation (voir [Automatisations et risques](Automatisations-et-risques.md)).
 
 ## Collection et familles
 
 | Fonctionnalité | Défaut | Ce qu'elle fait |
 | --- | --- | --- |
-| [Familles](Familles.md) (API) | oui | Familles de cartes, progression, ajout par sélection multiple, marché des manquantes |
-| Familles sur les cartes | oui | Pastilles de famille sur les cartes |
+| [Familles](Familles.md) (API) | oui | Familles de cartes, progression, ajout par sélection multiple, marché des manquantes (Réglages → Familles) |
+| Familles sur les cartes | oui | Pastilles de famille sur les cartes (Réglages → Familles) |
 | Prix moyen sur les cartes (API) | oui | « Moy. 12 W · 85 % » sous le titre de chaque carte de la collection et de « Toutes les cartes » (prix moyen, taux de vente rouge ≤ 15 %, vert ≥ 70 %), et « 17 / 20 vendues » en bas de la carte, au-dessus des étiquettes du site ; avec légende |
 | Classement « Plus chères » (API) | oui | Bouton à côté du titre de la collection : ta collection triée par prix, filtres (recherche, rareté, étiquette, favoris), valeur totale |
 | Mode compact | oui | Bouton « Compact » : cartes plus petites, plus de cartes à l'écran |
@@ -40,11 +40,11 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 
 | Fonctionnalité | Défaut | Ce qu'elle fait |
 | --- | --- | --- |
-| Récapitulatif d'ouverture | oui | Après l'ouverture : cartes obtenues, « Nouvelle » ou exemplaires déjà possédés, prix et total (sans gâcher la révélation) |
+| Récapitulatif d'ouverture | oui | Après l'ouverture : cartes obtenues, « Nouvelle » ou exemplaires déjà possédés, et pour chacune les mêmes infos que sur tes cartes — « Moy. 12 W », taux de vente (rouge ≤ 15 %, vert ≥ 70 %), « 17 / 20 vendues », médiane, min et max au survol — et le total (sans gâcher la révélation). Les prix déjà connus s'affichent sans nouvelle requête |
 | Statistiques de tirage | oui | Répartition des raretés de tes paquets, sur la page Paquets (réinitialisable, importable depuis une autre extension) ; masquées pendant l'ouverture des cartes |
 | Partager un tirage | oui | Bouton « Partager » : le tirage en image |
-| Tout étiqueter après ouverture | oui | Bouton « Tout étiqueter » sous le récapitulatif d'ouverture : les cartes obtenues reçoivent les étiquettes de tes règles (plages de prix, conditions). Visible avec l'étiquetage par l'API |
-| Tout défausser après ouverture | oui | Bouton rouge « Tout défausser » sous le récapitulatif d'ouverture : un exemplaire de chaque carte obtenue est défaussé. Confirmation si une carte vaut plus du seuil réglable sous les fonctionnalités Paquets (10 W par défaut), ou si les prix chargent encore. Irréversible ; favoris verrouillés |
+| Tout étiqueter après ouverture | oui | Bouton « Tout étiqueter » sous le récapitulatif d'ouverture : les cartes obtenues reçoivent leurs étiquettes (plages de prix, conditions, familles). Visible avec l'étiquetage par l'API ; réglé dans Réglages → Étiquettes |
+| Tout défausser après ouverture | oui | Bouton rouge « Tout défausser » sous le récapitulatif d'ouverture : un exemplaire de chaque carte obtenue est défaussé. Confirmation si une carte vaut plus du seuil réglable sous les fonctionnalités Paquets (Réglages → Sur le site, 10 W par défaut), ou si les prix chargent encore. Irréversible ; favoris verrouillés |
 
 ## Échanges et notifications
 
@@ -56,10 +56,12 @@ Chaque fonctionnalité s'active dans **Réglages → Fonctionnalités**. Celles 
 
 ## ⚠️ Automatisations
 
-| Fonctionnalité | Ce qu'elle fait |
-| --- | --- |
-| Surenchère en un clic | Bouton « Surenchérir » dans le suivi des mises : mise minimale (+10 %), après confirmation avec le montant et ton solde |
-| Vendre depuis le classement | « Vendre » sur une ligne du classement : prix et durée conseillés modifiables, deux clics pour confirmer ; jamais un exemplaire déjà en vente, confirmation pour un favori |
-| Vendre depuis les ventes conseillées | non | Bouton « Vendre… » sur chaque vente conseillée (fenêtre Vendre) : prix moyen, taux de vente, ventes, médiane, min – max, calcul du prix conseillé ; prix et durée modifiables (la durée suit les paliers tant qu'elle n'est pas choisie à la main) ; mise aux enchères en un clic. Un onglet WikiMasters doit être ouvert |
-| Ouvrir tous les paquets | Ouvre tes paquets un par un (pause aléatoire, 100 au plus), progression et bouton Arrêter, récapitulatif final ; respecte la limite du site |
-| Ouverture automatique | Ouvre tes paquets à intervalle aléatoire (min / max en minutes) tant qu'un onglet visible est ouvert ; indicateur et bouton Arrêter |
+Désactivées par défaut ; chacune est rangée avec ce qu'elle concerne, et listée dans Réglages → Accès au site.
+
+| Fonctionnalité | Où la régler | Ce qu'elle fait |
+| --- | --- | --- |
+| Surenchère en un clic | Sur le site → Marché et enchères | Bouton « Surenchérir » dans le suivi des mises : mise minimale (+10 %), après confirmation avec le montant et ton solde |
+| Vendre depuis le classement | Ventes → Aide à la vente | « Vendre » sur une ligne du classement : prix et durée conseillés modifiables, deux clics pour confirmer ; jamais un exemplaire déjà en vente, confirmation pour un favori |
+| Vendre depuis les ventes conseillées | Ventes → Aide à la vente | Bouton « Vendre… » sur chaque vente conseillée (fenêtre Vendre) : prix moyen, taux de vente, ventes, médiane, min – max, calcul du prix conseillé ; prix et durée modifiables (la durée suit les paliers tant qu'elle n'est pas choisie à la main) ; mise aux enchères en un clic. Un onglet WikiMasters doit être ouvert |
+| Ouvrir tous les paquets | Sur le site → Paquets | Ouvre tes paquets un par un (pause aléatoire, 100 au plus), progression et bouton Arrêter, récapitulatif final ; respecte la limite du site |
+| Ouverture automatique | Sur le site → Paquets | Ouvre tes paquets à intervalle aléatoire (min / max en minutes) tant qu'un onglet visible est ouvert ; indicateur et bouton Arrêter |

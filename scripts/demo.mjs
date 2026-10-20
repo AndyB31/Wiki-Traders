@@ -262,7 +262,7 @@ const SB_DATA = {
     { id: 'k3', wikipedia_title: 'Hérisson', rarity: 'PC' },
     { id: 'k4', wikipedia_title: 'Pyramide de Khéops', rarity: 'L' },
   ],
-  sales: [{ card_id: 'k1', final_price: 70 }, { card_id: 'k1', final_price: 90 }, { card_id: 'k4', final_price: 320 }],
+  sales: [{ card_id: 'k1', final_price: 70, status: 'settled_sold' }, { card_id: 'k1', final_price: 90, status: 'settled_sold' }, { card_id: 'k4', final_price: 320, status: 'settled_sold' }],
 };
 const ok = (cond, msg) => {
   if (!cond) throw new Error(`✗ ${msg}`);
@@ -367,6 +367,10 @@ const waitFor = async (pred, label, timeout = 5000) => {
   }
   throw new Error(`✗ délai dépassé : ${label}`);
 };
+
+// Parcours de démo en mode « par étiquette » (slots réservés par étiquette) ; le mode « meilleures cartes »,
+// par défaut depuis la 1.0, est montré à part dans les captures des réglages.
+await sw.evaluate(() => chrome.storage.local.set({ settings: { allocationMode: 'quota', priority: 'value', protectFamilies: false } }));
 
 // 1. Collection
 const site = await ctx.newPage();
@@ -505,7 +509,8 @@ ok(true, '↺ retour aux propositions par défaut');
 // 4. Options et journal
 const opts = await ctx.newPage();
 await opts.goto(extUrl('options.html'));
-await opts.waitForSelector('table.rules');
+await opts.click('#tab-ventes');
+await opts.waitForSelector('#panel-ventes .rule-card');
 await opts.screenshot({ path: join(shots, 'options.png'), fullPage: true });
 await opts.goto(extUrl('journal.html'));
 await opts.waitForSelector('table');
@@ -555,7 +560,8 @@ await sw.evaluate(async () => {
 const popup2 = await ctx.newPage();
 await popup2.setViewportSize({ width: 380, height: 640 });
 await popup2.goto(extUrl('popup.html'));
-await popup2.click('.tabs .tab:has-text("Étiquettes")');
+await popup2.click('.tabs .tab:has-text("Cartes")');
+await popup2.click('.segmented button:has-text("Étiquetage")');
 await popup2.waitForSelector('.autotag');
 const planText = await popup2.textContent('.autotag');
 ok(/2 carte\(s\)/.test(planText), `plan d'étiquetage : ${planText.match(/Étiquetage auto : \d+ carte\(s\)/)?.[0]}`);
@@ -604,7 +610,7 @@ const embedFrame = async (pg) => {
   return f;
 };
 let ef = await embedFrame(market);
-ok((await ef.$$('.tabs .tab')).length === 6, 'fenêtre en onglets : Vendre / En cours / Mises / Cartes / Étiquettes / Outils');
+ok((await ef.$$('.tabs .tab')).length === 4, 'fenêtre en onglets : Vendre / Enchères / Historique / Cartes');
 await ef.click('.tabs .tab:has-text("Vendre")');
 await ef.waitForSelector('.slot.free button.primary');
 await ef.click('.slot.free button.primary');
@@ -626,7 +632,8 @@ await market.waitForURL(/tab=mine/, { timeout: 10000 });
 s = await waitFor((x) => x.intent === null && x.meta.lastAuctionsScan > scanBefore, 'ventes relues', 10000);
 ok(true, '🔄 : Marché → onglet « Mes ventes » → liste relue');
 ef = await embedFrame(market);
-await ef.click('.tabs .tab:has-text("En cours")');
+await ef.click('.tabs .tab:has-text("Enchères")');
+await ef.click('.segmented button:has-text("Mes ventes")');
 await market.waitForTimeout(400);
 await market.screenshot({ path: join(shots, 'window-tabs.png') });
 
@@ -655,7 +662,8 @@ await market.reload();
 s = await waitFor((x) => x.myAuctions.length === 3 && x.meta.lastAuctionsScan > 0, 'relève automatique au chargement', 10000);
 ok(true, 'relève automatique via l\'API au chargement de la page : vente terminée retirée (3 en cours)');
 ef = await embedFrame(market);
-await ef.click('.tabs .tab:has-text("Mises")');
+await ef.click('.tabs .tab:has-text("Enchères")');
+await ef.click('.segmented button:has-text("Mes mises")');
 await ef.click('button[title="Relire mes mises"]');
 await ef.waitForSelector('.bid', { timeout: 8000 });
 const bidRows = await ef.$$eval('.bid', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
@@ -665,7 +673,8 @@ ok(apiCalls.length > 0 && apiCalls.every((m) => m === 'GET' || m === 'OPTIONS'),
 // Rouvrir « Mises » relit les mises sans clic ; « En cours seulement » masque les terminées.
 const bidsAt = (await storage()).bidsCache.at;
 await ef.click('.tabs .tab:has-text("Vendre")');
-await ef.click('.tabs .tab:has-text("Mises")');
+await ef.click('.tabs .tab:has-text("Enchères")');
+await ef.click('.segmented button:has-text("Mes mises")');
 await waitFor((x) => x.bidsCache?.at > bidsAt, 'mises relues à l\'ouverture', 8000);
 ok(true, '« Mises » actualisée automatiquement à l\'ouverture');
 await ef.click('label:has-text("En cours seulement") input');
@@ -678,6 +687,7 @@ await market.screenshot({ path: join(shots, 'window-bids.png') });
 
 // 12. Onglet « Cartes » : familles, puis enchères en cours d'une carte (de la moins chère à la plus chère)
 await ef.click('.tabs .tab:has-text("Cartes")');
+await ef.click('.segmented button:has-text("Cartes")');
 await ef.waitForSelector('.family');
 const families = await ef.$$eval('.family summary', (els) => els.map((e) => e.textContent.trim()));
 ok(families.join() === 'Merveilles du monde (1/3),Animaux (2/2)', `familles lues depuis l'autre extension : ${families.join(', ')}`);
@@ -746,7 +756,7 @@ ok(s.priceObs.some((o) => o.auctionId === 'm-R-0' && o.cardId === 'marche-r-0'),
 const priceBox = await ef.textContent('.price-status');
 ok(/Ventes du marché \(API\) : 36 chargée/.test(priceBox) && /Rare\s*\d+/.test(priceBox), 'bilan des prix visible dans 🧰 Outils');
 await (await ef.$('.price-status')).screenshot({ path: join(shots, 'price-status.png') });
-await ef.click('.tabs .tab:has-text("Vendues")');
+await ef.click('.tabs .tab:has-text("Historique")');
 await ef.click('button[title="Relire mes ventes terminées"]');
 await ef.waitForSelector('.bid', { timeout: 8000 });
 const soldRows = await ef.$$eval('.bid', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
@@ -839,7 +849,7 @@ await integ.keyboard.press('Escape');
 await integ.click('[data-wiky="settings-entry"]');
 await integ.waitForURL(/wiky=settings/);
 const optFrame = await (await integ.waitForSelector('#wiky-page iframe')).contentFrame();
-await optFrame.waitForSelector('section.card');
+await optFrame.waitForSelector('[role=tabpanel]:not([hidden]) section.card');
 await integ.waitForTimeout(400);
 ok(true, 'réglages Wiki-Traders dans la page Paramètres du site');
 await integ.screenshot({ path: join(shots, 'site-settings.png') });

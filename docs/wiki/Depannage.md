@@ -36,15 +36,16 @@ Ouvre ta collection une fois (et ses différentes pages), ou active la lecture v
 
 La fenêtre Vendre en donne la raison :
 
-- toutes les cartes de l'étiquette sont en **favori** ;
+- les cartes du palier ou de l'étiquette sont en **favori**, en **liste noire** ou dans tes **familles** (Réglages → Familles) ;
 - elles sont **déjà en vente** ;
-- **Garder** vaut 1 et tu n'as qu'un exemplaire ;
-- aucune carte ne porte l'étiquette (vérifie l'orthographe, ou utilise *plage de prix moyen*) ;
-- la somme des quotas est inférieure au nombre de slots (« slot libre sans règle »).
+- les **exemplaires gardés** valent 1 et tu n'as qu'un exemplaire ;
+- leur taux de vente est sous le **minimum** (Ventes → Taux de vente) ;
+- meilleures cartes : le filtre **Quelles cartes vendre** les écarte, ou leur prix est hors de tous les **paliers de prix** (l'aperçu de Réglages → Ventes le montre) ;
+- par étiquette : aucune carte ne porte l'étiquette (vérifie l'orthographe), ou la somme des slots réservés est inférieure au nombre de slots (« slot libre sans règle »).
 
 ## Le prix semble faux
 
-Le détail du calcul est affiché à côté de chaque prix. Voir [Prix conseillé](Prix-conseille.md) : visite Marché → *Historique*, ou saisis un prix à la main.
+Le détail du calcul est affiché à côté de chaque prix. Voir [Prix conseillé](Prix-conseille.md) : vérifie le calcul du palier (ou par défaut) et son prix minimum dans Réglages → Ventes, visite Marché → *Historique*, ou saisis un prix à la main (Réglages → Avancé).
 
 ## Le Mode enchère n'ouvre pas la vente
 
@@ -52,12 +53,18 @@ Le détail du calcul est affiché à côté de chaque prix. Voir [Prix conseill�
 - La carte doit être affichée sur la page de la collection.
 - Exporte un **diagnostic** avec la fenêtre de la carte ouverte.
 
+## L'étiquetage en continu ne passe pas
+
+- Il faut **Étiquetage automatique** activé, **Lancement : En continu** et le niveau d'accès **Lecture et étiquettes** (Réglages → Accès au site).
+- Un onglet WikiMasters doit être ouvert ; il passe au plus toutes les 2 minutes (et toutes les 10 minutes sans changement).
+- Rien à changer = aucune écriture : popup → **Cartes → Étiquetage** montre le plan et pourquoi des cartes sont écartées (prix pas encore connu, favori…).
+
 ## Page non reconnue
 
 WikiMasters change ses classes CSS à chaque mise à jour. L'extension préfère afficher « page non reconnue » plutôt que des données fausses.
 
 1. Sur la page en question : **Outils → Diagnostic**. Un fichier JSON est téléchargé : le plan de la page (balises, classes, textes courts, **jamais** le contenu des champs), un échantillon des données lues et les dernières étapes des automatisations.
-2. Ajuste Réglages → Données → **Sélecteurs avancés**, ou [ouvre une issue](https://github.com/AndyB31/Wiki-Traders/issues) avec le fichier.
+2. Ajuste Réglages → Avancé → **Sélecteurs avancés**, ou [ouvre une issue](https://github.com/AndyB31/Wiki-Traders/issues) avec le fichier.
 
 ## FAQ
 
@@ -67,4 +74,8 @@ WikiMasters change ses classes CSS à chaque mise à jour. L'extension préfère
 
 **Sur mobile ?** Les navigateurs mobiles ne chargent pas ces extensions ; la barre du bas du site n'est pas modifiée.
 
-**Comment sauvegarder mes réglages ?** Réglages → **Exporter (JSON)**, puis **Importer** sur l'autre navigateur.
+**Comment sauvegarder mes réglages ?** Réglages → Avancé → **Exporter (JSON)**, puis **Importer…** sur l'autre navigateur.
+
+**J'ai fait une erreur dans les réglages.** Ils sont enregistrés automatiquement : clique **Annuler** dans le bandeau du bas pour revenir à l'état d'avant tes dernières modifications.
+
+**Mes anciens réglages (avant la 1.0) ?** Ils ont été convertis automatiquement pour donner les mêmes prix : mise de départ et paliers de taux de vente sont devenus des calculs (paliers de taux de vente → formule avancée), les conditions « famille » sont passées dans Réglages → Familles.
