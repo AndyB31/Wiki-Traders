@@ -90,7 +90,7 @@ function data(over: Partial<Parameters<typeof setMarketDataForTest>[0] & object>
 }
 
 function ctx(settings: Partial<Settings> = {}, cards: Record<string, Card> = {}) {
-  return makeContext({ ...DEFAULT_SETTINGS, siteIntegration: true, ...settings }, cards, []);
+  return makeContext({ ...DEFAULT_SETTINGS, allocationMode: 'quota', siteIntegration: true, ...settings }, cards, []);
 }
 
 function bid(over: Partial<MyBid> = {}): MyBid {
@@ -220,7 +220,7 @@ describe('Mes ventes : slots libres', () => {
 describe('carte au hasard', () => {
   const input = (cards: Record<string, Card>, myAuctions: MyAuction[] = []) => ({
     rules: structuredClone(DEFAULT_RULES),
-    settings: { ...DEFAULT_SETTINGS },
+    settings: { ...DEFAULT_SETTINGS, allocationMode: 'quota' as const },
     cards,
     priceObs: [],
     myAuctions,

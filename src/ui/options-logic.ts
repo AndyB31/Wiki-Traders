@@ -7,7 +7,8 @@ import { durationLabel, overlappingDurations } from '../lib/duration';
 import { roundTo } from '../lib/pricing';
 import { formulaError } from '../lib/formula';
 import { overlappingRateRules } from '../lib/sellrate';
-import type { DurationRule, SellRateRule, Settings, TagRule } from '../lib/types';
+import { overlappingTiers, tierLabel } from '../lib/salecalc';
+import type { DurationRule, PriceCalc, SellRateRule, Settings, TagRule } from '../lib/types';
 
 /** Prix moyen pris pour illustrer le % d'une étiquette. */
 export const EXAMPLE_PRICE = 40;
@@ -124,7 +125,7 @@ export function nextTier(rules: DurationRule[]): DurationRule {
 // Validation
 // ---------------------------------------------------------------------------
 
-export type OptionsSection = 'rules' | 'pricing' | 'durations' | 'sellRate' | 'advanced';
+export type OptionsSection = 'rules' | 'pricing' | 'tiers' | 'priority' | 'families' | 'durations' | 'sellRate' | 'advanced';
 
 export interface ValidationError {
   section: OptionsSection;
@@ -156,7 +157,7 @@ function rateErrors(min: number | null, rows: SellRateRule[], section: OptionsSe
     if (r.from != null && r.to != null && r.from > r.to) {
       errors.push({ section, keys: [`${prefix}tdv:${i}:from`, `${prefix}tdv:${i}:to`], message: `${label}Palier de taux de vente ${i + 1} : « de » dépasse « à ».` });
     }
-    if (!(r.adjust > -100)) errors.push({ section, keys: [`${prefix}tdv:${i}:adjust`], message: `${label}Palier de taux de vente ${i + 1} : l'ajustement doit être au-dessus de −100 %.` });
+    if (!(r.pricePct > 0 && r.pricePct <= 500)) errors.push({ section, keys: [`${prefix}tdv:${i}:pricePct`], message: `${label}Palier de taux de vente ${i + 1} : le % du prix doit être entre 1 et 500 (100 = prix inchangé).` });
   }
   const overlap = overlappingRateRules(rows);
   if (overlap) {
@@ -180,13 +181,24 @@ function ruleExtraErrors(r: TagRule): ValidationError[] {
       errors.push({ section: 'rules', keys: [`${prefix}rateMin`, `${prefix}rateMax`], message: `${label}taux de vente : « de » dépasse « à ».` });
     }
   }
-  const s = r.sale;
-  if (s) {
-    errors.push(...rateErrors(s.minSellRate, s.sellRateRules, 'rules', prefix, label), ...durationErrors(s.durationRules, 'rules', prefix, label));
-    if (s.sort === 'score') {
-      const err = s.score.trim() ? formulaError(s.score) : 'formule vide';
-      if (err) errors.push({ section: 'rules', keys: [`${prefix}score`], message: `${label}formule de score : ${err}.` });
-    }
+  if (r.calc) errors.push(...calcErrors(r.calc, 'rules', prefix, label));
+  return errors;
+}
+
+/** Calcul du prix (par défaut, d'un palier ou d'une étiquette). `prefix` : préfixe des champs, ex. « tier:<id>: ». */
+export function calcErrors(c: PriceCalc, section: OptionsSection, prefix: string, label: string): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (c.mode === 'default') return errors;
+  if (c.mode === 'simple') {
+    if (!(c.pct > 0 && c.pct <= 500)) errors.push({ section, keys: [`${prefix}pct`], message: `${label}la mise de départ doit être entre 1 et 500 %.` });
+    if (!(c.tdvWeight >= 0 && c.tdvWeight <= 100)) errors.push({ section, keys: [`${prefix}tdvWeight`], message: `${label}l'influence du taux de vente doit être entre 0 et 100 %.` });
+    if (!(c.trustSales >= 1)) errors.push({ section, keys: [`${prefix}trustSales`], message: `${label}le nombre d'enchères pour être sûr doit être d'au moins 1.` });
+  } else {
+    const err = c.formula.trim() ? formulaError(c.formula) : 'formule vide';
+    if (err) errors.push({ section, keys: [`${prefix}formula`], message: `${label}formule : ${err}.` });
+  }
+  if (c.minPrice != null && c.maxPrice != null && c.minPrice > c.maxPrice) {
+    errors.push({ section, keys: [`${prefix}minPrice`, `${prefix}maxPrice`], message: `${label}le prix minimum dépasse le maximum.` });
   }
   return errors;
 }
@@ -195,8 +207,9 @@ function ruleExtraErrors(r: TagRule): ValidationError[] {
 export function validateOptions(rules: TagRule[], settings: Settings, extra: { selectorsInvalid?: boolean } = {}): ValidationError[] {
   const errors: ValidationError[] = [];
   const sum = quotaSum(rules);
-  // Mode « meilleures cartes » : les quotas ne servent pas.
-  if (sum > settings.slots && settings.allocationMode !== 'pool') {
+  const pool = settings.allocationMode === 'pool';
+  // Mode « meilleures cartes » : les quotas des étiquettes ne servent pas.
+  if (sum > settings.slots && !pool) {
     errors.push({
       section: 'rules',
       keys: ['slots', ...rules.filter((r) => r.active).map((r) => `rule:${r.id}:quota`)],
@@ -218,12 +231,46 @@ export function validateOptions(rules: TagRule[], settings: Settings, extra: { s
     if (r.floor != null && r.ceiling != null && r.floor > r.ceiling) {
       errors.push({ section: 'rules', keys: [`rule:${r.id}:floor`, `rule:${r.id}:ceiling`], message: `« ${r.tag} » : le plancher dépasse le plafond.` });
     }
-    if (!(r.pct > 0)) errors.push({ section: 'rules', keys: [`rule:${r.id}:pct`], message: `« ${r.tag} » : le % doit être positif.` });
     errors.push(...ruleExtraErrors(r));
   }
   errors.push(...durationErrors(settings.durationRules, 'durations', '', ''));
-  errors.push(...rateErrors(settings.minSellRate, settings.sellRateRules, 'sellRate', '', ''));
+  errors.push(...rateErrors(settings.minSellRate, [], 'sellRate', '', ''));
+  errors.push(...calcErrors(settings.defaultCalc, 'pricing', 'calc:', 'Calcul par défaut : '));
+  if (pool) errors.push(...tierErrors(settings));
+  for (const ft of settings.familyTags) {
+    if (!ft.family.trim()) errors.push({ section: 'families', keys: [`famtag:${ft.id}:family`], message: 'Choisis la famille à étiqueter.' });
+    if (!ft.tag.trim()) errors.push({ section: 'families', keys: [`famtag:${ft.id}:tag`], message: `Famille ${ft.family || '?'} : indique l'étiquette à poser.` });
+  }
+  if (settings.priority === 'formula') {
+    const err = settings.priorityFormula.trim() ? formulaError(settings.priorityFormula) : 'formule vide';
+    if (err) errors.push({ section: 'priority', keys: ['priorityFormula'], message: `Formule de priorité : ${err}.` });
+  }
+  if (!(Number.isInteger(settings.sellRateMinSamples) && settings.sellRateMinSamples >= 1 && settings.sellRateMinSamples <= 1000)) {
+    errors.push({ section: 'sellRate', keys: ['sellRateMinSamples'], message: 'Le nombre d\'enchères terminées doit être un entier entre 1 et 1 000.' });
+  }
   if (extra.selectorsInvalid) errors.push({ section: 'advanced', keys: ['selectors'], message: 'JSON des sélecteurs invalide.' });
+  return errors;
+}
+
+/** Paliers de prix du mode « meilleures cartes ». */
+export function tierErrors(settings: Settings): ValidationError[] {
+  const errors: ValidationError[] = [];
+  for (const t of settings.priceTiers) {
+    const label = `Palier ${tierLabel(t)} : `;
+    if (t.from != null && t.to != null && t.from > t.to) errors.push({ section: 'tiers', keys: [`tier:${t.id}:from`, `tier:${t.id}:to`], message: `${label}« de » dépasse « à ».` });
+    errors.push(...calcErrors(t.calc, 'tiers', `tier:${t.id}:`, label));
+  }
+  const overlap = overlappingTiers(settings.priceTiers);
+  if (overlap) {
+    const [a, b] = overlap.map((i) => settings.priceTiers[i]);
+    errors.push({ section: 'tiers', keys: [a, b].flatMap((t) => [`tier:${t.id}:from`, `tier:${t.id}:to`]), message: `Les paliers ${tierLabel(a)} et ${tierLabel(b)} se chevauchent.` });
+  }
+  if (settings.reserveTierSlots) {
+    const sum = settings.priceTiers.filter((t) => t.active).reduce((n, t) => n + t.slots, 0);
+    if (sum > settings.slots) {
+      errors.push({ section: 'tiers', keys: ['slots', ...settings.priceTiers.map((t) => `tier:${t.id}:slots`)], message: `Les slots réservés par palier (${sum}) dépassent ton nombre de slots (${settings.slots}).` });
+    }
+  }
   return errors;
 }
 
@@ -269,6 +316,21 @@ export function quickStartChecks(input: { cardCount: number; rules: TagRule[]; s
   const { cardCount, rules, settings } = input;
   const active = rules.filter((r) => r.active && r.tag.trim());
   const q = quotaSummary(rules, settings.slots);
+  const pool = settings.allocationMode === 'pool';
+  const filter = settings.saleTags;
+  const sales: QuickCheck = pool
+    ? {
+        id: 'rules',
+        ok: filter.mode === 'exclude' || filter.tags.length > 0,
+        label: 'Cartes à vendre',
+        detail: filter.mode === 'exclude' ? (filter.tags.length ? `Toutes sauf ${filter.tags.join(', ')}.` : 'Toutes tes cartes (sauf favoris et exemplaires gardés).') : filter.tags.length ? `Celles avec ${filter.tags.join(', ')}.` : 'Aucune étiquette choisie : rien ne sera proposé.',
+      }
+    : {
+        id: 'rules',
+        ok: active.length > 0,
+        label: 'Étiquettes à vendre',
+        detail: active.length ? `${plural(active.length, 'étiquette')} active${active.length > 1 ? 's' : ''}.` : 'Aucune étiquette active : rien ne sera proposé à la vente.',
+      };
   return [
     {
       id: 'collection',
@@ -282,12 +344,7 @@ export function quickStartChecks(input: { cardCount: number; rules: TagRule[]; s
       label: 'Lecture via l\'API',
       detail: settings.apiRead ? 'Prix et ventes lus directement, plus rapide et plus complet.' : 'Désactivée : plusieurs fonctionnalités (prix moyens, mises) en ont besoin.',
     },
-    {
-      id: 'rules',
-      ok: active.length > 0,
-      label: 'Règles définies',
-      detail: active.length ? `${plural(active.length, 'étiquette')} active${active.length > 1 ? 's' : ''}.` : 'Aucune étiquette active : rien ne sera proposé à la vente.',
-    },
-    { id: 'quotas', ok: q.status === 'ok', label: 'Quotas = slots', detail: q.message },
+    sales,
+    ...(pool ? [] : [{ id: 'quotas' as const, ok: q.status === 'ok', label: 'Quotas = slots', detail: q.message }]),
   ];
 }

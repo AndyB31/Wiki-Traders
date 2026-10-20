@@ -1,8 +1,8 @@
 import { makeContext, type AllocationInput } from './allocation';
-import { hasConditions, isAutoTagRule, ruleStatus, type Tri } from './conditions';
+import { EMPTY_CONDITIONS, hasConditions, isAutoTagRule, ruleStatus, type Tri } from './conditions';
 import { ownPrice } from './pricing';
 import { sameTag } from './text';
-import type { Card, Rarity, TagRule } from './types';
+import type { Card, Rarity, Settings, TagRule } from './types';
 
 /** Prix moyen d'une carte relevé dans les ventes du site (cache des prix, voir content/catalog.ts). */
 export interface CatalogPriceEntry {
@@ -51,6 +51,13 @@ export function ruleForPrice(rules: TagRule[], price: number): TagRule | null {
   return fits.sort((a, b) => width(a) - width(b))[0] ?? null;
 }
 
+/** Familles → étiquette, présentées au planificateur comme des règles à une seule condition (la famille). */
+export function familyTagRules(settings: Pick<Settings, 'familyTags'>): TagRule[] {
+  return (settings.familyTags ?? [])
+    .filter((f) => f.active && f.family.trim() && f.tag.trim())
+    .map((f) => ({ id: `fam:${f.id}`, tag: f.tag.trim(), quota: 0, floor: null, ceiling: null, keepMin: 0, active: true, match: 'tag', when: { ...EMPTY_CONDITIONS, family: f.family } }));
+}
+
 export interface AutoTagOptions {
   /** Retirer les autres étiquettes de plage (y compris quand le prix sort de toutes les plages). */
   removeOthers: boolean;
@@ -75,7 +82,7 @@ export interface AutoTagOptions {
 export function planAutoTags(input: AllocationInput, opts: AutoTagOptions | boolean, now = Date.now()): TagChange[] {
   const { removeOthers, clearUnpriced = false, extraPrice } = typeof opts === 'boolean' ? { removeOthers: opts } : opts;
   const ctx = makeContext(input, now);
-  const autoRules = input.rules.filter(isAutoTagRule);
+  const autoRules = [...input.rules, ...familyTagRules(input.settings)].filter(isAutoTagRule);
   const priceOnly = autoRules.filter((r) => !hasConditions(r));
   const withConditions = autoRules.filter(hasConditions);
   const out: TagChange[] = [];
@@ -118,7 +125,7 @@ export function diagnoseAutoTags(input: AllocationInput, now = Date.now(), extra
   const priced = cards.filter((c) => (ownPrice(c, ctx) ?? extraPrice?.(c) ?? null) != null).length;
   return {
     cards: Object.keys(input.cards).length,
-    rulesWithRange: input.rules.filter(isAutoTagRule).length,
+    rulesWithRange: [...input.rules, ...familyTagRules(input.settings)].filter(isAutoTagRule).length,
     pricedCards: priced,
     unpricedCards: cards.length - priced,
   };

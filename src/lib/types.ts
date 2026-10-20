@@ -7,7 +7,7 @@ export interface RuleConditions {
   text: string;
   /** Nom d'une de mes familles : la carte doit en faire partie. */
   family: string;
-  /** Taux de vente (en %) entre ces bornes, à partir de SELL_RATE_MIN_SAMPLES enchères terminées. */
+  /** Taux de vente (en %) entre ces bornes, à partir de `sellRateMinSamples` enchères terminées. */
   rateMin: number | null;
   rateMax: number | null;
 }
@@ -23,17 +23,52 @@ export interface SortCriterion {
   dir: 'asc' | 'desc';
 }
 
-/** Réglages de vente propres à une étiquette (remplacent les réglages globaux). */
-export interface RuleSale {
-  minSellRate: number | null;
-  sellRateRules: SellRateRule[];
-  durationRules: DurationRule[];
-  sort: CandidateSort;
-  /** Formule de score (ordre `score`) : la plus haute d'abord. */
-  score: string;
-  /** Critères de tri (ordre `custom`), dans l'ordre. */
-  sortCriteria?: SortCriterion[];
+/**
+ * Calcul du prix de départ.
+ * `default` (option A) : suit le calcul par défaut des réglages ; `simple` (B1) : prix moyen × mise de départ × bonus du
+ * taux de vente ; `formula` (B2) : formule libre (voir lib/formula.ts).
+ */
+export type PriceCalcMode = 'default' | 'simple' | 'formula';
+
+export interface PriceCalc {
+  mode: PriceCalcMode;
+  /** Mise de départ, en % du prix moyen. */
+  pct: number;
+  /** Influence du taux de vente (0 = aucune, 100 = un tdv de 100 % double l'écart à 50 %). */
+  tdvWeight: number;
+  /** Enchères terminées à partir desquelles le taux de vente compte pleinement (en dessous, il compte en partie). */
+  trustSales: number;
+  /** Formule du mode `formula`. */
+  formula: string;
+  /** Prix minimum et maximum (W) ; null = sans. */
+  minPrice: number | null;
+  maxPrice: number | null;
 }
+
+/** Palier de prix du mode « meilleures cartes » : cartes dont le prix moyen est entre `from` et `to` (inclus). */
+export interface PriceTier {
+  id: string;
+  active: boolean;
+  from: number | null;
+  to: number | null;
+  /** Slots réservés (si « Réserver des slots par palier » est activé). */
+  slots: number;
+  calc: PriceCalc;
+  /** Durée de l'enchère (minutes) ; null = paliers de durée généraux. */
+  durationMin: number | null;
+}
+
+/** Étiquette posée sur les cartes d'une famille. */
+export interface FamilyTag {
+  id: string;
+  active: boolean;
+  /** Nom d'une de mes familles. */
+  family: string;
+  tag: string;
+}
+
+/** Ordre de priorité des cartes proposées. */
+export type Priority = 'balanced' | 'value' | 'fast' | 'clear' | 'custom' | 'formula';
 
 export interface TagRule {
   id: string;
@@ -41,8 +76,6 @@ export interface TagRule {
   tag: string;
   /** Nombre de slots que l'étiquette doit occuper en permanence. */
   quota: number;
-  /** Pourcentage du prix moyen (70 = 70 %). */
-  pct: number;
   floor: number | null;
   ceiling: number | null;
   /** Nombre d'exemplaires à toujours garder (1 = seuls les doublons sont vendables). */
@@ -56,8 +89,12 @@ export interface TagRule {
   match: 'tag' | 'price';
   /** Conditions en plus de la plage de prix (absentes = aucune). */
   when?: RuleConditions;
-  /** Réglages de vente propres (absents = réglages globaux). */
-  sale?: RuleSale;
+  /** Calcul du prix de départ (mode « par étiquette ») ; absent = calcul par défaut. */
+  calc?: PriceCalc;
+  /** Durée de l'enchère (minutes) ; null ou absent = paliers de durée généraux. */
+  durationMin?: number | null;
+  /** Règle interne tirée d'un palier de prix (mode « meilleures cartes ») : filtre d'étiquettes des ventes en plus. */
+  tier?: boolean;
 }
 
 export interface Card {
@@ -125,11 +162,11 @@ export interface DurationRule {
   minutes: number;
 }
 
-/** Palier de taux de vente : tdv entre `from` et `to` % (inclus) → prix conseillé ajusté de `adjust` % (−50 = moitié prix). */
+/** Palier de taux de vente : tdv entre `from` et `to` % (inclus) → prix conseillé × `pricePct` % (100 = inchangé, 50 = moitié prix). */
 export interface SellRateRule {
   from: number | null;
   to: number | null;
-  adjust: number;
+  pricePct: number;
 }
 
 export interface Settings {
@@ -138,15 +175,29 @@ export interface Settings {
   stat: 'mean' | 'median';
   /** Pas d'arrondi du prix conseillé ; 0 = automatique selon le montant. */
   rounding: number;
-  /** Classement à doublons égaux : prix le plus haut d'abord, ou le plus bas (pour écouler). */
-  sortPrice: 'desc' | 'asc' | 'random' | 'custom';
-  /** Critères de tri des cartes proposées (ordre `custom`), dans l'ordre. */
+  /** Ordre de priorité des cartes proposées. */
+  priority: Priority;
+  /** Les cartes en plusieurs exemplaires passent d'abord. */
+  duplicatesFirst: boolean;
+  /** Critères de tri (priorité `custom`), dans l'ordre. */
   sortCriteria: SortCriterion[];
+  /** Formule de priorité (priorité `formula`) : la plus haute d'abord. */
+  priorityFormula: string;
   /**
-   * `quota` : chaque étiquette réserve ses slots ; `pool` : les meilleures cartes de toutes les étiquettes remplissent
-   * les slots libres, page par page (« Suivant »).
+   * `pool` (« meilleures cartes ») : les meilleures cartes remplissent les slots libres, réparties en paliers de prix ;
+   * `quota` (« par étiquette ») : chaque étiquette réserve ses slots.
    */
   allocationMode: 'quota' | 'pool';
+  /** Calcul du prix par défaut (option A des paliers et des étiquettes). */
+  defaultCalc: PriceCalc;
+  /** Meilleures cartes : paliers de prix (vide = un seul groupe, toutes les cartes). */
+  priceTiers: PriceTier[];
+  /** Meilleures cartes : chaque palier réserve son nombre de slots. */
+  reserveTierSlots: boolean;
+  /** Meilleures cartes : `include` = seulement les cartes avec une de ces étiquettes ; `exclude` = toutes sauf celles-là. */
+  saleTags: { mode: 'include' | 'exclude'; tags: string[] };
+  /** Meilleures cartes : exemplaires toujours gardés (1 = seuls les doublons sont vendus). */
+  keepMin: number;
   /** Graine du tirage « aléatoire » (stable entre deux rafraîchissements, change à la demande). */
   randomSeed: number;
   /** Autoriser à proposer une carte déjà en vente. */
@@ -166,8 +217,10 @@ export interface Settings {
   durationRules: DurationRule[];
   /** Ne pas proposer une carte dont le taux de vente est sous ce % (null = pas de minimum). */
   minSellRate: number | null;
-  /** Ajustement du prix conseillé selon le taux de vente (vide = aucun). */
-  sellRateRules: SellRateRule[];
+  /** Nombre d'enchères terminées à partir duquel le taux de vente compte (minimum, paliers, conditions, tri). */
+  sellRateMinSamples: number;
+  /** Ne jamais proposer à la vente une carte d'une de mes familles (sauf étiquette qui vise cette famille). */
+  protectFamilies: boolean;
   /** Pastilles d'étiquettes sur les cartes de la collection. */
   showTagOverlay: boolean;
   /** `label` : nom de l'étiquette ; `dot` : simple pastille de couleur (nom au survol). */
@@ -190,6 +243,10 @@ export interface Settings {
   autoTagRemoveOthers: boolean;
   /** Retirer les étiquettes de plage des cartes sans prix propre connu. */
   autoTagClearUnpriced: boolean;
+  /** Étiquetage en continu : l'étiquetage automatique tourne tout seul (par l'API) tant qu'un onglet du site est ouvert. */
+  autoTagContinuous: boolean;
+  /** Familles → étiquette : une carte d'une de ces familles reçoit l'étiquette (étiquetage automatique). */
+  familyTags: FamilyTag[];
   /** Remettre ses étiquettes à une carte dont l'enchère se termine sans acheteur (par l'API, nécessite apiWrite). */
   retagUnsold: boolean;
   /** « Tout défausser » après ouverture : confirmation si une carte vaut plus que ce prix moyen (W). */

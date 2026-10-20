@@ -186,7 +186,7 @@ function drawHome(): void {
   part('summary', key, (node) => {
     const total = families.reduce((n, f) => n + f.cards.length, 0);
     const owned = families.reduce((n, f) => n + statsOf(f).owned, 0);
-    node.textContent = families.length ? `${plural(families.length, 'famille')} · ${owned.toLocaleString('fr-FR')}/${total.toLocaleString('fr-FR')} cartes possédées${ctx!.apiRead ? '' : ' · prix moyens : active la lecture via l\'API (Réglages → Automatisations)'}` : '';
+    node.textContent = families.length ? `${plural(families.length, 'famille')} · ${owned.toLocaleString('fr-FR')}/${total.toLocaleString('fr-FR')} cartes possédées${ctx!.apiRead ? '' : ' · prix moyens : active la lecture via l\'API (Réglages → Accès au site)'}` : '';
   });
   part('tiles', key, (node) => {
     const q = normalize(ui.homeQuery);
@@ -356,7 +356,7 @@ function drawGrid(node: HTMLElement, f: CardFamily): void {
 function drawMarket(f: CardFamily, missing: CatalogCard[]): void {
   const missingKey = missing.map((c) => c.siteId).join(',');
   if (!ctx!.apiRead) {
-    part('marketBody', 'noapi', (n) => (n.innerHTML = '<p class="wf-muted" style="margin:0">Le marché utilise la lecture via l\'API (Réglages → Automatisations).</p>'));
+    part('marketBody', 'noapi', (n) => (n.innerHTML = '<p class="wf-muted" style="margin:0">Le marché utilise la lecture via l\'API (Réglages → Accès au site).</p>'));
     return;
   }
   if (!missing.length) {
@@ -507,7 +507,7 @@ class AddPanel {
       return;
     }
     if (!ctx?.apiRead) {
-      this.status.textContent = 'La recherche dans le catalogue utilise la lecture via l\'API (Réglages → Automatisations).';
+      this.status.textContent = 'La recherche dans le catalogue utilise la lecture via l\'API (Réglages → Accès au site).';
       return;
     }
     const token = this.token;
@@ -588,7 +588,7 @@ class AddPanel {
     this.addBtn.textContent = n ? `Ajouter ${plural(n, 'carte')}` : 'Ajouter';
     const q = this.input.value.trim();
     let text: string;
-    if (!ctx?.apiRead) text = 'Recherche dans le catalogue : active la lecture via l\'API (Réglages → Automatisations). « Mes cartes de cette catégorie » fonctionne sans.';
+    if (!ctx?.apiRead) text = 'Recherche dans le catalogue : active la lecture via l\'API (Réglages → Accès au site). « Mes cartes de cette catégorie » fonctionne sans.';
     else if (this.loading && !this.results.length) text = 'Recherche…';
     else if (q.length < 2 && !this.rarity.value) text = 'Tape au moins 2 lettres : titre ou catégorie (ex. « roi de France »).';
     else if (!this.results.length) text = 'Aucune carte trouvée.';

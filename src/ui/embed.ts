@@ -28,7 +28,7 @@ function applyTheme(t: SiteTheme): void {
     '--bg': t.surface || '#131615',
     '--card': t.surfaceLight || '#1b1f1d',
     '--text': fg,
-    '--muted': `color-mix(in srgb, ${fg} 55%, transparent)`,
+    '--muted': `color-mix(in srgb, ${fg} 75%, transparent)`,
     '--border': t.border || '#2e3431',
     '--accent': ORANGE,
     '--accent-dark': '#fb923c',

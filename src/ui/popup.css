@@ -1,7 +1,8 @@
 body { width: 380px; }
 #app { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-header h1 { font-size: 16px; }
-header button { padding: 2px 6px; }
+header h1 { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+header { gap: 4px; }
+header button { padding: 2px 4px; }
 .banner { font-size: 14px; }
 
 .slot.free { display: flex; flex-direction: column; gap: 6px; border-color: var(--accent); }
@@ -82,3 +83,21 @@ button.tag-switch:disabled { opacity: .4; }
 .news-section h3 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .news-section ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 6px; }
 .news-section li .pill { margin-left: 6px; }
+/* Contraste des textes secondaires (WCAG AA, y compris en petit) */
+#app { --muted: #57534e; }
+@media (prefers-color-scheme: dark) { #app { --muted: #c4bfbb; } }
+.site #app { --muted: color-mix(in srgb, var(--text) 75%, transparent); }
+/* Sous-vues d'un onglet (Mes ventes / Mes mises, Cartes / Étiquetage) */
+.segmented { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); align-self: flex-start; }
+.segmented button { border: 0; background: none; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.segmented button:hover { color: var(--text); }
+.segmented button.on { background: var(--accent-soft); color: var(--accent-dark); }
+/* Justification du prix sur une ligne, explications au clic sur « ? » */
+.slot .detail.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.why > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
+.why > summary::-webkit-details-marker { display: none; }
+.why > summary .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.why[open] > summary .ellipsis { white-space: normal; }
+.why-btn { flex: none; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+.why > div { margin-top: 4px; }
+.tabs .tab { padding: 6px 10px; font-size: 13px; }

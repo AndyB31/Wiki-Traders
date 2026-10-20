@@ -47,7 +47,7 @@ export async function addCardsFlow(target: CardFamily | null, source: Source): P
     return;
   }
   if (!cards.length && target) {
-    noticeToast(unresolved.length ? `Aucune carte reconnue (${unresolved.slice(0, 3).join(', ')}…). Active la lecture via l'API (Réglages → Automatisations).` : 'Aucune carte à ajouter.', { error: true });
+    noticeToast(unresolved.length ? `Aucune carte reconnue (${unresolved.slice(0, 3).join(', ')}…). Active la lecture via l'API (Réglages → Accès au site).` : 'Aucune carte à ajouter.', { error: true });
     return;
   }
   const { family, added } = await addToFamily(target ?? name!, cards);

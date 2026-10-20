@@ -14,14 +14,14 @@ const cfg = { url: `https://${REF}.supabase.co`, anonKey: 'anon' };
 const session = { accessToken: 't', userId: 'me', expiresAt: 0 };
 
 /** Faux serveur PostgREST : plafonne chaque réponse à 1 000 lignes, annonce le total si `Prefer: count=exact`. */
-function server(all: unknown[]) {
+function server(all: unknown[], cap = 1000) {
   const calls: string[] = [];
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     if (url.includes('/_next/')) return new Response(`u="https://${REF}.supabase.co";k="${jwt({ role: 'anon', ref: REF })}"`);
     calls.push(url);
     const u = new URL(url);
     const offset = Number(u.searchParams.get('offset') ?? 0);
-    const limit = Math.min(Number(u.searchParams.get('limit') ?? 1000), 1000);
+    const limit = Math.min(Number(u.searchParams.get('limit') ?? 1000), cap);
     const rows = all.slice(offset, offset + limit);
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if ((init?.headers as Record<string, string>)?.Prefer === 'count=exact') headers['content-range'] = `${offset}-${offset + rows.length - 1}/${all.length}`;
@@ -40,6 +40,13 @@ describe('pagination de l\'API (plafond de 1 000 lignes par réponse)', () => {
     expect(rows.at(-1)!.i).toBe(2499);
     expect(calls).toHaveLength(3);
     expect(calls.every((c) => c.includes('order=id') && c.includes(`limit=${PAGE_SIZE}`))).toBe(true);
+  });
+
+  it('serveur plafonné sous 1 000 : pages restantes en parallèle, à la taille servie, dans l\'ordre', async () => {
+    const calls = server(Array.from({ length: 2300 }, (_, i) => ({ i })), 400);
+    const rows = await getAll<{ i: number }>(cfg, session, 'auctions?select=i');
+    expect(rows.map((r) => r.i)).toEqual(Array.from({ length: 2300 }, (_, i) => i));
+    expect(calls.map((c) => Number(new URL(c).searchParams.get('offset')))).toEqual([0, 400, 800, 1200, 1600, 2000]);
   });
 
   it('prix moyens : une carte dont les ventes sont au-delà de la 1 000e ligne a bien son prix (plus de « — »)', async () => {

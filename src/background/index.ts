@@ -138,7 +138,7 @@ async function handleScan(msg: ScanMessage): Promise<void> {
       patch.slotOverrides = {};
       patch.ignoredSlots = [];
       patch.poolOffset = 0;
-      if (store.settings.sortPrice === 'random') patch.settings = { ...(patch.settings ?? store.settings), randomSeed: (now % 2_147_483_647) || 1 };
+      if (store.settings.priority === 'custom' && store.settings.sortCriteria.some((c) => c.key === 'hasard')) patch.settings = { ...(patch.settings ?? store.settings), randomSeed: (now % 2_147_483_647) || 1 };
       if (store.pendingFocus && created.some((a) => a.cardId === store.pendingFocus!.cardId)) patch.pendingFocus = null;
     }
   }

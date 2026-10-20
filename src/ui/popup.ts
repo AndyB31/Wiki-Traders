@@ -3,7 +3,7 @@ import './popup.css';
 import { allocate, makeContext, type FreeSlot } from '../lib/allocation';
 import { rarityBase } from '../lib/pricing';
 import { catalogPriceOf, diagnoseAutoTags, planAutoTags, type CatalogPriceEntry } from '../lib/autotag';
-import { rateOf, sellRateOfCache, SELL_RATE_MIN_SAMPLES, type RateEntry } from '../lib/sellrate';
+import { rateOf, sellRateOfCache, type RateEntry } from '../lib/sellrate';
 import { DURATIONS, durationFor, durationLabel } from '../lib/duration';
 import { ext } from '../lib/browser';
 import { CARD_PRICES_KEY, SITE_ORIGIN, STALE_AFTER_MS } from '../lib/defaults';
@@ -26,12 +26,40 @@ function closeUi(): void {
 }
 let store: StoreShape;
 let activeTab: chrome.tabs.Tab | undefined;
+/** Vue affichée (aussi l'identifiant `view` des pages du site) ; les 4 onglets regroupent ces vues. */
 type PopupTab = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'tags' | 'tools' | 'news';
+type TopTab = 'sell' | 'auctions' | 'history' | 'cards';
+/** Onglet de chaque vue ; Outils et Nouveautés s'ouvrent depuis l'en-tête. */
+const TOP_OF: Record<PopupTab, TopTab | null> = { sell: 'sell', running: 'auctions', bids: 'auctions', sold: 'history', cards: 'cards', tags: 'cards', tools: null, news: null };
+const POPUP_TABS = Object.keys(TOP_OF) as PopupTab[];
+const asTab = (v: string | null): PopupTab | null => (POPUP_TABS.includes(v as PopupTab) ? (v as PopupTab) : null);
 type GroupBy = 'family' | 'tag' | 'category' | 'rarity';
 let groupBy = localStorage.getItem('wiky-group') as GroupBy | null;
 let cardFilter = '';
 const openGroups = new Set<string>();
-let currentTab = ((view as PopupTab | null) ?? (localStorage.getItem('wiky-tab') as PopupTab | null)) ?? 'sell';
+let currentTab: PopupTab = asTab(view) ?? asTab(localStorage.getItem('wiky-tab')) ?? 'sell';
+
+/** Change de vue (mémorisée pour la prochaine ouverture et, par onglet, la dernière sous-vue choisie). */
+function goTo(tab: PopupTab): void {
+  currentTab = tab;
+  localStorage.setItem('wiky-tab', tab);
+  const top = TOP_OF[tab];
+  if (top) localStorage.setItem(`wiky-sub-${top}`, tab);
+  render();
+  scrollTo(0, 0);
+  void refreshBidsOnOpen();
+}
+
+/** Sélecteur segmenté entre les vues d'un même onglet (ex. Mes ventes / Mes mises). */
+function segmented(options: [PopupTab, string][]) {
+  return h(
+    'div',
+    { class: 'segmented', role: 'group' },
+    options.map(([id, label]) =>
+      h('button', { type: 'button', class: id === currentTab ? 'on' : '', 'aria-pressed': String(id === currentTab), onclick: () => id !== currentTab && goTo(id) }, label),
+    ),
+  );
+}
 
 function rarityDot(r: Rarity | null) {
   return r ? h('span', { class: `rarity ${r}`, title: RARITIES[r].label }) : null;
@@ -102,9 +130,13 @@ async function refreshSales(): Promise<void> {
  * « Proposer d'autres cartes » : chaque slot libre passe à la carte suivante de ses candidates
  * (en boucle), sans proposer deux fois la même carte.
  */
+function randomOrder(): boolean {
+  return store.settings.priority === 'custom' && store.settings.sortCriteria[0]?.key === 'hasard';
+}
+
 async function rotateProposals(free: FreeSlot[]): Promise<void> {
-  // Mode aléatoire : un nouveau tirage plutôt qu'une rotation.
-  if (store.settings.sortPrice === 'random') {
+  // Critère « hasard » : un nouveau tirage plutôt qu'une rotation.
+  if (randomOrder()) {
     await save({ slotOverrides: {}, settings: { ...store.settings, randomSeed: (store.settings.randomSeed * 48271 + 11) % 2_147_483_647 } });
     return;
   }
@@ -152,7 +184,7 @@ function proposalTools(free: FreeSlot[]) {
     rotatable
       ? h(
           'button',
-          { title: store.settings.sortPrice === 'random' ? 'Nouveau tirage aléatoire' : 'Propose d\'autres cartes pour les slots libres', onclick: () => rotateProposals(free) },
+          { title: randomOrder() ? 'Nouveau tirage aléatoire' : 'Propose d\'autres cartes pour les slots libres', onclick: () => rotateProposals(free) },
           '🔀 Proposer d\'autres cartes',
         )
       : null,
@@ -191,7 +223,11 @@ function whyEmpty(slot: FreeSlot) {
   const e = slot.excluded;
   if (!e) return null;
   if (!e.total) {
-    const how = slot.rule.match === 'tag' ? `Aucune carte connue ne porte l'étiquette « ${slot.rule.tag} » : ouvre ta collection, ou vérifie le nom exact dans les réglages.` : 'Aucune carte connue dans cette plage de prix.';
+    const how = slot.rule.tier
+      ? 'Aucune carte connue dans ce palier : ouvre ta collection, ou vérifie les cartes à vendre (Réglages → Ventes).'
+      : slot.rule.match === 'tag'
+        ? `Aucune carte connue ne porte l'étiquette « ${slot.rule.tag} » : ouvre ta collection, ou vérifie le nom exact dans les réglages.`
+        : 'Aucune carte connue dans cette plage de prix.';
     return h('div', { class: 'small muted' }, how);
   }
   const parts = [
@@ -199,13 +235,14 @@ function whyEmpty(slot: FreeSlot) {
     e.onSale ? `${e.onSale} déjà en vente` : '',
     e.favorite ? `${e.favorite} en favori` : '',
     e.blacklist ? `${e.blacklist} en liste noire` : '',
+    e.family ? `${e.family} dans tes familles (protégées)` : '',
     e.lowRate ? `${e.lowRate} sous le taux de vente minimum (${store.settings.minSellRate} %)` : '',
   ].filter(Boolean);
   return h(
     'div',
     { class: 'small muted' },
-    `${e.total} carte(s) dans l'étiquette : ${parts.join(', ')}.`,
-    e.keep ? h('div', null, 'Pour vendre ton seul exemplaire, mets « Garder » à 0 pour cette étiquette dans les réglages.') : null,
+    `${e.total} carte(s) dans ${slot.rule.tier ? 'le palier' : 'l\'étiquette'} : ${parts.join(', ')}.`,
+    e.keep ? h('div', null, slot.rule.tier ? 'Pour vendre ton seul exemplaire, mets « Exemplaires gardés » à 0 (Réglages → Ventes).' : 'Pour vendre ton seul exemplaire, mets « Garder » à 0 pour cette étiquette dans les réglages.') : null,
   );
 }
 
@@ -275,18 +312,7 @@ function freeSlotView(slot: FreeSlot) {
       h('span', { class: 'muted small' }, `×${p.card.quantity}`),
       priceBlock,
     ),
-    h(
-      'div',
-      { class: 'muted small detail' },
-      p.pricing.detail,
-      p.pricing.durationMin != null ? h('span', { class: 'duration' }, ` · durée ${durationLabel(p.pricing.durationMin)}`) : null,
-    ),
-    p.pricing.base.source === 'rarity' || p.pricing.base.source === 'estimate'
-      ? h('div', { class: 'small muted' }, `Prix déduit de la rareté : cette carte n'a pas de vente connue (toutes les cartes ${p.card.rarity ? RARITIES[p.card.rarity].label : ''} sans historique ont ce prix).`)
-      : null,
-    !store.settings.prefill
-      ? h('div', { class: 'small muted' }, '« Ouvrir » met la carte en évidence. Pour ouvrir aussi la fenêtre de vente : Réglages → Automatisations → V4.')
-      : null,
+    slotDetail(slot),
     h(
       'div',
       { class: 'row actions' },
@@ -299,6 +325,28 @@ function freeSlotView(slot: FreeSlot) {
         : null,
       slot.candidates.length > 1 ? select : null,
     ),
+  );
+}
+
+/** Justification du prix sur une ligne ; les explications se déplient avec « ? ». */
+function slotDetail(slot: FreeSlot) {
+  const p = slot.proposal!;
+  const line = [
+    p.pricing.detail,
+    p.pricing.durationMin != null ? h('span', { class: 'duration' }, ` · durée ${durationLabel(p.pricing.durationMin)}`) : null,
+  ];
+  const notes = [
+    p.pricing.base.source === 'rarity' || p.pricing.base.source === 'estimate'
+      ? `Prix déduit de la rareté : cette carte n'a pas de vente connue (toutes les cartes ${p.card.rarity ? RARITIES[p.card.rarity].label : ''} sans historique ont ce prix).`
+      : null,
+    !store.settings.prefill ? '« Ouvrir » met la carte en évidence. Pour ouvrir aussi la fenêtre de vente : Réglages → Ventes → Aide à la vente.' : null,
+  ].filter((n): n is string => !!n);
+  if (!notes.length) return h('div', { class: 'muted small detail ellipsis', title: p.pricing.detail }, ...line);
+  return h(
+    'details',
+    { class: 'muted small detail why' },
+    h('summary', { title: 'Explications' }, h('span', { class: 'grow ellipsis' }, ...line), h('span', { class: 'why-btn', 'aria-hidden': 'true' }, '?')),
+    notes.map((n) => h('div', null, n)),
   );
 }
 
@@ -316,18 +364,19 @@ function openSellDialog(slot: FreeSlot): void {
   const close = () => modal.remove();
   const cached = card.siteId ? (catalogPrices?.[card.siteId] as CachedPrice | undefined) : undefined;
   const rate = rateOf(cached);
-  const tiers = slot.rule.sale?.durationRules ?? store.settings.durationRules;
+  const tiers = store.settings.durationRules;
 
   const info = (label: string, value: string | Node, title?: string) => h('div', { class: 'sell-info', title }, h('span', { class: 'muted small' }, label), h('strong', null, value));
-  const rateClass = !rate ? '' : rate.total < SELL_RATE_MIN_SAMPLES ? '' : rate.pct <= 15 ? 'down' : rate.pct >= 70 ? 'up' : '';
+  const minSamples = store.settings.sellRateMinSamples;
+  const rateClass = !rate ? '' : rate.total < minSamples ? 'muted' : rate.pct <= 15 ? 'down' : rate.pct >= 70 ? 'up' : '';
   const infos = h(
     'div',
     { class: 'sell-infos' },
     info('Prix moyen', p.pricing.base.value != null ? formatPrice(Math.round(p.pricing.base.value)) : '—', p.pricing.detail),
     info(
       'Taux de vente',
-      rate ? h('span', { class: rateClass }, `${rate.pct} %`) : '—',
-      rate ? `${rate.sold} vendue(s) sur ${rate.total} enchère(s) terminée(s)${rate.total < SELL_RATE_MIN_SAMPLES ? ' : trop peu pour être fiable' : ''}` : 'Pas encore lu (ouvre ta collection)',
+      rate ? h('span', { class: rateClass }, `${rate.pct} % (${rate.sold}/${rate.total})`) : '—',
+      rate ? `${rate.sold} vendue(s) sur ${rate.total} enchère(s) terminée(s)${rate.total < minSamples ? ` : moins de ${minSamples}, pas pris en compte` : ''}` : 'Pas encore lu (ouvre ta collection)',
     ),
     info('Ventes', rate ? `${rate.sold} / ${rate.total}` : cached ? String(cached.count) : '—', 'Enchères conclues / enchères terminées'),
     cached?.median != null ? info('Médiane', formatPrice(Math.round(cached.median))) : null,
@@ -352,7 +401,7 @@ function openSellDialog(slot: FreeSlot): void {
   };
   priceIn.addEventListener('input', () => {
     // La durée suit les paliers tant qu'elle n'a pas été choisie à la main.
-    const d = durationFor(Number(priceIn.value) || null, tiers);
+    const d = slot.rule.durationMin ?? durationFor(Number(priceIn.value) || null, tiers);
     if (!durTouched && d != null) durIn.value = String(d);
     label();
   });
@@ -431,10 +480,7 @@ function newsBlock() {
   if (store.changelogSeen !== LATEST_CHANGELOG) void save({ changelogSeen: LATEST_CHANGELOG });
   const done = () => {
     if (embedded) parent.postMessage({ wiky: 'close' }, '*');
-    else {
-      currentTab = 'sell';
-      render();
-    }
+    else goTo('sell');
   };
   return [
     ...CHANGELOG.map((entry, i) =>
@@ -781,6 +827,7 @@ function cardsBlock() {
   const search = h('input', {
     type: 'search',
     class: 'grow',
+    name: 'card-search',
     placeholder: 'Rechercher une carte…',
     value: cardFilter,
     oninput: (e: Event) => {
@@ -833,7 +880,7 @@ function collectionStatus(label = '↻ Recharger') {
       // Sans API : on relit la page de collection (seules les cartes affichées sont vues).
       if (!tab.url?.startsWith(SITE_ORIGIN + '/collection')) await ext.tabs.update(tab.id!, { url: SITE_ORIGIN + '/collection' });
       else await sendToTab({ type: 'rescan' });
-      status.textContent = 'Page relue. Active la lecture via l\'API (onglet Mises) pour recharger toute la collection.';
+      status.textContent = 'Page relue. Active la lecture via l\'API (Enchères → Mes mises) pour recharger toute la collection.';
     }
     btn.disabled = false;
   };
@@ -1107,10 +1154,11 @@ function autoTagBlock(onCollection: boolean) {
   const why = () => {
     const d = diag;
     if (!d.cards) return 'Aucune carte connue : ouvre ta collection.';
-    if (!d.rulesWithRange) return 'Aucune règle d\'étiquetage : renseigne une plage de prix (ex. « Mettre au Enchère » : 20 à 1000) ou des conditions (texte, famille, taux de vente) dans les réglages.';
-    if (!d.pricedCards) return store.settings.apiRead ? 'Aucune carte n\'a encore de prix : patiente pendant le chargement, ou clique « Rafraîchir les prix ».' : 'Aucune carte n\'a de prix : active la lecture via l\'API (Réglages → Automatisations).';
+    if (!d.rulesWithRange) return 'Aucune règle d\'étiquetage : renseigne une plage de prix (ex. « Mettre au Enchère » : 20 à 1000) ou des conditions (texte, taux de vente) dans Réglages → Étiquettes, ou une famille dans Réglages → Familles.';
+    if (!d.pricedCards) return store.settings.apiRead ? 'Aucune carte n\'a encore de prix : patiente pendant le chargement, ou clique « Rafraîchir les prix ».' : 'Aucune carte n\'a de prix : active la lecture via l\'API (Réglages → Accès au site).';
     return `Les ${d.pricedCards} carte(s) au prix connu sont déjà dans la bonne étiquette.`;
   };
+  const continuous = store.settings.autoTagContinuous && viaApi;
   return h(
     'div',
     { class: 'card autotag' },
@@ -1120,7 +1168,8 @@ function autoTagBlock(onCollection: boolean) {
       'div',
       { class: 'row' },
       h('strong', { class: 'grow' }, `Étiquetage auto : ${plan.length} carte(s)`),
-      plan.length ? h('button', { class: 'primary', onclick: start }, onCollection || viaApi ? 'Lancer' : 'Aller à la collection') : null,
+      continuous ? h('span', { class: 'pill', title: 'Tourne tout seul tant qu\'un onglet du site est ouvert (Réglages → Étiquettes)' }, 'en continu') : null,
+      plan.length ? h('button', { class: continuous ? undefined : 'primary', onclick: start }, continuous ? 'Maintenant' : onCollection || viaApi ? 'Lancer' : 'Aller à la collection') : null,
       h('button', { title: 'Désactiver', onclick: () => save({ settings: { ...store.settings, autoTag: false } }) }, 'Off'),
     ),
     plan.length
@@ -1253,10 +1302,9 @@ function render(): void {
 
   const refreshing = !!store.intent && now - store.intent.at < 30_000;
   const sellCount = alloc.free.filter((s) => !s.ignored).length;
-  const tabs: { id: PopupTab; label: string; hidden?: boolean; body: () => (Node | string | null)[] }[] = [
+  const panes: { id: PopupTab; body: () => (Node | string | null)[] }[] = [
     {
       id: 'sell',
-      label: `Vendre${sellCount ? ` (${sellCount})` : ''}`,
       body: () => [
         alloc.pool ? poolTools(alloc.free, alloc.pool) : proposalTools(alloc.free),
         ...free.map(freeSlotView),
@@ -1266,25 +1314,22 @@ function render(): void {
     },
     {
       id: 'running',
-      label: `En cours (${busy.length})`,
       body: () => (busy.length ? busy : [h('p', { class: 'muted empty' }, 'Aucune enchère en cours relevée. Utilise 🔄 pour relire tes ventes.')]),
     },
-    { id: 'bids', label: 'Mises', body: bidsBlock },
-    { id: 'sold', label: 'Vendues', body: soldBlock },
-    { id: 'cards', label: 'Cartes', body: cardsBlock },
-    { id: 'tags', label: 'Étiquettes', body: () => [autoTagBlock(!!activeTab?.url?.startsWith(SITE_ORIGIN + '/collection'))] },
-    { id: 'news', label: 'Nouveautés', hidden: true, body: newsBlock },
+    { id: 'bids', body: bidsBlock },
+    { id: 'sold', body: soldBlock },
+    { id: 'cards', body: cardsBlock },
+    { id: 'tags', body: () => [autoTagBlock(!!activeTab?.url?.startsWith(SITE_ORIGIN + '/collection'))] },
+    { id: 'news', body: newsBlock },
     {
       id: 'tools',
-      label: 'Outils',
-      hidden: true,
       body: () => [
         tools ?? h('p', { class: 'muted small' }, 'Ouvre WikiMasters pour relire la page ou exporter un diagnostic.'),
         h(
           'div',
           { class: 'tools row small' },
           h('button', { onclick: () => ext.tabs.create({ url: ext.runtime.getURL('journal.html') }) }, '📒 Journal'),
-          h('button', { onclick: () => ((currentTab = 'news'), render()) }, '🎉 Nouveautés'),
+          h('button', { onclick: () => goTo('news') }, '🎉 Nouveautés'),
           h('button', { onclick: () => ext.runtime.openOptionsPage() }, '⚙️ Réglages'),
         ),
         h('p', { class: 'muted small' }, `Ventes relues : ${fmtDate(store.meta.lastAuctionsScan)} · collection : ${fmtDate(store.meta.lastCollectionScan)}`),
@@ -1292,15 +1337,23 @@ function render(): void {
       ],
     },
   ];
-  const current = tabs.find((t) => t.id === currentTab) ?? tabs[0];
+  const tops: { id: TopTab; label: string; sub?: [PopupTab, string][] }[] = [
+    { id: 'sell', label: `Vendre${sellCount ? ` (${sellCount})` : ''}` },
+    { id: 'auctions', label: `Enchères${busy.length ? ` (${busy.length})` : ''}`, sub: [['running', `Mes ventes (${busy.length})`], ['bids', 'Mes mises']] },
+    { id: 'history', label: 'Historique' },
+    { id: 'cards', label: 'Cartes', sub: [['cards', 'Cartes'], ['tags', 'Étiquetage']] },
+  ];
+  const current = panes.find((t) => t.id === currentTab) ?? panes[0];
+  const top = tops.find((t) => t.id === TOP_OF[current.id]);
+  const openTop = (t: (typeof tops)[number]) => goTo(asTab(localStorage.getItem(`wiky-sub-${t.id}`)) ?? t.sub?.[0][0] ?? (t.id as PopupTab));
 
   // Un seul onglet, dans une fenêtre ou une page du site : le résumé est déjà dans la barre latérale.
   if (view) {
-    mount(app, current.id === 'sell' ? warnings : null, h('section', { class: 'panel', role: 'tabpanel' }, current.body()));
+    keepPlace(() => mount(app, current.id === 'sell' ? warnings : null, h('section', { class: 'panel', role: 'tabpanel' }, current.body())));
     return;
   }
 
-  mount(
+  keepPlace(() => mount(
     app,
     h(
       'header',
@@ -1318,13 +1371,14 @@ function render(): void {
         {
           title: 'Outils : relire la page, diagnostic…',
           class: current.id === 'tools' ? 'on' : '',
-          onclick: () => {
-            currentTab = current.id === 'tools' ? 'sell' : 'tools';
-            localStorage.setItem('wiky-tab', currentTab);
-            render();
-          },
+          onclick: () => goTo(current.id === 'tools' ? 'sell' : 'tools'),
         },
         '🧰',
+      ),
+      h(
+        'button',
+        { title: 'Nouveautés', class: current.id === 'news' ? 'on' : '', onclick: () => goTo(current.id === 'news' ? 'sell' : 'news') },
+        '🎉',
       ),
       tagStyleSwitch(),
       h('button', { title: 'Réglages', onclick: () => ext.runtime.openOptionsPage() }, '⚙️'),
@@ -1335,25 +1389,21 @@ function render(): void {
     h(
       'nav',
       { class: 'tabs', role: 'tablist' },
-      tabs.filter((t) => !t.hidden).map((t) =>
+      tops.map((t) =>
         h(
           'button',
           {
             role: 'tab',
-            class: t.id === current.id ? 'tab active' : 'tab',
-            'aria-selected': String(t.id === current.id),
-            onclick: () => {
-              currentTab = t.id;
-              localStorage.setItem('wiky-tab', t.id);
-              render();
-              void refreshBidsOnOpen();
-            },
+            class: t === top ? 'tab active' : 'tab',
+            'aria-selected': String(t === top),
+            onclick: () => openTop(t),
           },
           t.label,
         ),
       ),
     ),
-    current.id === 'tools' ? h('h2', { class: 'tools-title' }, '🧰 Outils') : null,
+    current.id === 'tools' ? h('h2', { class: 'tools-title' }, '🧰 Outils') : current.id === 'news' ? h('h2', { class: 'tools-title' }, '🎉 Nouveautés') : null,
+    top?.sub ? segmented(top.sub) : null,
     h('section', { class: 'panel', role: 'tabpanel' }, current.body()),
     h(
       'footer',
@@ -1362,7 +1412,24 @@ function render(): void {
         ? '⚠️ Automatisations actives : interdites par les règles de WikiMasters, risque de ban.'
         : 'Conseils uniquement : c\'est toi qui cliques sur « Mettre aux enchères ».',
     ),
-  );
+  ));
+}
+
+/** Redessine sans perdre la position de défilement ni le champ en cours de saisie (rafraîchissements périodiques). */
+function keepPlace(draw: () => void): void {
+  const y = scrollY;
+  const active = document.activeElement as HTMLInputElement | null;
+  const name = active?.getAttribute('name');
+  const sel = name && active ? [active.selectionStart, active.selectionEnd] : null;
+  draw();
+  if (name) {
+    const el = app.querySelector<HTMLInputElement>(`[name="${name}"]`);
+    if (el && el !== active) {
+      el.focus({ preventScroll: true });
+      if (sel && sel[0] != null) el.setSelectionRange(sel[0], sel[1]);
+    }
+  }
+  scrollTo(0, y);
 }
 
 /** Bilan des prix : d'où viennent-ils, combien de ventes par rareté, dernier chargement. */
@@ -1378,7 +1445,7 @@ function priceStatus() {
   const load = async (e: Event) => {
     const btn = e.currentTarget as HTMLButtonElement;
     if (!store.settings.apiRead) {
-      status.textContent = 'Active la lecture via l\'API (onglet Mises) pour charger les ventes du marché.';
+      status.textContent = 'Active la lecture via l\'API (Enchères → Mes mises) pour charger les ventes du marché.';
       return;
     }
     if (!(await siteTab())) {

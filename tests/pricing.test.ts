@@ -4,7 +4,7 @@ import { computePrice, indexObs, median, roundTo, type PricingContext } from '..
 import type { PriceObs, TagRule } from '../src/lib/types';
 import { DAY, NOW, card, cardsById, sales } from './helpers';
 
-const rule: TagRule = { id: 'r', tag: '50-100', quota: 1, pct: 70, floor: 50, ceiling: 100, keepMin: 1, active: true, match: 'tag' };
+const rule: TagRule = { id: 'r', tag: '50-100', quota: 1, floor: 50, ceiling: 100, keepMin: 1, active: true, match: 'tag' };
 
 function ctx(obs: PriceObs[] = [], over: Partial<PricingContext> = {}): PricingContext {
   return { settings: { ...DEFAULT_SETTINGS }, cards: {}, obsByCard: indexObs(obs), manualPrices: {}, now: NOW, ...over };

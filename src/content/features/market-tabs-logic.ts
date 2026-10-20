@@ -5,7 +5,7 @@
  * Barre d'onglets réelle (/marketplace) : boutons frères sans attribut ARIA, l'onglet actif ne diffère que par
  * ses classes : « Parcourir », « Mes ventes (2/5) », « Mes enchères (2) », « Gagnées », « Historique (8) ».
  */
-import { cardMatchesRule, isActive, makeContext, rankCandidates, type AllocationInput, type Candidate } from '../../lib/allocation';
+import { cardMatchesRule, isActive, makeContext, rankCandidates, type AllocationInput, type Candidate, saleRules } from '../../lib/allocation';
 import { normalize, sameTag } from '../../lib/text';
 import type { MyBid, SoldItem } from '../../lib/types';
 
@@ -100,7 +100,7 @@ export function onSaleMap(input: Pick<AllocationInput, 'myAuctions'>, now: numbe
  * noire, ni déjà en vente, et au-delà du « garder au moins » de la règle.
  */
 export function tagCandidates(input: AllocationInput, tag: string, now = Date.now()): Candidate[] {
-  const rule = input.rules.find((r) => r.active && sameTag(r.tag, tag));
+  const rule = saleRules(input).find((r) => r.active && sameTag(r.tag, tag));
   if (!rule) return [];
   return rankCandidates(rule, makeContext(input, now), onSaleMap(input, now), new Map());
 }
@@ -119,7 +119,7 @@ export function sellablePool(input: AllocationInput, now = Date.now()): Candidat
   const ctx = makeContext(input, now);
   const onSale = onSaleMap(input, now);
   const out = new Map<string, Candidate>();
-  for (const rule of input.rules.filter((r) => r.active)) {
+  for (const rule of saleRules(input).filter((r) => r.active)) {
     for (const c of rankCandidates(rule, ctx, onSale, new Map())) if (!out.has(c.card.id)) out.set(c.card.id, c);
   }
   return [...out.values()];
@@ -135,7 +135,7 @@ export function searchPool(pool: Candidate[], q: string, limit = 8): Candidate[]
 export function randomTags(input: AllocationInput, now = Date.now()): string[] {
   const ctx = makeContext(input, now);
   const cards = Object.values(input.cards);
-  return input.rules.filter((r) => r.active && cards.some((c) => cardMatchesRule(c, r, ctx))).map((r) => r.tag);
+  return saleRules(input).filter((r) => r.active && cards.some((c) => cardMatchesRule(c, r, ctx))).map((r) => r.tag);
 }
 
 // ---------------------------------------------------------------- mes mises

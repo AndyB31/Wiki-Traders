@@ -1,3 +1,4 @@
+import { DEFAULT_CALC } from './salecalc';
 import type { Meta, Settings, StoreShape, TagRule } from './types';
 
 export const SITE_ORIGIN = 'https://www.wiki-masters.com';
@@ -9,9 +10,17 @@ export const DEFAULT_SETTINGS: Settings = {
   stat: 'median',
   // 0 = arrondi automatique (unité sous 20, 5 sous 100, 10 sous 1 000, 50 au-delà).
   rounding: 0,
-  sortPrice: 'desc',
+  priority: 'balanced',
+  duplicatesFirst: true,
   sortCriteria: [],
-  allocationMode: 'quota',
+  priorityFormula: '{prix_conseille} * (50 + ({tdv} - 50) * {confiance}) / 100',
+  // Par défaut : les meilleures cartes, toutes étiquettes confondues (le mode « par étiquette » reste au choix).
+  allocationMode: 'pool',
+  defaultCalc: DEFAULT_CALC,
+  priceTiers: [],
+  reserveTierSlots: false,
+  saleTags: { mode: 'exclude', tags: [] },
+  keepMin: 1,
   randomSeed: 1,
   allowDuplicateListing: false,
   includeListings: false,
@@ -24,7 +33,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sellPath: '/collection',
   durationRules: [],
   minSellRate: null,
-  sellRateRules: [],
+  sellRateMinSamples: 5,
+  protectFamilies: true,
   apiRead: false,
   sellMarketSummary: true,
   sellMarketList: true,
@@ -36,6 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoTag: false,
   autoTagRemoveOthers: true,
   autoTagClearUnpriced: false,
+  autoTagContinuous: false,
+  familyTags: [],
   retagUnsold: false,
   discardConfirmAbove: 10,
   selectorOverrides: {},
@@ -45,8 +57,8 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const DEFAULT_RULES: TagRule[] = [
-  { id: 'r-50-100', tag: '50-100', quota: 1, pct: 70, floor: 50, ceiling: 100, keepMin: 1, active: true, match: 'tag' },
-  { id: 'r-20-50', tag: '20-50', quota: 4, pct: 70, floor: 20, ceiling: 50, keepMin: 1, active: true, match: 'tag' },
+  { id: 'r-50-100', tag: '50-100', quota: 1, floor: 50, ceiling: 100, keepMin: 1, active: true, match: 'tag' },
+  { id: 'r-20-50', tag: '20-50', quota: 4, floor: 20, ceiling: 50, keepMin: 1, active: true, match: 'tag' },
 ];
 
 export const DEFAULT_META: Meta = { lastAuctionsScan: null, lastCollectionScan: null, lastPage: null };

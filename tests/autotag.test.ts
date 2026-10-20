@@ -49,7 +49,7 @@ describe('favoris', () => {
 });
 
 describe('étiquetage auto : prix propre à la carte uniquement', () => {
-  const rule20100 = { id: 'r', tag: '20-100', quota: 1, pct: 70, floor: 20, ceiling: 100, keepMin: 0, active: true, match: 'tag' as const };
+  const rule20100 = { id: 'r', tag: '20-100', quota: 1, floor: 20, ceiling: 100, keepMin: 0, active: true, match: 'tag' as const };
   const rarityObs = Array.from({ length: 6 }, (_, i) => ({ cardId: `autre${i}`, price: 40, type: 'sold' as const, at: NOW - 1000, rarity: 'C' as const }));
 
   it('ne classe pas une carte d\'après la médiane de sa rareté', () => {

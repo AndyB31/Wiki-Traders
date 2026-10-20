@@ -198,7 +198,7 @@ export function updateOverlay(state: OverlayState): void {
       if (minutes != null) selectSellDuration(state.cfg, minutes);
     }
     if (fromProposal) showPanel(pending!.cardName, pending!.price, withDuration(pending!.detail), () => {});
-    else if (sell.card && advice) showPanel(sell.card.name, advice.pricing.price, withDuration(`${advice.pricing.detail} · étiquette ${advice.rule.tag}`), () => {});
+    else if (sell.card && advice) showPanel(sell.card.name, advice.pricing.price, withDuration(`${advice.pricing.detail} · ${advice.rule.tier ? 'palier' : 'étiquette'} ${advice.rule.tag}`), () => {});
     else hidePanel();
     return;
   }

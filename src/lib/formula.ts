@@ -10,8 +10,10 @@ export type FormulaVars = Record<string, number | null | undefined>;
 /** Variables proposées pour le score d'une carte. */
 export const FORMULA_VARS: { name: string; help: string }[] = [
   { name: 'prix', help: 'prix moyen de la carte (W)' },
-  { name: 'prix_conseille', help: 'mise de départ conseillée (W)' },
-  { name: 'tdv', help: 'taux de vente (0 à 100 ; 0 si inconnu)' },
+  { name: 'prix_conseille', help: 'mise de départ du calcul par défaut (W)' },
+  { name: 'tdv', help: 'taux de vente (0 à 100 ; 50 si inconnu)' },
+  { name: 'confiance', help: 'confiance dans le taux de vente, de 0 (aucune enchère) à 1 (assez d\'enchères)' },
+  { name: 'tdv_fiable', help: '1 si le taux de vente porte sur assez d\'enchères (Ventes → Taux de vente), sinon 0' },
   { name: 'ventes', help: 'enchères conclues de la carte' },
   { name: 'encheres', help: 'enchères terminées de la carte' },
   { name: 'quantite', help: 'exemplaires possédés' },

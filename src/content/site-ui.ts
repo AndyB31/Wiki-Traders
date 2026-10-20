@@ -296,7 +296,8 @@ function themeParam(): string {
 }
 
 function frameUrl(page: 'popup' | 'options', view?: View): string {
-  return ext.runtime.getURL(`${page}.html?embed=1${view ? `&view=${view}` : ''}&theme=${themeParam()}`);
+  // Réglages : l'ancre de la page (#maj, #ventes…) ouvre l'onglet correspondant.
+  return ext.runtime.getURL(`${page}.html?embed=1${view ? `&view=${view}` : ''}&theme=${themeParam()}${page === 'options' ? location.hash : ''}`);
 }
 
 // ---------------------------------------------------------------- menus regroupés
