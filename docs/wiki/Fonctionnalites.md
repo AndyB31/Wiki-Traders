@@ -44,7 +44,7 @@ Chaque fonctionnalité s'active dans **Réglages → Sur le site → Fonctionnal
 | Statistiques de tirage | oui | Répartition des raretés de tes paquets, sur la page Paquets (réinitialisable, importable depuis une autre extension) ; masquées pendant l'ouverture des cartes |
 | Partager un tirage | oui | Bouton « Partager » : le tirage en image |
 | Tout étiqueter après ouverture | oui | Bouton « Tout étiqueter » sous le récapitulatif d'ouverture : les cartes obtenues reçoivent leurs étiquettes (plages de prix, conditions, familles). Visible avec l'étiquetage par l'API ; réglé dans Réglages → Étiquettes |
-| Tout défausser après ouverture | oui | Bouton rouge « Tout défausser » sous le récapitulatif d'ouverture : un exemplaire de chaque carte obtenue est défaussé. Confirmation si une carte vaut plus du seuil réglable sous les fonctionnalités Paquets (Réglages → Sur le site, 10 W par défaut), ou si les prix chargent encore. Irréversible ; favoris verrouillés |
+| Tout défausser après ouverture | oui | Bouton rouge « Tout défausser » sous le récapitulatif d'ouverture : un exemplaire de chaque carte obtenue est défaussé. Coche des cartes (case à gauche de chaque ligne) pour ne défausser qu'elles : le bouton devient « Défausser X cartes ». Confirmation si une carte vaut plus du seuil réglable sous les fonctionnalités Paquets (Réglages → Sur le site, 10 W par défaut), ou si les prix chargent encore. Irréversible ; favoris verrouillés |
 
 ## Échanges et notifications
 

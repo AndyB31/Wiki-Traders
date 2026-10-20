@@ -25,8 +25,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-10-20',
-    title: 'Fenêtre « Slots à remplir » plus large',
+    title: 'Défausse au choix, fenêtre « Slots à remplir » plus large',
     sections: [
+      {
+        title: 'Paquets',
+        items: [
+          {
+            title: 'Choisir les cartes à défausser',
+            text: 'Dans le récapitulatif d\'ouverture, coche les cartes à défausser (case à gauche de chaque ligne, ou clic sur la ligne) : « Tout défausser » devient « Défausser X cartes ». Les cartes défaussées sont barrées, et le bouton propose ensuite les autres.',
+            where: 'Récapitulatif après l\'ouverture d\'un paquet (avec « Tout défausser après ouverture »).',
+          },
+        ],
+      },
       {
         title: 'Vendre',
         items: [
