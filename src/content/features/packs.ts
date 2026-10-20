@@ -16,7 +16,7 @@ import { noticeToast } from '../toast';
 import { discardPackCards } from './discard';
 import { onSiteResponse } from '../net';
 import { endProgress, showProgress } from '../overlay';
-import { AUTO_OPEN_KEY, buildRecap, type RecapRow, loadAutoOpen, loadPullStats, mapPackCards, normalizeBounds, openPacksSequence, PULL_STATS_KEY, pullShares, randomDelay, recordPulls, resetPullStats, saveAutoOpen, type AutoOpenState, type OpenAllResult, type PackCard, packCardsForTagging, type PullStats, importOtherPullStats, OTHER_PULL_STATS_KEY, readOtherPullStats } from './packs-logic';
+import { AUTO_OPEN_KEY, buildRecap, discardLabel, discardTargets, type RecapRow, loadAutoOpen, loadPullStats, mapPackCards, normalizeBounds, openPacksSequence, PULL_STATS_KEY, pullShares, randomDelay, recordPulls, resetPullStats, saveAutoOpen, type AutoOpenState, type OpenAllResult, type PackCard, packCardsForTagging, type PullStats, importOtherPullStats, OTHER_PULL_STATS_KEY, readOtherPullStats } from './packs-logic';
 import { type FeatureContext, registerFeature } from './runtime';
 import { button, confirmDialog, ensureFeatureStyle, floatingPanel, node, rarityChip, RARITY_COLORS, wiki } from './ui';
 import { ext } from '../../lib/browser';
@@ -29,7 +29,11 @@ const CSS = `
 .wiky-f-pack-actions .wiky-f-btn.danger { background: #ef4444; border-color: #ef4444; color: #fff; }
 .wiky-f-pack-actions .wiky-f-btn.danger:hover:not(:disabled) { background: #dc2626; }
 .wiky-f-confirm p { white-space: pre-line; }
-.wiky-f-recap-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; }
+.wiky-f-row.wiky-f-recap-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; }
+.wiky-f-row.wiky-f-recap-row.pick { grid-template-columns: auto auto minmax(0, 1fr) auto; cursor: pointer; }
+.wiky-f-row.wiky-f-recap-row.pick.is-picked { background: rgba(239,68,68,.16); box-shadow: inset 0 0 0 1px rgba(239,68,68,.45); border-radius: 8px; }
+.wiky-f-row.wiky-f-recap-row.is-gone { opacity: .45; text-decoration: line-through; cursor: default; }
+.wiky-f-pick { width: 16px; height: 16px; margin: 0; accent-color: #ef4444; cursor: pointer; }
 .wiky-f-recap-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .wiky-f-recap-main .wiky-f-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wiky-f-recap-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; color: color-mix(in srgb, var(--color-foreground, #e7e5e4) 85%, transparent); }
@@ -132,11 +136,43 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
   const seq = ++recapSeq;
   const draw = (prices: Map<string, CardPrice>, loading: boolean) => {
     if (seq !== recapSeq) return;
+    // Le récapitulatif a ses propres styles (même si les outils de la page Paquets sont désactivés).
+    ensureFeatureStyle(CSS, 'packs');
     const recap = buildRecap(result.cards, prices, ownedOf(result.owned));
     const { body, foot } = floatingPanel('pack-recap', result.packs > 1 ? `Wiki-Traders · ${result.packs} paquets` : 'Wiki-Traders · paquet', result.title, () => {
       dismissedAt = result.at;
     });
-    for (const r of recap.rows) body.append(recapRow(r, loading));
+    const canPick = flag('packDiscard') && result.cards.length > 0;
+    const picked = pickedOf(result.at);
+    const gone = goneOf(result.at);
+    let refreshDiscard = () => {};
+    for (const r of recap.rows) {
+      const row = recapRow(r, loading);
+      if (canPick) {
+        // Case à cocher : choisir les cartes à défausser (aucune cochée = « Tout défausser »).
+        const box = node('input', 'part', 'wiky-f-pick') as HTMLInputElement;
+        box.type = 'checkbox';
+        box.checked = picked.has(r.index);
+        box.disabled = gone.has(r.index);
+        box.setAttribute('aria-label', `Défausser ${r.title}`);
+        row.classList.add('pick');
+        row.classList.toggle('is-picked', box.checked);
+        row.classList.toggle('is-gone', gone.has(r.index));
+        const toggle = (on: boolean) => {
+          if (on) picked.add(r.index);
+          else picked.delete(r.index);
+          box.checked = on;
+          row.classList.toggle('is-picked', on);
+          refreshDiscard();
+        };
+        box.addEventListener('change', () => toggle(box.checked));
+        row.addEventListener('click', (e) => {
+          if (e.target !== box && !box.disabled) toggle(!box.checked);
+        });
+        row.prepend(box);
+      }
+      body.append(row);
+    }
     const total = node('span', 'part');
     total.append('Total ', node('b', 'part', '', wiki(recap.total)));
     const meta = node('span', 'part', 'wiky-f-muted', loading ? 'chargement des prix…' : `${recap.priced}/${recap.rows.length} cotées · ${recap.fresh} nouvelle${recap.fresh > 1 ? 's' : ''}`);
@@ -154,11 +190,16 @@ export async function showRecap(result: PackResult, fetchPrices = !!ctx?.apiRead
     if ((canTag || canDiscard) && result.cards.length) {
       const actions = node('div', 'part', 'wiky-f-pack-actions');
       if (canDiscard) {
-        const done = discarded.get(result.at);
-        const discard = button(done ? `Défaussé ✓ (${done})` : 'Tout défausser', () => void discardAll(result, recap, loading, discard), '', true);
+        const discard = button('', () => void discardAll(result, recap, loading, discard), '', true);
         discard.classList.add('danger');
-        discard.disabled = done != null;
-        discard.title = `Défausse les ${result.cards.length} cartes obtenues (un exemplaire chacune). Confirmation si une carte vaut plus de ${discardThreshold(ctx?.settings)} W. Irréversible.`;
+        refreshDiscard = () => {
+          const left = result.cards.length - gone.size;
+          const n = picked.size;
+          discard.disabled = left === 0;
+          discard.textContent = discardLabel(result.cards.length, n, gone.size);
+          discard.title = `${n ? `Défausse les ${n} cartes cochées` : `Défausse les ${left} cartes obtenues`} (un exemplaire chacune). Coche des cartes pour choisir. Confirmation si une carte vaut plus de ${discardThreshold(ctx?.settings)} W. Irréversible.`;
+        };
+        refreshDiscard();
         actions.append(discard);
       }
       if (canTag) {
@@ -221,8 +262,11 @@ function recapRow(r: RecapRow, loading: boolean): HTMLElement {
   return row;
 }
 
-/** Paquets déjà défaussés (clé : `at` du résultat) → nombre de cartes défaussées. */
-const discarded = new Map<number, number>();
+/** Par paquet (clé : `at` du résultat) : cartes cochées et cartes déjà défaussées (positions dans le paquet). */
+const picks = new Map<number, Set<number>>();
+const discardedIdx = new Map<number, Set<number>>();
+const pickedOf = (at: number) => picks.get(at) ?? picks.set(at, new Set()).get(at)!;
+const goneOf = (at: number) => discardedIdx.get(at) ?? discardedIdx.set(at, new Set()).get(at)!;
 
 /** Seuil par défaut (W) au-delà duquel « Tout défausser » demande confirmation. */
 export const DISCARD_CONFIRM_ABOVE = 10;
@@ -247,13 +291,19 @@ async function discardAll(result: PackResult, recap: ReturnType<typeof buildReca
     noticeToast('« Tout défausser après ouverture » est désactivé (Réglages → Sur le site → Paquets).', { title: 'Défausse', error: true });
     return;
   }
-  const n = result.cards.length;
-  const fresh = recap.rows.filter((r) => !r.ownedBefore && !r.repeat);
-  const lines = recap.rows.map((r) => `• ${r.title}${r.rarity ? ` (${r.rarity})` : ''} · ${wiki(r.price)}${!r.ownedBefore && !r.repeat ? ' · nouvelle' : ''}`);
+  const picked = pickedOf(result.at);
+  const gone = goneOf(result.at);
+  // Les cartes cochées, sinon toutes celles qui restent.
+  const rows = discardTargets(recap.rows, picked, gone);
+  if (!rows.length) return;
+  const n = rows.length;
+  const fresh = rows.filter((r) => !r.ownedBefore && !r.repeat);
+  const lines = rows.map((r) => `• ${r.title}${r.rarity ? ` (${r.rarity})` : ''} · ${wiki(r.price)}${!r.ownedBefore && !r.repeat ? ' · nouvelle' : ''}`);
   // Seuil relu au moment d'agir (il vient peut-être d'être changé dans les réglages).
   const threshold = discardThreshold((await load('settings')).settings);
-  const valuable = recap.rows.filter((r) => r.price != null && r.price > threshold);
-  if (discardNeedsConfirm(recap.rows, loading, threshold)) {
+  const valuable = rows.filter((r) => r.price != null && r.price > threshold);
+  const value = rows.reduce((t, r) => t + (r.price ?? 0), 0);
+  if (discardNeedsConfirm(rows, loading, threshold)) {
     const ok = await confirmDialog({
       title: `Défausser ${n} carte${n > 1 ? 's' : ''} ?`,
       text: [
@@ -263,7 +313,7 @@ async function discardAll(result: PackResult, recap: ReturnType<typeof buildReca
         '',
         ...lines,
         '',
-        `Valeur moyenne totale : ${wiki(recap.total)}.`,
+        `Valeur moyenne totale : ${wiki(value)}.`,
         fresh.length ? `${fresh.length} carte${fresh.length > 1 ? 's' : ''} que tu n'avais pas encore.` : '',
         'Un exemplaire de chaque carte est retiré définitivement ; les cartes en favori sont ignorées.',
       ].filter((l, i, all) => l !== '' || all[i - 1] !== '').join('\n'),
@@ -274,9 +324,17 @@ async function discardAll(result: PackResult, recap: ReturnType<typeof buildReca
   }
   btn.disabled = true;
   btn.textContent = 'Défausse…';
-  const res = await discardPackCards(result.cards, (done, total) => (btn.textContent = `Défausse… ${done}/${total}`));
-  discarded.set(result.at, res.done.length);
-  btn.textContent = `Défaussé ✓ (${res.done.length})`;
+  const res = await discardPackCards(rows.map((r) => result.cards[r.index]), (done, total) => (btn.textContent = `Défausse… ${done}/${total}`));
+  // Cartes défaussées marquées par position (une même carte peut sortir deux fois du paquet).
+  const done = [...res.done];
+  for (const r of rows) {
+    const i = done.indexOf(r.title);
+    if (i < 0) continue;
+    done.splice(i, 1);
+    gone.add(r.index);
+  }
+  picked.clear();
+  if (dismissedAt !== result.at && recapSeq) void showRecap(result);
   noticeToast(
     [
       res.done.length ? `${res.done.length} carte${res.done.length > 1 ? 's' : ''} défaussée${res.done.length > 1 ? 's' : ''}.` : 'Aucune carte défaussée.',

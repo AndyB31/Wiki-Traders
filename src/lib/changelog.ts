@@ -24,6 +24,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-20',
+    title: 'Défausse au choix, fenêtre « Slots à remplir » plus large',
+    sections: [
+      {
+        title: 'Paquets',
+        items: [
+          {
+            title: 'Choisir les cartes à défausser',
+            text: 'Dans le récapitulatif d\'ouverture, coche les cartes à défausser (case à gauche de chaque ligne, ou clic sur la ligne) : « Tout défausser » devient « Défausser X cartes ». Les cartes défaussées sont barrées, et le bouton propose ensuite les autres.',
+            where: 'Récapitulatif après l\'ouverture d\'un paquet (avec « Tout défausser après ouverture »).',
+          },
+        ],
+      },
+      {
+        title: 'Vendre',
+        items: [
+          {
+            title: 'Plus de place pour chaque carte',
+            text: 'La fenêtre « Slots à remplir » s\'ouvre en grand : les fiches des cartes à vendre s\'affichent côte à côte, avec une image plus grande et le détail du prix en entier.',
+            where: 'Bloc Wiki-Traders de la barre latérale → Vendre.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-19f',
     title: 'Version 1.0 : des réglages plus simples',
     intro: 'Les réglages sont rangés par ce que tu veux faire, et non plus par niveau de risque. Rien de ce que tu avais réglé n\'est perdu.',

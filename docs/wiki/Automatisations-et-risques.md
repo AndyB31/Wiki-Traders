@@ -23,7 +23,7 @@ Par défaut, Wiki-Traders ne fait que **lire** ce que la page affiche et **conse
 | Vendre depuis les ventes conseillées | Ventes → Aide à la vente | **Met aux enchères** à ta place, en un clic dans la fenêtre « Vendre… » d'une vente conseillée | Action |
 | Ouvrir tous les paquets / ouverture automatique | Sur le site → Paquets | **Ouvre** tes paquets à ta place | Action |
 
-Ce que l'extension ne fait **jamais** : acheter, échanger, ou agir sans que l'option correspondante soit activée. Mise, mise en vente et ouverture de paquets ne se font qu'avec les options ci-dessus, après confirmation. La défausse ne se fait que sur ton clic « Tout défausser » sous le récapitulatif d'ouverture (confirmation au-delà du seuil réglé dans Sur le site → Paquets).
+Ce que l'extension ne fait **jamais** : acheter, échanger, ou agir sans que l'option correspondante soit activée. Mise, mise en vente et ouverture de paquets ne se font qu'avec les options ci-dessus, après confirmation. La défausse ne se fait que sur ton clic « Tout défausser » (ou « Défausser X cartes », pour les cartes cochées) sous le récapitulatif d'ouverture (confirmation au-delà du seuil réglé dans Sur le site → Paquets).
 
 ## Garde-fous
 

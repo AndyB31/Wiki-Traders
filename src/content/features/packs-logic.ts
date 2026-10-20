@@ -192,6 +192,8 @@ export interface RecapRow extends PackCard {
   ownedBefore: number;
   /** Déjà obtenue plus haut dans ce même récapitulatif. */
   repeat: boolean;
+  /** Position de la carte dans le paquet (les lignes sont triées par prix). */
+  index: number;
 }
 
 export interface Recap {
@@ -205,7 +207,7 @@ export interface Recap {
 /** Lignes du récapitulatif, triées par prix décroissant (les cartes sans prix à la fin). */
 export function buildRecap(cards: PackCard[], prices: Map<string, CardPrice>, owned: (c: PackCard) => number): Recap {
   const seen = new Set<string>();
-  const rows: RecapRow[] = cards.map((c) => {
+  const rows: RecapRow[] = cards.map((c, index) => {
     const repeat = seen.has(c.siteId);
     seen.add(c.siteId);
     const p = prices.get(c.siteId);
@@ -219,6 +221,7 @@ export function buildRecap(cards: PackCard[], prices: Map<string, CardPrice>, ow
       max: p?.max ?? null,
       ownedBefore: owned(c),
       repeat,
+      index,
     };
   });
   const order = (r: RecapRow) => (r.price == null ? -1 : r.price);
@@ -406,4 +409,19 @@ export function packCardsForTagging(cards: PackCard[], known: Record<string, Car
     };
   }
   return out;
+}
+
+// ---------------------------------------------------------------- défausse au choix
+
+/** Cartes à défausser : celles cochées, sinon toutes celles pas encore défaussées. */
+export function discardTargets<T extends { index: number }>(rows: T[], picked: Set<number>, gone: Set<number>): T[] {
+  return rows.filter((r) => !gone.has(r.index) && (!picked.size || picked.has(r.index)));
+}
+
+/** Libellé du bouton : « Tout défausser », « Défausser 2 cartes », « Défausser les 3 autres », « Défaussé ✓ (4) ». */
+export function discardLabel(total: number, picked: number, gone: number): string {
+  const left = total - gone;
+  if (left <= 0) return `Défaussé ✓ (${gone})`;
+  if (picked) return `Défausser ${picked} carte${picked > 1 ? 's' : ''}`;
+  return gone ? `Défausser les ${left} autre${left > 1 ? 's' : ''}` : 'Tout défausser';
 }

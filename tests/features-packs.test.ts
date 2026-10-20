@@ -19,7 +19,7 @@ const storage = vi.hoisted(() => {
   return data;
 });
 
-const { addPulls, buildRecap, emptyPullStats, loadPullStats, mapPackCards, normalizeBounds, openPackRequest, packCardsForTagging, pullShares, randomDelay, recordPulls } = await import('../src/content/features/packs-logic');
+const { addPulls, buildRecap, discardLabel, discardTargets, emptyPullStats, loadPullStats, mapPackCards, normalizeBounds, openPackRequest, packCardsForTagging, pullShares, randomDelay, recordPulls } = await import('../src/content/features/packs-logic');
 const { planAutoTags } = await import('../src/lib/autotag');
 const { DEFAULT_STORE } = await import('../src/lib/defaults');
 const { autoTick, discardNeedsConfirm, discardThreshold, openAllPacks, showRecap } = await import('../src/content/features/packs');
@@ -135,6 +135,25 @@ describe('« Tout défausser » après ouverture', () => {
     expect(discardThreshold({ discardConfirmAbove: 0 })).toBe(0);
     expect(discardThreshold({})).toBe(10);
     expect(discardThreshold({ discardConfirmAbove: -3 })).toBe(10);
+  });
+});
+
+describe('défausse au choix (cases à cocher du récapitulatif)', () => {
+  const rows = buildRecap(mapPackCards(PACK), new Map(), () => 0).rows;
+
+  it('cartes cochées, sinon toutes celles qui restent ; chaque exemplaire repéré par sa position', () => {
+    expect(rows.map((r) => r.index).sort()).toEqual([0, 1, 2, 3]);
+    expect(discardTargets(rows, new Set(), new Set()).map((r) => r.index).sort()).toEqual([0, 1, 2, 3]);
+    expect(discardTargets(rows, new Set([1, 3]), new Set()).map((r) => r.title)).toEqual(['Paris', 'Paris']);
+    expect(discardTargets(rows, new Set(), new Set([0, 1])).map((r) => r.index).sort()).toEqual([2, 3]);
+  });
+
+  it('le bouton dit ce qu\'il va faire', () => {
+    expect(discardLabel(4, 0, 0)).toBe('Tout défausser');
+    expect(discardLabel(4, 1, 0)).toBe('Défausser 1 carte');
+    expect(discardLabel(4, 2, 0)).toBe('Défausser 2 cartes');
+    expect(discardLabel(4, 0, 2)).toBe('Défausser les 2 autres');
+    expect(discardLabel(4, 0, 4)).toBe('Défaussé ✓ (4)');
   });
 });
 
