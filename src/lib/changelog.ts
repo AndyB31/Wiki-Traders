@@ -65,7 +65,7 @@ export const CHANGELOG: ChangelogEntry[] = [
           },
           {
             title: 'Ordre de priorité',
-            text: 'Équilibrée (prix × chance de vente), rapporter le plus, vendre vite, écouler, tes critères ou ta formule. Un aperçu montre tout de suite les prochaines ventes.',
+            text: 'Équilibrée (prix × chance de vente), rapporter le plus, vendre vite, écouler, tes critères ou ta formule. La chance de vente tient compte du nombre de ventes : 90 % sur 900 ventes passe devant 100 % sur 1 vente. Un aperçu montre tout de suite les prochaines ventes.',
             where: 'Réglages → Ventes → Ordre de priorité.',
           },
           {
@@ -110,7 +110,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         items: [
           {
             title: 'Quatre onglets',
-            text: 'Vendre, Enchères (mes ventes et mes mises), Historique, Cartes (cartes et étiquetage). Outils et Nouveautés sont dans l\'en-tête. Les ventes conseillées sont plus compactes, le détail se déplie avec « ? ».',
+            text: 'Vendre, Enchères (mes ventes et mes mises), Historique, Cartes (cartes et étiquetage). Outils et Nouveautés sont dans l\'en-tête. Chaque vente conseillée montre la fiche de la carte : image, catégorie, prix moyen, taux de vente, ventes, médiane, durée.',
           },
           {
             title: 'Plus lisible',

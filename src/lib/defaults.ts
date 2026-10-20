@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   priority: 'balanced',
   duplicatesFirst: true,
   sortCriteria: [],
-  priorityFormula: '{prix_conseille} * (50 + ({tdv} - 50) * {confiance}) / 100',
+  priorityFormula: '{prix_conseille} * {chance}',
   // Par défaut : les meilleures cartes, toutes étiquettes confondues (le mode « par étiquette » reste au choix).
   allocationMode: 'pool',
   defaultCalc: DEFAULT_CALC,

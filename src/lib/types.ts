@@ -16,7 +16,7 @@ export interface RuleConditions {
 export type CandidateSort = 'desc' | 'asc' | 'random' | 'rate' | 'score' | 'custom';
 
 /** Critère de tri des cartes proposées (voir lib/sorting.ts). */
-export type SortKey = 'prix' | 'prix_moyen' | 'tdv' | 'ventes' | 'encheres' | 'doublons' | 'rarete' | 'hasard';
+export type SortKey = 'prix' | 'prix_moyen' | 'tdv' | 'chance' | 'ventes' | 'encheres' | 'doublons' | 'rarete' | 'hasard';
 
 export interface SortCriterion {
   key: SortKey;

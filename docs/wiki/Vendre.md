@@ -7,7 +7,8 @@
 Ouvre-la d'un clic sur le bloc **Wiki-Traders** de la barre latérale (ou avec l'icône de l'extension). C'est aussi le premier onglet de la popup (**Vendre**). Chaque **slot libre** affiche :
 
 - le **palier de prix** du slot (ex. `21–100 W`, mode « meilleures cartes ») ou son **étiquette** (ex. `20-50`, mode « par étiquette ») ;
-- la **carte proposée**, sa rareté (point coloré) et son nombre d'exemplaires (×3) ;
+- la **fiche de la carte** : image, nom, catégorie, rareté, nombre d'exemplaires (×3, doublons) et ses autres étiquettes ;
+- ses **chiffres** : prix moyen (dans sa rareté), taux de vente (rouge ≤ 15 %, vert ≥ 70 %), ventes (« 17 / 20 » : conclues / terminées), médiane (min et max au survol) ;
 - le **prix conseillé** et le détail du calcul sur une ligne (« médiane Rare 36 (12 ventes) × 70 % = 25 ») ;
 - la **durée conseillée** (celle du palier, sinon selon tes paliers de durée) ;
 - un « ? » qui déplie les explications (estimation, prix déduit de la rareté…).
@@ -45,12 +46,14 @@ Chaque étiquette réserve ses slots, et a son propre calcul du prix (A / B1 / B
 
 | Priorité | Carte proposée en premier |
 | --- | --- |
-| **Équilibrée** (défaut) | Celle qui rapporte le plus en moyenne : prix de départ × chance de vente (le taux de vente pondéré par le nombre d'enchères ; une carte inconnue compte pour 50 %) |
+| **Équilibrée** (défaut) | Celle qui rapporte le plus en moyenne : prix de départ × chance de vente |
 | Rapporter le plus | Le prix de départ le plus haut |
-| Vendre vite | Le meilleur taux de vente (fiable), puis le prix le plus haut |
+| Vendre vite | La meilleure chance de vente, puis le prix le plus haut |
 | Écouler | Le plus d'exemplaires en trop, puis le prix le plus bas |
 | Mes critères | Une liste de critères appliqués dans l'ordre, chacun départageant les égalités du précédent — prix conseillé, prix moyen, taux de vente, nombre de ventes, enchères terminées, doublons, rareté, hasard — chacun du plus haut ou du plus bas. Une valeur inconnue passe toujours en dernier. |
 | Ma formule | Ta formule (mêmes variables que le calcul avancé, `{prix_conseille}` = prix de départ calculé) : le score le plus haut d'abord |
+
+**Chance de vente** : le taux de vente pondéré par le nombre d'enchères (borne basse de Wilson). Plus une carte a d'enchères, plus son taux compte : 90 % sur 900 ventes (≈ 0,88) passe loin devant 100 % sur 1 vente (≈ 0,33) ; une carte jamais mise en vente vaut ≈ 0,17. Variable `{chance}` dans les formules, critère « Chance de vente » dans Mes critères.
 
 **Doublons d'abord** (activé par défaut) : les cartes en plus d'exemplaires passent avant les autres ; la priorité départage le reste.
 

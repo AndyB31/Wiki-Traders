@@ -13,6 +13,7 @@ export const FORMULA_VARS: { name: string; help: string }[] = [
   { name: 'prix_conseille', help: 'mise de départ du calcul par défaut (W)' },
   { name: 'tdv', help: 'taux de vente (0 à 100 ; 50 si inconnu)' },
   { name: 'confiance', help: 'confiance dans le taux de vente, de 0 (aucune enchère) à 1 (assez d\'enchères)' },
+  { name: 'chance', help: 'chance de vente de 0 à 1 : taux de vente pondéré par le nombre d\'enchères (90 % sur 900 ≈ 0,88 ; 100 % sur 1 ≈ 0,33)' },
   { name: 'tdv_fiable', help: '1 si le taux de vente porte sur assez d\'enchères (Ventes → Taux de vente), sinon 0' },
   { name: 'ventes', help: 'enchères conclues de la carte' },
   { name: 'encheres', help: 'enchères terminées de la carte' },

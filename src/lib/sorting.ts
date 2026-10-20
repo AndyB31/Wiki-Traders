@@ -9,6 +9,7 @@ export const SORT_KEYS: { key: SortKey; label: string; help: string }[] = [
   { key: 'prix', label: 'Prix conseillé', help: 'Mise de départ conseillée' },
   { key: 'prix_moyen', label: 'Prix moyen', help: 'Prix moyen de la carte' },
   { key: 'tdv', label: 'Taux de vente', help: 'À partir de 5 enchères terminées ; sinon en dernier' },
+  { key: 'chance', label: 'Chance de vente', help: 'Taux de vente pondéré par le nombre d\'enchères : 90 % sur 900 passe devant 100 % sur 1' },
   { key: 'ventes', label: 'Nombre de ventes', help: 'Enchères conclues de la carte' },
   { key: 'encheres', label: 'Enchères terminées', help: 'Vendues, sans acheteur et annulées' },
   { key: 'doublons', label: 'Doublons', help: 'Exemplaires en plus du premier' },
