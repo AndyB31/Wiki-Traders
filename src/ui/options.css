@@ -217,3 +217,7 @@ button.link.error { color: var(--danger); }
 .view-card .tag-chips { margin-top: 2px; }
 .view-card .field .row input[type='number'] { width: 72px; }
 .view-card .view-count { padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--text); }
+.view-card .view-icon { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-dark); }
+.view-card .icon-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.view-card .icon-pick { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 8px; }
+.view-card .icon-pick.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-dark); }

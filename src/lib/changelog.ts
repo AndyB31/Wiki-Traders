@@ -24,6 +24,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-26b',
+    title: 'Vues de la collection : toutes les pages filtrées, une icône par vue',
+    sections: [
+      {
+        title: 'Interface',
+        items: [
+          {
+            title: 'Les vues remplissent les filtres du site',
+            text: 'Ouvrir une vue règle la recherche, l\'étiquette, les raretés et le tri de la collection du site : toutes ses pages ne montrent plus que les cartes de la vue (avant, seules celles de la page affichée étaient filtrées). Ce que le site ne sait pas faire (prix, favoris, plusieurs étiquettes, tri par prix…) est appliqué en plus sur la page. « Quitter la vue » remet les filtres du site à zéro.',
+            where: 'Barre latérale → Collection → une de tes vues.',
+          },
+          {
+            title: 'Une icône par vue',
+            text: 'Choisis l\'icône de chaque menu (étoile, couronne, flamme, gemme…). L\'entonnoir reste l\'icône par défaut.',
+            where: 'Réglages → Interface → Vues de la collection → « Icône du menu ».',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-26',
     title: 'Tes propres menus dans la barre latérale',
     sections: [

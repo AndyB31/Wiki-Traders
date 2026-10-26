@@ -1,16 +1,21 @@
 /**
- * Vues de la collection (Réglages → Interface) : /collection?wview=<id> garde visibles les cartes qui passent le
- * filtre de la vue, dans l'ordre de son tri, avec un bandeau au-dessus de la grille (nom, résumé, nombre de cartes,
- * « Modifier », « Quitter la vue »).
+ * Vues de la collection (Réglages → Interface) : /collection?wview=<id>.
  *
- * Les cartes du site ne sont jamais déplacées (React les gère) : celles qui ne passent pas le filtre sont masquées
- * (`data-wiky-vhide`), les autres reçoivent un `order` CSS (la grille du site les range dans cet ordre).
+ *  1. Les champs du site sont remplis (recherche, étiquette, raretés, tri : collection-controls.ts) : sa collection
+ *     est paginée, c'est ce qui met les bonnes cartes sur ses pages. Ils sont remis à zéro en quittant la vue.
+ *  2. Le filtre de la vue s'applique en plus sur la page affichée, pour ce que le site ne sait pas faire (prix,
+ *     favoris, plusieurs étiquettes…), et range la page dans l'ordre de la vue quand le tri du site diffère.
+ *     Les cartes du site ne sont jamais déplacées (React les gère) : masquées (`data-wiky-vhide`) ou rangées par
+ *     un `order` CSS.
+ *  3. Un bandeau au-dessus des cartes : nom, résumé, ce qui est réglé sur le site, « Modifier », « Quitter la vue ».
  * Filtre et tri sans DOM : lib/views.ts.
  */
 import { familiesOf } from '../../lib/families';
 import type { Card } from '../../lib/types';
-import { applyView, viewHref, viewSummary, type CollectionView, type ViewContext } from '../../lib/views';
+import { RARITIES } from '../../lib/text';
+import { applyView, remainingView, siteFilters, SITE_ONLY_SORTS, viewHref, viewIconSvg, viewSummary, type CollectionView, type ViewContext } from '../../lib/views';
 import { cardPrices, displayCount, knownCardPrice, knownCardRate, knownPrice } from '../catalog';
+import { applySiteFilters, resetSiteFilters, searchInput, siteControlsReady, type SiteApplied } from '../collection-controls';
 import { nativeCardSiteId } from '../collection-selection';
 import { getFamilyIndex } from './families-state';
 import { cardRarity, cardTitle, ensureStyle, isolateClicks, myCard, nativeCards } from './dom';
@@ -34,13 +39,66 @@ const CSS = `
 .wiky-view-bar .wiky-view-btn:hover { color: var(--color-foreground); border-color: rgba(249,115,22,.5); }
 `;
 
-const FILTER_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>';
-
 let last: FeatureContext | null = null;
 let listening = false;
 /** Lot de prix déjà demandé (une seule requête par vue et par jeu de cartes). */
 let pricesAsked = '';
+
+// ---------------------------------------------------------------- champs du site
+
+/** Vue (et réglages) dont les champs du site ont été remplis ; '' = champs du site laissés tels quels. */
+let siteKey = '';
+/** Champ de recherche rempli : si le site redessine sa page (nouveau champ), on remplit à nouveau. */
+let siteInput: HTMLInputElement | null = null;
+let siteApplied: SiteApplied | null = null;
+/** Les champs du site ont été changés par une vue (à remettre à zéro en la quittant). */
+let siteDirty = false;
+let siteBusy = false;
+
+function siteKeyOf(view: CollectionView | null): string {
+  return view ? JSON.stringify([view.id, siteFilters(view), view.sort, view.dir]) : '';
+}
+
+/** Remplit (ou remet à zéro) les champs du site, une fois par vue ; la page est relue ensuite. */
+async function syncSite(view: CollectionView | null): Promise<void> {
+  if (siteBusy || !siteControlsReady()) return;
+  const key = siteKeyOf(view);
+  if (key === siteKey && (!view || searchInput() === siteInput)) return;
+  if (!view && !siteDirty) {
+    siteKey = '';
+    return;
+  }
+  siteBusy = true;
+  try {
+    if (view) {
+      siteApplied = await applySiteFilters(view, siteFilters(view));
+      siteDirty = true;
+    } else {
+      await resetSiteFilters();
+      siteDirty = false;
+      siteApplied = null;
+    }
+  } catch (e) {
+    console.warn('[Wiki-Traders] vue : champs du site', e);
+  } finally {
+    siteKey = key;
+    siteInput = searchInput();
+    siteBusy = false;
+    if (last) render(last);
+  }
+}
+
+/** « recherche « roi » · étiquette 10-100 · L, UR · tri Nom » : ce que le site filtre lui-même. */
+function siteNote(a: SiteApplied | null, view: CollectionView): string {
+  if (!a) return '';
+  const parts: string[] = [];
+  if (a.q) parts.push(`recherche « ${a.q} »`);
+  if (a.tag) parts.push(`étiquette ${a.tag}`);
+  if (a.untagged) parts.push('sans étiquette');
+  if (a.rarities.length) parts.push(a.rarities.map((r) => RARITIES[r].label).join(', '));
+  if (a.sort) parts.push(`tri ${a.sort}${a.sortExact || SITE_ONLY_SORTS.includes(view.sort) ? '' : ' (chaque page est rangée selon la vue)'}`);
+  return parts.length ? `Réglé sur le site : ${parts.join(' · ')}.` : '';
+}
 
 /** Vue demandée par l'adresse (`?wview=`), si elle existe encore. */
 export function currentView(views: CollectionView[]): CollectionView | null {
@@ -120,7 +178,8 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 function renderBar(grid: HTMLElement, view: CollectionView, shown: number, total: number, onPage: number): void {
   let bar = document.querySelector<HTMLElement>('[data-wiky="view-bar"]');
-  const key = JSON.stringify([view, shown, total, onPage]);
+  const note = siteNote(siteApplied, view);
+  const key = JSON.stringify([view, shown, total, onPage, note]);
   if (bar && bar.nextElementSibling === grid && bar.dataset.key === key) return;
   if (!bar) {
     bar = document.createElement('div');
@@ -132,15 +191,18 @@ function renderBar(grid: HTMLElement, view: CollectionView, shown: number, total
   bar.dataset.key = key;
   const missing = total - shown;
   bar.innerHTML = `
-    <span class="wiky-view-name">${FILTER_ICON}<span></span></span>
+    <span class="wiky-view-name">${viewIconSvg(view.icon, 16)}<span></span></span>
     <span class="wiky-view-sum"></span>
     <span class="wiky-view-count"><b>${plural(shown, 'carte')}</b> sur ${onPage} affichée${onPage > 1 ? 's' : ''}</span>
     <a class="wiky-view-btn" href="/settings?wiky=settings#interface">Modifier</a>
     <button type="button" class="wiky-view-btn" data-act="quit">✕ Quitter la vue</button>
-    ${missing > 0 ? `<span class="wiky-view-note">${plural(missing, 'autre carte')} de ta collection ${missing > 1 ? 'correspondent' : 'correspond'} à cette vue mais ${missing > 1 ? 'ne sont' : 'n\'est'} pas sur cette page : change de page ou fais défiler la collection.</span>` : ''}
+    ${note ? `<span class="wiky-view-note" data-note="site"></span>` : ''}
+    ${missing > 0 ? `<span class="wiky-view-note">${plural(missing, 'autre carte')} de ta collection ${missing > 1 ? 'correspondent' : 'correspond'} à cette vue sur les autres pages (« Suivant → »).</span>` : ''}
     ${!shown && !missing ? '<span class="wiky-view-note">Aucune carte ne correspond à cette vue.</span>' : ''}`;
   bar.querySelector('.wiky-view-name > span:last-child')!.textContent = view.name || 'Vue';
   bar.querySelector('.wiky-view-sum')!.textContent = viewSummary(view);
+  const noteEl = bar.querySelector('[data-note="site"]');
+  if (noteEl) noteEl.textContent = note;
   bar.querySelector('[data-act="quit"]')!.addEventListener('click', () => goToView(null));
 }
 
@@ -153,6 +215,8 @@ function render(ctx: FeatureContext): void {
     window.addEventListener('popstate', () => last && setTimeout(() => last && render(last), 0));
   }
   const view = currentView(ctx.settings.collectionViews ?? []);
+  const onCollection = location.pathname === '/collection' && !new URLSearchParams(location.search).has('wiky');
+  if (onCollection) void syncSite(view);
   if (!view) return clearView();
   ensureStyle('wiky-views-style', CSS);
   const main = document.querySelector('main') ?? document.body;
@@ -162,9 +226,11 @@ function render(ctx: FeatureContext): void {
   const all = Object.values(ctx.cards);
   const bySiteId = new Map(all.filter((c) => c.siteId).map((c) => [c.siteId!, c]));
   const pairs = els.map((el) => ({ el, card: cardOf(el, ctx, bySiteId) }));
+  // Champs du site remplis pour cette vue : seul le reste du filtre (et du tri) s'applique à la page.
+  const done = siteKey === siteKeyOf(view) && !siteBusy ? siteApplied : null;
   const ordered = applyView(
     pairs.map((p) => p.card),
-    view,
+    remainingView(view, done),
     vctx,
   );
   const rank = new Map(ordered.map((c, i) => [c, i]));
@@ -201,5 +267,9 @@ registerFeature({
   keys: [],
   when: (ctx) => (ctx.settings.collectionViews?.length ?? 0) > 0,
   render,
-  cleanup: clearView,
+  cleanup: () => {
+    clearView();
+    if (siteDirty && location.pathname === '/collection') void resetSiteFilters().then(() => (siteDirty = false));
+    siteKey = '';
+  },
 });
