@@ -257,6 +257,8 @@ export interface Settings {
   siteIntegration: boolean;
   /** Barre latérale du site plus compacte, avec les menus regroupés (Social, Progression). */
   compactNav: boolean;
+  /** Vues de la collection (filtre + tri) affichées sous « Collection » dans la barre latérale (voir lib/views.ts). */
+  collectionViews: import('./views').CollectionView[];
   /** Fonctionnalités reprises de « Prix moyen collection » (voir lib/features.ts) ; absentes = valeur par défaut. */
   features: Partial<import('./features').FeatureFlags>;
 }

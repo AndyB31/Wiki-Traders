@@ -3,6 +3,7 @@ import { DEFAULT_META, DEFAULT_SETTINGS, DEFAULT_STORE } from './defaults';
 import { hasConditions, hasRange } from './conditions';
 import { inheritCalc, legacyCalc } from './salecalc';
 import { migrateRateRules } from './sellrate';
+import { normalizeView } from './views';
 import type { Priority, SellRateRule, Settings, StoreShape, TagRule } from './types';
 
 export type StoreKey = keyof StoreShape;
@@ -51,6 +52,7 @@ export function migrateSettings(stored: LegacySettings | undefined, rules?: Lega
       .filter((r) => r.when?.family?.trim() && r.tag.trim())
       .map((r) => ({ id: `ft-${r.id}`, active: r.active, family: r.when!.family.trim(), tag: r.tag.trim() }));
   }
+  s.collectionViews = Array.isArray(s.collectionViews) ? s.collectionViews.filter((v) => v && typeof v.id === 'string').map(normalizeView) : [];
   delete s.sortPrice;
   delete s.sellRateRules;
   delete s.sellRateTiersOn;

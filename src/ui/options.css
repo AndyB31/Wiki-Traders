@@ -210,3 +210,10 @@ button.link.error { color: var(--danger); }
 .family-tag.inactive > :not(input.switch) { opacity: .5; }
 .family-tag select { max-width: 220px; }
 .launch { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+
+/* Vues de la collection (onglet Interface) */
+.view-card .view-name { width: 220px; font-weight: 700; }
+.view-card .view-h { margin: 6px 0 0; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.view-card .tag-chips { margin-top: 2px; }
+.view-card .field .row input[type='number'] { width: 72px; }
+.view-card .view-count { padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--text); }

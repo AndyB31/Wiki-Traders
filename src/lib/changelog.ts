@@ -24,6 +24,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-26',
+    title: 'Tes propres menus dans la barre latérale',
+    sections: [
+      {
+        title: 'Interface',
+        items: [
+          {
+            title: 'Vues de la collection',
+            text: 'Crée tes propres menus sous « Collection » : chaque vue garde un filtre (nom, étiquettes, rareté, favoris, brillantes, famille, exemplaires, prix moyen) et un tri (nom, prix, valeur, rareté, exemplaires, taux de vente…). Exemple : « 10-100 A→Z » = étiquette 10-100, triée par nom. Un clic ouvre ta collection avec seulement ces cartes, dans cet ordre ; « Quitter la vue » réaffiche tout.',
+            where: 'Réglages → Interface → Vues de la collection, bouton « + Nouvelle vue ».',
+          },
+          {
+            title: 'Nouvel onglet « Interface »',
+            text: 'L\'intégration au site et la barre latérale compacte y sont rangées, avec les vues.',
+            where: 'Réglages → Interface.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-20',
     title: 'Défausse au choix, fenêtre « Slots à remplir » plus large',
     sections: [

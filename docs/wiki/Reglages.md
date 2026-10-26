@@ -2,7 +2,7 @@
 
 # Référence des réglages
 
-Réglages : **Paramètres → onglet Wiki-Traders** sur le site, ou page d'options de l'extension. Depuis la **version 1.0.0**, ils sont rangés en **7 onglets**, par ce que tu veux faire. Chaque section s'ouvre sur une explication avec un exemple, les « ? » détaillent chaque champ.
+Réglages : **Paramètres → onglet Wiki-Traders** sur le site, ou page d'options de l'extension. Depuis la **version 1.0.0**, ils sont rangés en onglets (8 depuis la 1.1.0, avec **Interface**), par ce que tu veux faire. Chaque section s'ouvre sur une explication avec un exemple, les « ? » détaillent chaque champ.
 
 **Enregistrement automatique** : chaque modification est enregistrée aussitôt (Ctrl/⌘ + S force l'enregistrement). Le bandeau du bas affiche « ✓ Enregistré » avec un bouton **Annuler** qui revient à l'état d'avant tes dernières modifications. Une saisie invalide n'est pas enregistrée : l'erreur s'affiche à côté du champ.
 
@@ -59,9 +59,23 @@ Voir [Étiquettes](Etiquettes.md).
 
 Voir [Familles](Familles.md).
 
+## Interface
+
+| Section | Réglages | Défaut |
+| --- | --- | --- |
+| Barre latérale | Intégration au site ; barre latérale compacte | oui ; oui |
+| Vues de la collection | Tes propres menus sous « Collection » : nom, filtre, tri ; affichée ou non, ordre, dupliquer, supprimer | aucune |
+
+Une **vue** est un menu de la barre latérale qui ouvre ta collection avec un filtre et un tri déjà posés. Exemple : « 10-100 A→Z » = étiquette *10-100*, tri par *Nom A → Z*. Crée-en autant que tu veux avec **+ Nouvelle vue**.
+
+- **Filtres** (tous facultatifs, ils se cumulent) : nom ou catégorie contient (plusieurs mots séparés par des virgules : l'un d'eux suffit) ; étiquettes (au moins une / toutes), étiquettes exclues, seulement les cartes sans étiquette ; raretés ; favoris (oui / non / indifférent) ; brillantes ; famille ; nombre d'exemplaires ; prix moyen (une carte sans prix connu est écartée dès qu'une limite est posée).
+- **Tri** : nom, prix moyen, valeur (prix × exemplaires), rareté, exemplaires, taux de vente, nombre de ventes, catégorie, étiquette ; dans un sens ou dans l'autre. Les cartes sans valeur (prix pas encore lu…) passent à la fin.
+- Sous la vue, le nombre de cartes de ta collection qui y correspondent, et les premières.
+
+Voir [Intégration au site](Integration-au-site.md#vues-de-la-collection).
+
 ## Sur le site
 
-- **Intégration au site** et **barre latérale compacte** : voir [Intégration au site](Integration-au-site.md).
 - **Fonctionnalités** par thème (collection, affichage des cartes, marché et enchères, paquets, échanges) : voir [Fonctionnalités](Fonctionnalites.md). Seuil de confirmation de « Tout défausser » avec les paquets.
 - **Notifications** (fin d'enchère, slot libéré) et **heures silencieuses** (23:00 – 08:00 par défaut).
 

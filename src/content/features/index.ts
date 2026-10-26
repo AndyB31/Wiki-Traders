@@ -17,6 +17,7 @@ import './bid-watch';
 import './families-page';
 import './family-badges';
 import './collection-families';
+import './collection-views';
 import './auction-others';
 import './price-history';
 import './market-deals';
