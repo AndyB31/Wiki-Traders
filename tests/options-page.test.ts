@@ -318,3 +318,26 @@ describe('page Réglages : vues de la collection', () => {
     extra = {};
   });
 });
+
+describe('page Réglages : étiquettes avec « ou »', () => {
+  it('ajoute un groupe « ou » (plage + taux de vente), résumé et enregistrement', async () => {
+    await open('#etiquettes');
+    const ruleCard = panel('etiquettes').querySelector<HTMLElement>('.rule-card[data-rule="r-50-100"]')!;
+    // Sans « ou », pas de résumé « Posée si ».
+    expect(ruleCard.querySelector<HTMLElement>('.rule-or-summary')!.hidden).toBe(true);
+    [...ruleCard.querySelectorAll('button')].find((b) => b.textContent === '+ Ajouter un « ou »')!.click();
+    const card2 = panel('etiquettes').querySelector<HTMLElement>('.rule-card[data-rule="r-50-100"]')!;
+    const alt = card2.querySelector<HTMLElement>('.rule-or')!;
+    type(alt.querySelector<HTMLInputElement>('input[aria-label="Plancher"]')!, '200');
+    type(alt.querySelector<HTMLInputElement>('input[aria-label="Plafond"]')!, '500');
+    type(alt.querySelector<HTMLInputElement>('input[aria-label="Taux de vente minimum"]')!, '70');
+    const summary = card2.querySelector<HTMLElement>('.rule-or-summary')!;
+    expect(summary.hidden).toBe(false);
+    expect(summary.textContent).toBe('Posée si : (50–100 W) ou (200–500 W · tdv ≥ 70 %)');
+    await ctrlS();
+    expect(saved.at(-1)!.rules!.find((r) => r.id === 'r-50-100')!.or).toMatchObject([{ floor: 200, ceiling: 500, when: { rateMin: 70 } }]);
+    // Retirer le groupe.
+    card2.querySelector<HTMLButtonElement>('.rule-or button[aria-label^="Retirer le groupe"]')!.click();
+    expect(panel('etiquettes').querySelector('.rule-card[data-rule="r-50-100"] .rule-or')).toBeNull();
+  });
+});

@@ -16,7 +16,15 @@ Pour chaque étiquette :
 | Le nom ou la catégorie contient | `pays, nation` : il suffit d'un mot ; accents et majuscules ignorés |
 | Taux de vente | de 0 à 15 % (compté à partir du seuil de fiabilité, Ventes → Taux de vente) |
 
-Une étiquette avec des conditions est **indépendante** des plages de prix : la carte France (catégorie Pays, 30 W) reçoit `20-50` **et** `Pays`. Pour étiqueter les cartes d'une **famille**, voir l'onglet [Familles](Familles.md#une-étiquette-par-famille).
+- **« ou »** (bouton **+ Ajouter un « ou »**) : une autre façon d'avoir l'étiquette, avec sa propre plage de prix, son texte et son taux de vente. La plage et les conditions du haut forment le premier groupe ; chaque « ou » en ajoute un. L'étiquette est posée dès qu'**un** groupe est rempli, et retirée seulement si **aucun** ne peut l'être (jamais sur un prix ou un taux de vente inconnu). Un résumé « Posée si : … » s'affiche sous l'étiquette.
+
+| Exemple : étiquette `A` | |
+| --- | --- |
+| Groupe 1 | plage 10 – 20 W, taux de vente de 90 % |
+| ou groupe 2 | plage 20 – 100 W, taux de vente de 70 % |
+| Résultat | 15 W à 95 % → `A` ; 50 W à 75 % → `A` ; 15 W à 80 % → pas `A` ; 200 W → pas `A` |
+
+Une étiquette avec des conditions (ou des « ou ») est **indépendante** des plages de prix : la carte France (catégorie Pays, 30 W) reçoit `20-50` **et** `Pays`. Pour étiqueter les cartes d'une **famille**, voir l'onglet [Familles](Familles.md#une-étiquette-par-famille).
 
 ## Étiquettes sur les cartes
 

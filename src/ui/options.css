@@ -221,3 +221,8 @@ button.link.error { color: var(--danger); }
 .view-card .icon-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .view-card .icon-pick { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 8px; }
 .view-card .icon-pick.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-dark); }
+
+/* Alternatives « ou » d'une étiquette (onglet Étiquettes) */
+.rule-or { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--border); background: var(--bg); }
+.rule-or .field .row input[type='number'] { width: 64px; }
+.rule-or-summary { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--text); }

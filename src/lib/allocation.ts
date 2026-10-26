@@ -1,5 +1,5 @@
 import { cardVars, computePrice, indexObs, referencePrice, reliableBase, type PriceResult, type PricingContext } from './pricing';
-import { hasRange, rangeStatus, ruleStatus } from './conditions';
+import { hasRange, needsPrice, rangeStatus, ruleStatus } from './conditions';
 import { sellChance, tierRule } from './salecalc';
 import { durationFor } from './duration';
 import { familiesOf, familyIndex, RARITY_ORDER } from './families';
@@ -141,7 +141,7 @@ export function cardMatchesRule(card: Card, rule: TagRule, ctx: PricingContext):
   }
   if (rule.match === 'price') {
     // Plage de prix et conditions (texte, famille, taux de vente) ; sans plage, le prix n'est pas nécessaire.
-    return ruleStatus(card, rule, hasRange(rule) ? referencePrice(card, ctx) : null, ctx) === 'yes';
+    return ruleStatus(card, rule, needsPrice(rule) ? referencePrice(card, ctx) : null, ctx) === 'yes';
   }
   return card.tags.some((t) => sameTag(t, rule.tag));
 }

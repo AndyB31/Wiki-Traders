@@ -24,6 +24,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-26c',
+    title: 'Étiquetage automatique : des conditions « ou »',
+    sections: [
+      {
+        title: 'Étiquettes',
+        items: [
+          {
+            title: 'Plusieurs façons d\'avoir une étiquette',
+            text: 'Une étiquette peut maintenant avoir des groupes « ou », chacun avec sa plage de prix, son texte et son taux de vente. Exemple : « A » si la carte vaut entre 10 et 20 W avec au moins 90 % de taux de vente, OU entre 20 et 100 W avec au moins 70 %. L\'étiquette est posée dès qu\'un groupe est rempli ; un résumé « Posée si : … » s\'affiche sous l\'étiquette.',
+            where: 'Réglages → Étiquettes → Mes étiquettes → « + Ajouter un « ou » » sous une étiquette.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-26b',
     title: 'Vues de la collection : toutes les pages filtrées, une icône par vue',
     sections: [

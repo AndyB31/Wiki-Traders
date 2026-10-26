@@ -5,7 +5,7 @@ import { CARD_PRICES_KEY, DEFAULT_RULES, DEFAULT_SETTINGS, SITE_ORIGIN } from '.
 import { DURATIONS } from '../lib/duration';
 import { clearAll, loadAll, migrateRules, migrateSettings, save } from '../lib/storage';
 import { formatPrice, RARITIES } from '../lib/text';
-import { conditionsSummary, EMPTY_CONDITIONS } from '../lib/conditions';
+import { conditionsSummary, EMPTY_CONDITIONS, ruleSummary } from '../lib/conditions';
 import { FORMULA_VARS, formulaError } from '../lib/formula';
 import { sellRateOfCache, type RateEntry } from '../lib/sellrate';
 import { allocate } from '../lib/allocation';
@@ -15,7 +15,7 @@ import { clampPrice, DEFAULT_CALC, defaultTiers, inheritCalc, newTier, PRIORITIE
 import { DEFAULT_CRITERIA, SORT_KEYS } from '../lib/sorting';
 import { applyView, DEFAULT_VIEW_ICON, newView, SITE_ONLY_SORTS, viewHref, viewIconSvg, viewSummary, VIEW_ICONS, VIEW_SORTS, type CollectionView, type TriState, type ViewContext, type ViewSortKey } from '../lib/views';
 import { familiesOf, familyIndex } from '../lib/families';
-import type { DurationRule, FamilyTag, PriceCalc, Rarity, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
+import type { DurationRule, FamilyTag, PriceCalc, Rarity, RuleAlternative, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { updatePanel } from './update-panel';
@@ -1624,7 +1624,13 @@ function tagCard(rule: TagRule) {
   const prefix = `rule:${rule.id}:`;
   const when = () => (rule.when ??= { ...EMPTY_CONDITIONS });
   const summary = h('span', { class: 'muted small' });
-  const refreshSummary = () => (summary.textContent = conditionsSummary(rule) || 'aucune');
+  // « Posée si : (10–20 W · tdv ≥ 90 %) ou (20–100 W · tdv ≥ 70 %) » : visible dès qu'il y a un « ou ».
+  const orSummary = h('p', { class: 'small rule-or-summary' });
+  const refreshSummary = () => {
+    summary.textContent = conditionsSummary(rule) || 'aucune';
+    orSummary.textContent = `Posée si : ${ruleSummary(rule) || 'toutes les cartes'}`;
+    orSummary.hidden = !rule.or?.length;
+  };
   refreshSummary();
   const edit = (fn: () => void) => () => {
     fn();
@@ -1633,7 +1639,48 @@ function tagCard(rule: TagRule) {
   };
   const bind = <K extends keyof TagRule>(key: K, parse: (v: string) => TagRule[K]) => (e: Event) => {
     rule[key] = parse((e.target as HTMLInputElement).value);
+    refreshSummary();
     onEdit();
+  };
+  const numIn = (key: string, value: number | null, placeholder: string, label: string, set: (v: number | null) => void, max?: string) =>
+    reg(key, h('input', { type: 'number', min: '0', max, value: value ?? '', placeholder, 'aria-label': label, oninput: (e: Event) => edit(() => set(num((e.target as HTMLInputElement).value)))() }));
+  /** Alternative « ou » : sa plage de prix, son texte et son taux de vente. */
+  const altBlock = (alt: RuleAlternative, i: number) => {
+    const ap = `${prefix}or:${alt.id}:`;
+    return h(
+      'div',
+      { class: 'rule-or', 'data-or': alt.id },
+      h(
+        'div',
+        { class: 'row' },
+        h('span', { class: 'pill' }, 'ou'),
+        h('span', { class: 'muted small grow' }, `Groupe ${i + 2} : toutes ses conditions remplies suffisent.`),
+        h('button', { type: 'button', class: 'danger small', 'aria-label': `Retirer le groupe ${i + 2}`, onclick: () => ((rule.or = rule.or!.filter((a) => a !== alt)), renderTagRules(), onEdit()) }, '✕'),
+      ),
+      h(
+        'div',
+        { class: 'grid' },
+        field(
+          'Plage de prix (W)',
+          h('span', { class: 'row nowrap' }, 'de', numIn(`${ap}floor`, alt.floor, '—', 'Plancher', (v) => (alt.floor = v)), 'à', numIn(`${ap}ceiling`, alt.ceiling, '∞', 'Plafond', (v) => (alt.ceiling = v))),
+        ),
+        field(
+          'Le nom ou la catégorie contient',
+          reg(`${ap}text`, h('input', { value: alt.when.text, placeholder: 'ex. pays, ville', oninput: (e: Event) => edit(() => (alt.when.text = (e.target as HTMLInputElement).value))() })),
+        ),
+        field(
+          'Taux de vente (%)',
+          h(
+            'span',
+            { class: 'row nowrap' },
+            'de',
+            numIn(`${ap}rateMin`, alt.when.rateMin, '0', 'Taux de vente minimum', (v) => (alt.when.rateMin = v), '100'),
+            'à',
+            numIn(`${ap}rateMax`, alt.when.rateMax, '100', 'Taux de vente maximum', (v) => (alt.when.rateMax = v), '100'),
+          ),
+        ),
+      ),
+    );
   };
   return h(
     'div',
@@ -1684,6 +1731,27 @@ function tagCard(rule: TagRule) {
         ),
       ),
     ),
+    (rule.or ?? []).map(altBlock),
+    h(
+      'div',
+      { class: 'row wrap' },
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'small',
+          title: 'Une autre façon d\'avoir cette étiquette : sa propre plage de prix et ses conditions',
+          onclick: () => {
+            (rule.or ??= []).push({ id: `or-${Date.now()}-${++idSeq}`, floor: null, ceiling: null, when: { ...EMPTY_CONDITIONS } });
+            renderTagRules();
+            onEdit();
+          },
+        },
+        '+ Ajouter un « ou »',
+      ),
+      hint('Ex. : étiquette A si le prix est entre 10 et 20 W avec au moins 90 % de taux de vente, OU entre 20 et 100 W avec au moins 70 %. La plage et les conditions ci-dessus forment le premier groupe ; chaque « ou » en ajoute un. L\'étiquette est posée dès qu\'un groupe est rempli, et retirée seulement si aucun ne peut l\'être.'),
+    ),
+    orSummary,
   );
 }
 

@@ -12,6 +12,14 @@ export interface RuleConditions {
   rateMax: number | null;
 }
 
+/** Alternative « ou » d'une règle d'étiquette : sa propre plage de prix et ses conditions. */
+export interface RuleAlternative {
+  id: string;
+  floor: number | null;
+  ceiling: number | null;
+  when: RuleConditions;
+}
+
 /** Ordre de choix des cartes d'une étiquette. `rate` : meilleur taux de vente d'abord ; `score` : formule ; `custom` : critères. */
 export type CandidateSort = 'desc' | 'asc' | 'random' | 'rate' | 'score' | 'custom';
 
@@ -89,6 +97,11 @@ export interface TagRule {
   match: 'tag' | 'price';
   /** Conditions en plus de la plage de prix (absentes = aucune). */
   when?: RuleConditions;
+  /**
+   * Autres façons d'avoir l'étiquette (« ou ») : chacune a sa plage de prix et ses conditions. La carte reçoit
+   * l'étiquette si la plage et les conditions principales, OU celles d'une de ces alternatives, sont remplies.
+   */
+  or?: RuleAlternative[];
   /** Calcul du prix de départ (mode « par étiquette ») ; absent = calcul par défaut. */
   calc?: PriceCalc;
   /** Durée de l'enchère (minutes) ; null ou absent = paliers de durée généraux. */
