@@ -2,7 +2,7 @@
 
 > Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : une extension navigateur qui garde tes slots d'enchères remplis avec tes meilleures cartes, calcule le bon prix… et te laisse cliquer.
 
-![Version](https://img.shields.io/badge/version-1.2.0-orange)
+![Version](https://img.shields.io/badge/version-1.3.0-orange)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178c6)
 
@@ -53,7 +53,7 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 | **Page d'une enchère** | **Historique des prix** de la carte : chiffres clés (ventes, moyenne, médiane, extrêmes, tendance 30 j, taux de vente), graphique en **points, bougies ou ligne**, moyenne glissante de 2 j à 1 mois, filtre vendues / sans acheteur ; **autres enchères de la même carte**. |
 | **Prix comme le site** | « Moy. » = moyenne des 200 dernières ventes de la carte dans sa rareté, comme le site, suivie du **taux de vente** (rouge ≤ 15 %, vert ≥ 70 %) et, en bas de la carte, des ventes conclues sur enchères terminées (« 17 / 20 vendues ») ; prix de 150 cartes par requête, toutes les ventes lues (pagination), cache 6 h, bouton **↻ Rafraîchir les prix**. |
 | **Familles** | Regroupe des cartes, progression, valeur et coût pour compléter, ajout par **sélection multiple** (mode « Sélectionner » du site) ou recherche au fil de la frappe, marché des manquantes, **une étiquette par famille** ; import depuis une autre extension. |
-| **Étiquettes** | Pastilles sur les cartes ; **étiquetage automatique** par plage de prix, conditions et familles, **à la demande** (bouton **Étiquettes** sur la collection) ou **en continu** ; option pour **remettre les étiquettes des invendues**. |
+| **Étiquettes** | Pastilles sur les cartes ; **étiquetage automatique** par plage de prix, conditions (combinables en « ou » : 10-20 W à 90 % de tdv OU 20-100 W à 70 %) et familles, **à la demande** (bouton **Étiquettes** sur la collection) ou **en continu** ; option pour **remettre les étiquettes des invendues**. |
 | **Échanges** | Valeur de chaque côté et **bilan pour toi** (« −500 W : tu donnes 600 W, tu reçois 100 W »), aperçus des cartes. |
 | **Et aussi** | Classement « Plus chères », mode compact, cartes illustrées, bouton Wikipédia, images manquantes, copie de carte en image, récapitulatif de paquets complet (prix, taux de vente, ventes) et statistiques, son des notifications, journal des ventes, notifications de fin d'enchère. |
 | **Mises à jour** | Vérification de la branche `main` (démarrage, toutes les 6 h) et **mise à jour en un clic** depuis les réglages. |

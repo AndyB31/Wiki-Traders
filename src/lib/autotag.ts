@@ -1,5 +1,5 @@
 import { makeContext, type AllocationInput } from './allocation';
-import { EMPTY_CONDITIONS, hasConditions, isAutoTagRule, ruleStatus, type Tri } from './conditions';
+import { EMPTY_CONDITIONS, isAutoTagRule, isConditional, ruleStatus, type Tri } from './conditions';
 import { ownPrice } from './pricing';
 import { sameTag } from './text';
 import type { Card, Rarity, Settings, TagRule } from './types';
@@ -45,7 +45,7 @@ export interface TagChange {
  */
 export function ruleForPrice(rules: TagRule[], price: number): TagRule | null {
   const fits = rules.filter(
-    (r) => r.active && !hasConditions(r) && (r.floor != null || r.ceiling != null) && (r.floor == null || price >= r.floor) && (r.ceiling == null || price <= r.ceiling),
+    (r) => r.active && !isConditional(r) && (r.floor != null || r.ceiling != null) && (r.floor == null || price >= r.floor) && (r.ceiling == null || price <= r.ceiling),
   );
   const width = (r: TagRule) => (r.ceiling ?? Infinity) - (r.floor ?? 0);
   return fits.sort((a, b) => width(a) - width(b))[0] ?? null;
@@ -74,8 +74,9 @@ export interface AutoTagOptions {
  * Étiquetage automatique. Deux sortes de règles :
  *  - plage de prix seule : la carte reçoit l'étiquette dont la plage contient son prix PROPRE (moyenne du site, ses
  *    ventes, prix saisi), une seule (la plus étroite) ; la médiane de la rareté n'est jamais utilisée ;
- *  - avec des conditions (texte dans le nom, famille, taux de vente, et la plage si elle est remplie) : chaque règle
- *    remplie ajoute son étiquette, indépendamment des autres (« Pays », « Films »…).
+ *  - avec des conditions (texte dans le nom, famille, taux de vente, et la plage si elle est remplie) ou des
+ *    alternatives « ou » (chacune sa plage et ses conditions) : chaque règle remplie ajoute son étiquette,
+ *    indépendamment des autres (« Pays », « Films »…).
  * Une étiquette n'est retirée que si sa règle répond non (jamais sur un prix ou un taux de vente inconnu, sauf
  * l'option « cartes sans prix »). Les favoris sont ignorés.
  */
@@ -83,8 +84,8 @@ export function planAutoTags(input: AllocationInput, opts: AutoTagOptions | bool
   const { removeOthers, clearUnpriced = false, extraPrice } = typeof opts === 'boolean' ? { removeOthers: opts } : opts;
   const ctx = makeContext(input, now);
   const autoRules = [...input.rules, ...familyTagRules(input.settings)].filter(isAutoTagRule);
-  const priceOnly = autoRules.filter((r) => !hasConditions(r));
-  const withConditions = autoRules.filter(hasConditions);
+  const priceOnly = autoRules.filter((r) => !isConditional(r));
+  const withConditions = autoRules.filter(isConditional);
   const out: TagChange[] = [];
   for (const card of Object.values(input.cards)) {
     // Les favoris ne sont jamais réétiquetés.

@@ -181,6 +181,18 @@ function ruleExtraErrors(r: TagRule): ValidationError[] {
       errors.push({ section: 'rules', keys: [`${prefix}rateMin`, `${prefix}rateMax`], message: `${label}taux de vente : « de » dépasse « à ».` });
     }
   }
+  (r.or ?? []).forEach((alt, i) => {
+    const ap = `${prefix}or:${alt.id}:`;
+    const n = `${label}« ou » n° ${i + 2} : `;
+    if (alt.floor != null && alt.ceiling != null && alt.floor > alt.ceiling) errors.push({ section: 'rules', keys: [`${ap}floor`, `${ap}ceiling`], message: `${n}le plancher dépasse le plafond.` });
+    for (const k of ['rateMin', 'rateMax'] as const) {
+      const v = alt.when[k];
+      if (v != null && (v < 0 || v > 100)) errors.push({ section: 'rules', keys: [`${ap}${k}`], message: `${n}le taux de vente doit être entre 0 et 100 %.` });
+    }
+    if (alt.when.rateMin != null && alt.when.rateMax != null && alt.when.rateMin > alt.when.rateMax) {
+      errors.push({ section: 'rules', keys: [`${ap}rateMin`, `${ap}rateMax`], message: `${n}taux de vente : « de » dépasse « à ».` });
+    }
+  });
   if (r.calc) errors.push(...calcErrors(r.calc, 'rules', prefix, label));
   return errors;
 }

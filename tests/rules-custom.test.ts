@@ -151,3 +151,61 @@ describe('réglages de vente par étiquette', () => {
     ]);
   });
 });
+
+describe('étiquetage automatique : conditions « ou »', () => {
+  // Étiquette A : entre 10 et 20 W avec au moins 90 % de tdv, OU entre 20 et 100 W avec au moins 70 %.
+  const a = rule('A', {
+    floor: 10,
+    ceiling: 20,
+    when: when({ rateMin: 90 }),
+    or: [{ id: 'o1', floor: 20, ceiling: 100, when: when({ rateMin: 70 }) }],
+  });
+  const cards = cardsById(
+    card('c15-95', { sitePrice: 15 }),
+    card('c15-80', { sitePrice: 15, tags: ['A'] }),
+    card('c50-75', { sitePrice: 50 }),
+    card('c50-60', { sitePrice: 50, tags: ['A'] }),
+    card('c200-99', { sitePrice: 200, tags: ['A'] }),
+    card('c50-unknown', { sitePrice: 50, tags: ['A'] }),
+    card('c15-unknown', { sitePrice: 15 }),
+  );
+  const sellRate = rates({ 'c15-95': rate(19, 20), 'c15-80': rate(8, 10), 'c50-75': rate(15, 20), 'c50-60': rate(6, 10), 'c200-99': rate(99, 100) });
+  const plan = (rules: TagRule[] = [a]) =>
+    Object.fromEntries(planAutoTags(input({ cards, rules, sellRate }), { removeOthers: true }, NOW).map((c) => [c.cardId, c]));
+
+  it('pose l\'étiquette dès qu\'un groupe est rempli, la retire seulement si aucun ne peut l\'être', () => {
+    const p = plan();
+    expect(p['c15-95']).toMatchObject({ add: ['A'] }); // 1er groupe
+    expect(p['c50-75']).toMatchObject({ add: ['A'] }); // 2e groupe
+    expect(p['c15-80']).toMatchObject({ remove: ['A'] }); // 15 W mais 80 % < 90 %
+    expect(p['c50-60']).toMatchObject({ remove: ['A'] }); // 50 W mais 60 % < 70 %
+    expect(p['c200-99']).toMatchObject({ remove: ['A'] }); // hors des deux plages
+    // Taux de vente inconnu : ni posée ni retirée.
+    expect(p['c50-unknown']).toBeUndefined();
+    expect(p['c15-unknown']).toBeUndefined();
+  });
+
+  it('une étiquette à « ou » est indépendante des plages seules (une carte peut avoir les deux)', () => {
+    const p = plan([a, rule('10-100', { floor: 10, ceiling: 100 })]);
+    expect(p['c50-75'].add.sort()).toEqual(['10-100', 'A']);
+    // Un « ou » vide ne change rien : la règle reste une simple plage.
+    const plain = rule('B', { floor: 10, ceiling: 20, or: [{ id: 'o', floor: null, ceiling: null, when: when({}) }] });
+    expect(plan([plain, rule('10-100', { floor: 10, ceiling: 100 })])['c15-95'].add).toEqual(['B']);
+  });
+
+  it('appartenance « prix dans la plage » et résumé', async () => {
+    const { ruleSummary } = await import('../src/lib/conditions');
+    const ctx = makeContext(input({ cards, rules: [a], sellRate }), NOW);
+    expect(cardMatchesRule(cards['c50-75'], { ...a, match: 'price' }, ctx)).toBe(true);
+    expect(cardMatchesRule(cards['c50-60'], { ...a, match: 'price' }, ctx)).toBe(false);
+    expect(ruleSummary(a)).toBe('(10–20 W · tdv ≥ 90 %) ou (20–100 W · tdv ≥ 70 %)');
+    expect(ruleSummary(rule('P', { floor: 20 }))).toBe('≥ 20 W');
+  });
+
+  it('validation des groupes « ou »', () => {
+    const bad = rule('A', { or: [{ id: 'x', floor: 50, ceiling: 10, when: when({ rateMin: 120 }) }] });
+    const msgs = validateOptions([bad], TEST_SETTINGS).map((e) => e.message);
+    expect(msgs).toContain('« A » : « ou » n° 2 : le plancher dépasse le plafond.');
+    expect(msgs).toContain('« A » : « ou » n° 2 : le taux de vente doit être entre 0 et 100 %.');
+  });
+});
