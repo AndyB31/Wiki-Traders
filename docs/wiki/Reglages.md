@@ -64,12 +64,14 @@ Voir [Familles](Familles.md).
 | Section | Réglages | Défaut |
 | --- | --- | --- |
 | Barre latérale | Intégration au site ; barre latérale compacte | oui ; oui |
-| Vues de la collection | Tes propres menus sous « Collection » : nom, filtre, tri ; affichée ou non, ordre, dupliquer, supprimer | aucune |
+| Vues de la collection | Tes propres menus sous « Collection » : nom, icône, filtre, tri ; affichée ou non, ordre, dupliquer, supprimer | aucune |
 
 Une **vue** est un menu de la barre latérale qui ouvre ta collection avec un filtre et un tri déjà posés. Exemple : « 10-100 A→Z » = étiquette *10-100*, tri par *Nom A → Z*. Crée-en autant que tu veux avec **+ Nouvelle vue**.
 
 - **Filtres** (tous facultatifs, ils se cumulent) : nom ou catégorie contient (plusieurs mots séparés par des virgules : l'un d'eux suffit) ; étiquettes (au moins une / toutes), étiquettes exclues, seulement les cartes sans étiquette ; raretés ; favoris (oui / non / indifférent) ; brillantes ; famille ; nombre d'exemplaires ; prix moyen (une carte sans prix connu est écartée dès qu'une limite est posée).
-- **Tri** : nom, prix moyen, valeur (prix × exemplaires), rareté, exemplaires, taux de vente, nombre de ventes, catégorie, étiquette ; dans un sens ou dans l'autre. Les cartes sans valeur (prix pas encore lu…) passent à la fin.
+- **Tri** : nom, prix moyen, valeur (prix × exemplaires), rareté, exemplaires, taux de vente, nombre de ventes, catégorie, étiquette, favoris, date d'ajout ; dans un sens ou dans l'autre. Rareté, Nom (A → Z), Favoris et Date d'ajout passent par le tri du site (toutes les pages) ; les autres rangent la page affichée. Les cartes sans valeur (prix pas encore lu…) passent à la fin.
+- **Icône du menu** : entonnoir par défaut, ou étoile, cœur, couronne, flamme, gemme, trophée…
+- À l'ouverture, la vue remplit les filtres du site (recherche, étiquette, raretés, tri) ; le reste est filtré sur la page affichée.
 - Sous la vue, le nombre de cartes de ta collection qui y correspondent, et les premières.
 
 Voir [Intégration au site](Integration-au-site.md#vues-de-la-collection).

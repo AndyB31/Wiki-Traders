@@ -31,12 +31,12 @@ Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans 
 
 ## Vues de la collection
 
-Dans **Réglages → Interface → Vues de la collection**, crée tes propres menus : chaque vue a un nom, un filtre (nom, étiquettes, rareté, favoris, brillantes, famille, exemplaires, prix moyen) et un tri (nom, prix, valeur, rareté, exemplaires, taux de vente, ventes, catégorie, étiquette). Elles apparaissent sous **Ma collection** dans le menu *Collection* (sous le lien *Collection* si la barre n'est pas compacte), dans l'ordre choisi.
+Dans **Réglages → Interface → Vues de la collection**, crée tes propres menus : chaque vue a un nom, une icône (entonnoir par défaut), un filtre (nom, étiquettes, rareté, favoris, brillantes, famille, exemplaires, prix moyen) et un tri (nom, prix, valeur, rareté, exemplaires, taux de vente, ventes, catégorie, étiquette). Elles apparaissent sous **Ma collection** dans le menu *Collection* (sous le lien *Collection* si la barre n'est pas compacte), dans l'ordre choisi.
 
-Un clic ouvre la collection (`/collection?wview=…`) avec seulement les cartes de la vue, dans l'ordre du tri. Un bandeau au-dessus des cartes rappelle la vue, son filtre et le nombre de cartes, avec **Modifier** (les réglages) et **✕ Quitter la vue** (toute la collection).
+Un clic ouvre la collection (`/collection?wview=…`) et **remplit les filtres du site** : recherche (un seul texte), étiquette (une seule, ou « Sans étiquette »), pastilles de rareté et tri (Rareté, Nom A → Z, Favoris, Date d'ajout). La collection du site est paginée : ce sont ses filtres qui mettent les bonnes cartes sur toutes ses pages. Un bandeau au-dessus des cartes rappelle la vue, ce qui est réglé sur le site et le nombre de cartes, avec **Modifier** (les réglages) et **✕ Quitter la vue** (filtres du site remis à zéro).
 
-- Les cartes du site ne sont pas déplacées : les autres sont masquées, celles de la vue rangées dans l'ordre du tri. Fiche, vente, sélection fonctionnent comme d'habitude.
-- La vue s'applique aux cartes **affichées** par le site. Si des cartes de la vue sont sur une autre page de la collection, le bandeau le signale.
+- Ce que le site ne sait pas faire (prix, favoris, brillantes, famille, exemplaires, plusieurs étiquettes, plusieurs mots de recherche) est appliqué **en plus sur la page affichée** : les autres cartes sont masquées. De même, un tri que le site n'a pas (prix, valeur, Nom Z → A…) range chaque page affichée.
+- Les cartes du site ne sont pas déplacées. Fiche, vente, sélection fonctionnent comme d'habitude.
 - Filtre ou tri par prix, valeur, taux de vente ou ventes : les prix manquants sont demandés (avec la *lecture via l'API*), puis la vue se met à jour.
 
 ## Le récapitulatif Wiki-Traders (toujours visible)

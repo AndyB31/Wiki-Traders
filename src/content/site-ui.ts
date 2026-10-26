@@ -12,7 +12,7 @@ import { ext } from '../lib/browser';
 import { STALE_AFTER_MS } from '../lib/defaults';
 import { featureFlags, type FeatureKey } from '../lib/features';
 import { formatDuration, formatPrice } from '../lib/text';
-import { viewHref, type CollectionView } from '../lib/views';
+import { viewHref, viewIconSvg, type CollectionView } from '../lib/views';
 import { goToView } from './features/collection-views';
 import { bindTips, hideTip } from './features/dom';
 import type { Meta, MyBidsResult } from '../lib/types';
@@ -44,7 +44,6 @@ const ICONS: Record<string, string> = {
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
   gavel: '<path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381"/><path d="m16 16 6-6"/><path d="m21.5 10.5-8-8"/><path d="m8 8 6-6"/><path d="m8.5 7.5 8 8"/>',
-  filter: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
   folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
 };
 
@@ -381,7 +380,7 @@ function activeViewId(): string | null {
 
 /** Entrée d'une vue de la collection : ouvre la collection filtrée et triée (sur place si l'on y est déjà). */
 function viewSub(view: CollectionView, activeId: string | null): HTMLElement {
-  const a = el('a', { class: `wiky-sub${view.id === activeId ? ' is-active' : ''}`, href: viewHref(view.id), 'data-wiky-view-id': view.id }, `<span class="wiky-ico">${icon('filter', 18)}</span><span></span>`);
+  const a = el('a', { class: `wiky-sub${view.id === activeId ? ' is-active' : ''}`, href: viewHref(view.id), 'data-wiky-view-id': view.id }, `<span class="wiky-ico">${viewIconSvg(view.icon, 18)}</span><span></span>`);
   a.querySelector('span:last-child')!.textContent = view.name || 'Vue';
   a.title = view.name;
   a.addEventListener('click', (e) => {

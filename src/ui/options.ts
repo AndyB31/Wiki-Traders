@@ -13,7 +13,7 @@ import { catalogPriceOf, type CatalogPriceEntry } from '../lib/autotag';
 import { roundTo } from '../lib/pricing';
 import { clampPrice, DEFAULT_CALC, defaultTiers, inheritCalc, newTier, PRIORITIES, simplePrice, tierLabel } from '../lib/salecalc';
 import { DEFAULT_CRITERIA, SORT_KEYS } from '../lib/sorting';
-import { applyView, newView, viewHref, viewSummary, VIEW_SORTS, type CollectionView, type TriState, type ViewContext, type ViewSortKey } from '../lib/views';
+import { applyView, DEFAULT_VIEW_ICON, newView, SITE_ONLY_SORTS, viewHref, viewIconSvg, viewSummary, VIEW_ICONS, VIEW_SORTS, type CollectionView, type TriState, type ViewContext, type ViewSortKey } from '../lib/views';
 import { familiesOf, familyIndex } from '../lib/families';
 import type { DurationRule, FamilyTag, PriceCalc, Rarity, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
@@ -1982,9 +1982,40 @@ function viewCard(v: CollectionView, i: number) {
   const families = familyNames();
   const sortDef = () => VIEW_SORTS.find((s) => s.key === v.sort) ?? VIEW_SORTS[0];
   const dirSelect = h('select', { 'aria-label': 'Sens du tri', onchange: (e: Event) => ((v.dir = (e.target as HTMLSelectElement).value as 'asc' | 'desc'), edited()) });
-  const drawDir = () =>
+  const drawDir = () => {
     mount(dirSelect, h('option', { value: 'asc', selected: v.dir === 'asc' }, sortDef().asc), h('option', { value: 'desc', selected: v.dir === 'desc' }, sortDef().desc));
+    // Date d'ajout : seulement l'ordre du site.
+    dirSelect.hidden = SITE_ONLY_SORTS.includes(v.sort);
+  };
   drawDir();
+  // Icône du menu : aperçu dans la tête de la carte, choix en pastilles.
+  const headIcon = h('span', { class: 'view-icon', 'aria-hidden': 'true' });
+  headIcon.innerHTML = viewIconSvg(v.icon, 20);
+  const iconPicker = h('div', { class: 'icon-picks', role: 'radiogroup', 'aria-label': 'Icône du menu' });
+  const drawIcons = () =>
+    mount(
+      iconPicker,
+      Object.entries(VIEW_ICONS).map(([key, def]) => {
+        const on = (v.icon ?? DEFAULT_VIEW_ICON) === key;
+        const b = h('button', {
+          type: 'button',
+          class: `icon-pick${on ? ' is-on' : ''}`,
+          role: 'radio',
+          'aria-checked': String(on),
+          title: def.label,
+          'aria-label': def.label,
+          onclick: () => {
+            v.icon = key;
+            headIcon.innerHTML = viewIconSvg(key, 20);
+            drawIcons();
+            onEdit();
+          },
+        });
+        b.innerHTML = viewIconSvg(key, 18);
+        return b;
+      }),
+    );
+  drawIcons();
   const move = (step: number) => {
     const j = i + step;
     if (j < 0 || j >= list.length) return;
@@ -2000,6 +2031,7 @@ function viewCard(v: CollectionView, i: number) {
       'div',
       { class: 'row wrap rule-head' },
       switchInput(v.active, (box) => ((v.active = box.checked), box.closest('.view-card')?.classList.toggle('inactive', !box.checked), onEdit()), `Afficher « ${v.name} » dans la barre latérale`),
+      headIcon,
       h('input', { class: 'view-name', value: v.name, maxlength: 40, placeholder: 'Nom du menu (ex. 10-100 A→Z)', 'aria-label': 'Nom de la vue', oninput: (e: Event) => ((v.name = (e.target as HTMLInputElement).value), edited()) }),
       h('span', { class: 'grow' }),
       siteLink,
@@ -2022,6 +2054,7 @@ function viewCard(v: CollectionView, i: number) {
       h('button', { type: 'button', class: 'danger small', 'aria-label': `Supprimer la vue ${v.name}`, onclick: () => (list.splice(i, 1), renderViews(), onEdit()) }, '✕'),
     ),
     h('div', { class: 'row wrap' }, summary),
+    h('details', { class: 'fine' }, h('summary', null, 'Icône du menu'), iconPicker),
     h(
       'div',
       { class: 'grid' },
@@ -2034,7 +2067,7 @@ function viewCard(v: CollectionView, i: number) {
           selectOf(VIEW_SORTS.map((s) => [s.key, s.label] as [ViewSortKey, string]), v.sort, (k) => ((v.sort = k), drawDir(), edited()), 'Trier par'),
           dirSelect,
         ),
-        'Les cartes sans valeur (prix pas encore lu, pas de catégorie…) passent à la fin.',
+        'Le site sait trier par rareté, nom (A → Z), favoris et date d\'ajout : ces tris passent par lui. Les autres rangent chaque page affichée. Les cartes sans valeur (prix pas encore lu…) passent à la fin.',
       ),
     ),
     h('h4', { class: 'view-h' }, 'Étiquettes'),
@@ -2113,7 +2146,7 @@ function interfacePanel() {
     section(
       'vues',
       'Vues de la collection',
-      'Tes propres menus sous « Collection » dans la barre latérale : chaque vue garde un filtre et un tri. Un clic ouvre ta collection avec seulement ces cartes, dans cet ordre. Crée-en autant que tu veux.',
+      'Tes propres menus sous « Collection » dans la barre latérale : chaque vue garde un filtre, un tri et une icône. Un clic ouvre ta collection et remplit ses champs (recherche, étiquette, raretés, tri) : toutes les pages ne montrent plus que ces cartes. Ce que le site ne sait pas filtrer (prix, favoris, plusieurs étiquettes…) est filtré en plus sur la page affichée. Crée-en autant que tu veux.',
       [ui.views],
     ),
   );

@@ -177,3 +177,119 @@ describe('vues dans la barre latérale', () => {
     expect(box.textContent).toContain('Ma vue');
   });
 });
+
+// ---------------------------------------------------------------- champs du site
+
+const { pickSiteSort, remainingView, siteFilters, siteTagName } = await import('../src/lib/views');
+const { applySiteFilters, resetSiteFilters } = await import('../src/content/collection-controls');
+
+/** Contrôles de la collection du site, tels que relevés le 2026-10-26 (listes à boutons role=option). */
+function mountControls(titles: string[] = ['Zola', 'Balzac']) {
+  const listbox = (id: string, label: string, value: string) => `
+    <div class="relative"><button type="button" id="b${id}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}" aria-label="${label}"><span>${value}</span></button></div>`;
+  document.body.innerHTML = `<main><div class="flex-1"><div class="flex items-center"><h1>Collection</h1></div>
+    <div class="space-y-3"><div class="flex"><input type="text" placeholder="Rechercher par titre ou catégorie...">
+      ${listbox('tags', 'Filtrer par étiquette', 'Toutes les étiquettes')}${listbox('sort', 'Trier la collection', 'Rareté')}</div>
+      <div class="flex flex-wrap gap-2">${['L', 'UR', 'SR', 'R', 'PC', 'C'].map((r) => `<button class="px-3 py-1 rounded-full opacity-50" style="background-color: var(--color-rarity-${r.toLowerCase()})30;">${r}</button>`).join('')}</div></div>
+    <div class="grid">${titles.map((t) => nativeCard(t)).join('')}</div></div></main>`;
+  const options: Record<string, string[]> = {
+    tags: ['Toutes les étiquettes', 'Sans étiquette', '#10-100 (142)', '#Galaxy (48)', 'Gérer les étiquettes…'],
+    sort: ['Rareté', 'Nom', 'Favoris', 'Date d\'ajout'],
+  };
+  // Comme le site : un clic ouvre la liste (portail), un clic sur une option la choisit et la referme.
+  for (const id of ['tags', 'sort']) {
+    const button = document.getElementById(`b${id}`)!;
+    button.addEventListener('click', () => {
+      const open = document.getElementById(id);
+      if (open) return open.remove();
+      const list = document.createElement('div');
+      list.id = id;
+      list.setAttribute('role', 'listbox');
+      for (const o of options[id]) {
+        const b = document.createElement('button');
+        b.setAttribute('role', 'option');
+        b.textContent = o;
+        b.addEventListener('click', () => {
+          button.querySelector('span')!.textContent = o;
+          list.remove();
+          // Comme le site, mais tout de suite : la liste des cartes suit l'étiquette et le tri.
+          const grid = document.querySelector('.grid')!;
+          const shown = titles.filter((t) => !(id === 'tags' && o.startsWith('#10-100')) || ['Zola', 'Balzac'].includes(t));
+          if (id === 'tags') grid.innerHTML = shown.map((t) => nativeCard(t)).join('');
+          if (id === 'sort' && o === 'Nom') grid.replaceChildren(...[...grid.children].sort((a, b) => a.textContent!.trim().localeCompare(b.textContent!.trim())));
+        });
+        list.append(b);
+      }
+      document.body.append(list);
+    });
+  }
+  for (const chip of document.querySelectorAll<HTMLElement>('[style*="color-rarity"]')) chip.addEventListener('click', () => chip.classList.toggle('opacity-50'));
+  const input = document.querySelector('input')!;
+  return {
+    q: () => input.value,
+    tag: () => document.querySelector('#btags')!.textContent!.trim(),
+    sort: () => document.querySelector('#bsort')!.textContent!.trim(),
+    rarities: () => [...document.querySelectorAll('[style*="color-rarity"]:not(.opacity-50)')].map((b) => b.textContent),
+  };
+}
+
+describe('champs de la collection du site', () => {
+  it('ce que le site sait faire : une recherche, une étiquette (ou « sans étiquette »), les raretés', () => {
+    expect(siteFilters(view({}, { q: ' roi ', tags: ['10-100'], rarities: ['L', 'UR'] }))).toEqual({ q: 'roi', tag: '10-100', untagged: false, rarities: ['L', 'UR'] });
+    expect(siteFilters(view({}, { q: 'roi, reine', tags: ['a', 'b'] }))).toMatchObject({ q: '', tag: null });
+    expect(siteFilters(view({}, { tags: ['a', 'b'], tagMode: 'all' })).tag).toBe('a');
+    expect(siteFilters(view({}, { untagged: true, tags: ['a'] }))).toMatchObject({ tag: null, untagged: true });
+    expect(siteTagName('#20-100 (142)')).toBe('20-100');
+    expect(siteTagName('#Mettre au Enchère (227)')).toBe('Mettre au Enchère');
+  });
+
+  it('tri du site : Nom = A → Z, Rareté = Légendaire d\'abord ; les autres tris n\'y sont pas', () => {
+    const labels = ['Rareté', 'Nom', 'Favoris', 'Date d\'ajout'];
+    expect(pickSiteSort(labels, 'name', 'asc')).toEqual({ index: 1, exact: true });
+    expect(pickSiteSort(labels, 'name', 'desc')).toEqual({ index: 1, exact: false });
+    expect(pickSiteSort(labels, 'rarity', 'desc')).toEqual({ index: 0, exact: true });
+    expect(pickSiteSort(labels, 'favorite', 'desc')).toEqual({ index: 2, exact: true });
+    expect(pickSiteSort(labels, 'added', 'asc')).toEqual({ index: 3, exact: true });
+    expect(pickSiteSort(labels, 'price', 'desc')).toBeNull();
+  });
+
+  it('ce que le site a déjà fait n\'est pas refait sur la page ; son ordre est gardé quand c\'est le bon', () => {
+    const v = view({ sort: 'name' }, { q: 'roi', tags: ['10-100', 'Garder'], tagMode: 'all', rarities: ['L'], minPrice: 10 });
+    const rest = remainingView(v, { q: 'roi', tag: '10-100', untagged: false, rarities: ['L'], sortExact: true });
+    expect(rest.filter).toMatchObject({ q: '', tags: ['Garder'], rarities: [], minPrice: 10 });
+    expect(rest.sort).toBe('added');
+    expect(remainingView(v, null)).toBe(v);
+    expect(remainingView(view({ sort: 'price' }, { tags: ['10-100'] }), { q: '', tag: '10-100', untagged: false, rarities: [], sortExact: false })).toMatchObject({ sort: 'price', filter: { tags: [] } });
+  });
+
+  it('remplit recherche, étiquette, raretés et tri ; puis remet tout comme au chargement', async () => {
+    const site = mountControls();
+    const v = view({ sort: 'name' }, { q: 'roi', tags: ['10-100'], rarities: ['L', 'SR'] });
+    const applied = await applySiteFilters(v, siteFilters(v));
+    expect([site.q(), site.tag(), site.sort(), site.rarities()]).toEqual(['roi', '#10-100 (142)', 'Nom', ['L', 'SR']]);
+    expect(applied).toMatchObject({ q: 'roi', tag: '10-100', rarities: ['L', 'SR'], sort: 'Nom', sortExact: true });
+    // Tri inconnu du site (prix) : son tri par défaut ; « sans étiquette » ; raretés changées.
+    const p = view({ sort: 'price', dir: 'desc' }, { untagged: true, rarities: ['C'] });
+    expect(await applySiteFilters(p, siteFilters(p))).toMatchObject({ q: '', untagged: true, rarities: ['C'], sort: 'Rareté', sortExact: false });
+    expect([site.q(), site.tag(), site.rarities()]).toEqual(['', 'Sans étiquette', ['C']]);
+    await resetSiteFilters();
+    expect([site.q(), site.tag(), site.sort(), site.rarities()]).toEqual(['', 'Toutes les étiquettes', 'Rareté', []]);
+  });
+
+  it('ouvrir une vue remplit les champs du site ; la quitter les remet à zéro', async () => {
+    const site = mountControls(['Zola', 'Balzac', 'Hugo']);
+    // Le dernier relevé de l'extension ne connaît pas encore l'étiquette de Zola : le site, si.
+    const v = view({ icon: 'star' }, { tags: ['10-100'] });
+    CARDS[0].tags = [];
+    history.replaceState(null, '', `/collection?wview=${v.id}`);
+    const ctx = makeContext(settingsWith([v]), cardsById(...CARDS), []);
+    runFeatures(ctx);
+    await vi.waitFor(() => expect([site.tag(), site.sort()]).toEqual(['#10-100 (142)', 'Nom']));
+    await vi.waitFor(() => expect(document.querySelector('[data-note="site"]')?.textContent).toBe('Réglé sur le site : étiquette 10-100 · tri Nom.'));
+    runFeatures(ctx);
+    expect(visible()).toEqual(['Balzac', 'Zola']);
+    CARDS[0].tags = ['10-100'];
+    document.querySelector<HTMLButtonElement>('[data-act="quit"]')!.click();
+    await vi.waitFor(() => expect([site.tag(), site.sort()]).toEqual(['Toutes les étiquettes', 'Rareté']));
+  });
+});
