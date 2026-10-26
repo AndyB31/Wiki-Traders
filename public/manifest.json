@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Wiki-Traders",
   "short_name": "Wiki-Traders",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Copilote d'enchères pour WikiMasters : garde tes slots remplis selon tes règles et calcule le bon prix. C'est toi qui cliques.",
   "icons": {
     "16": "icons/icon-16.png",

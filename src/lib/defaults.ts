@@ -53,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   selectorOverrides: {},
   siteIntegration: true,
   compactNav: true,
+  collectionViews: [],
   features: {},
 };
 

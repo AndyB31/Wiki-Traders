@@ -1,6 +1,6 @@
 {
   "name": "wiki-traders",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "description": "Copilote d'enchères pour WikiMasters (extension navigateur Manifest V3)",
   "type": "module",

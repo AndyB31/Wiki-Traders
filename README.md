@@ -2,7 +2,7 @@
 
 > Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : une extension navigateur qui garde tes slots d'enchères remplis avec tes meilleures cartes, calcule le bon prix… et te laisse cliquer.
 
-![Version](https://img.shields.io/badge/version-1.0.0-orange)
+![Version](https://img.shields.io/badge/version-1.1.0-orange)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178c6)
 
@@ -47,7 +47,7 @@ Quelques options **facultatives et désactivées par défaut** (pré-remplissage
 
 | | |
 | --- | --- |
-| **Intégré au site** | Barre latérale rangée en arborescence (Paquets en haut ; menus Collection, Marché, Social, Progression ; pages de l'extension à l'icône orange), **récapitulatif** toujours visible (slots occupés / libres, prochaine fin, gagnées / perdues sur 24 h, synchro) avec la liste des **mises en direct** relue toutes les 2 s, Paramètres tout en bas avec un onglet **Wiki-Traders**. |
+| **Intégré au site** | Barre latérale rangée en arborescence (Paquets en haut ; menus Collection, Marché, Social, Progression ; pages de l'extension à l'icône orange), **récapitulatif** toujours visible (slots occupés / libres, prochaine fin, gagnées / perdues sur 24 h, synchro) avec la liste des **mises en direct** relue toutes les 2 s, Paramètres tout en bas avec un onglet **Wiki-Traders**. **Vues de la collection** : tes propres menus sous Collection (ex. « 10-100 A→Z » : étiquette 10-100, tri par nom), avec filtre (nom, étiquettes, rareté, favoris, famille, exemplaires, prix) et tri au choix. |
 | **Vendre** | Par défaut, tes **meilleures cartes** (filtre « toutes sauf / seulement ces étiquettes », exemplaires gardés, liste noire, favoris et familles jamais proposés), réglées par **paliers de prix** : calcul simple (mise de départ ajustée par le taux de vente) ou formule libre, prix minimum, durée ; **ordre de priorité** (équilibrée = prix × chance de vente, rapporter le plus, vendre vite, écouler, critères, formule) et **aperçu** en direct. Ou slots **par étiquette**. Dans Marché → **Mes ventes**, un clic sur un slot libre ouvre « Vendre » : carte proposée, autre carte, recherche ou **carte au hasard**. **Mode enchère** sur la collection : un clic sur une carte ouvre sa mise en vente pré-remplie. |
 | **Marché enrichi** | Sur chaque enchère : **prix moyen de la carte et écart** (vert = bonne affaire). **Mes enchères** : tes mises, en cours ou historique. **Historique** : tes ventes, statistiques, filtres vendues / invendues, écart à la moyenne. |
 | **Page d'une enchère** | **Historique des prix** de la carte : chiffres clés (ventes, moyenne, médiane, extrêmes, tendance 30 j, taux de vente), graphique en **points, bougies ou ligne**, moyenne glissante de 2 j à 1 mois, filtre vendues / sans acheteur ; **autres enchères de la même carte**. |

@@ -52,9 +52,9 @@ describe('page Réglages', () => {
   // Enregistre ce qui attend, pour qu'aucun enregistrement automatique ne déborde sur le test suivant.
   afterEach(ctrlS);
 
-  it('six onglets, un seul panneau visible, interrupteurs partout', () => {
+  it('huit onglets, un seul panneau visible, interrupteurs partout', () => {
     const tabs = [...document.querySelectorAll('[role=tab]')].map((t) => t.textContent);
-    expect(tabs).toEqual(['Accueil', 'Ventes', 'Étiquettes', 'Familles', 'Sur le site', 'Accès au site', 'Avancé']);
+    expect(tabs).toEqual(['Accueil', 'Ventes', 'Étiquettes', 'Familles', 'Interface', 'Sur le site', 'Accès au site', 'Avancé']);
     expect([...document.querySelectorAll<HTMLElement>('[role=tabpanel]')].filter((p) => !p.hidden).map((p) => p.dataset.tab)).toEqual(['accueil']);
     expect(document.querySelectorAll('input[type=checkbox]:not([role=switch])')).toHaveLength(0);
     document.querySelector<HTMLButtonElement>('#tab-ventes')!.click();
@@ -292,5 +292,25 @@ describe('page Réglages : anciennes ancres', () => {
     expect(panel('avance').hidden).toBe(false);
     await open('#automatisations');
     expect(panel('acces').hidden).toBe(false);
+  });
+});
+
+describe('page Réglages : vues de la collection', () => {
+  it('#interface : créer une vue « 10-100 A→Z », compter ses cartes, l\'enregistrer', async () => {
+    extra = { cards: { a: card('a', 50, { name: 'Zola', tags: ['10-100'] }), b: card('b', 20, { name: 'Balzac', tags: ['10-100'] }), c: card('c', 500, { name: 'Hugo', tags: ['100+'] }) } };
+    await open('#interface');
+    expect(panel('interface').hidden).toBe(false);
+    // L'intégration au site est rangée ici, avec les vues.
+    expect([...panel('interface').querySelectorAll('section')].map((x) => x.id)).toEqual(['affichage', 'vues']);
+    [...panel('interface').querySelectorAll('button')].find((b) => b.textContent === '+ Nouvelle vue')!.click();
+    const view = panel('interface').querySelector('.view-card')!;
+    type(view.querySelector<HTMLInputElement>('.view-name')!, '10-100 A→Z');
+    [...view.querySelectorAll<HTMLButtonElement>('.tag-chip')].find((x) => x.textContent === '10-100')!.click();
+    expect(view.querySelector('.view-count')!.textContent).toBe('2 cartes de ta collection : Balzac, Zola');
+    await ctrlS();
+    const v = saved.at(-1)!.settings!.collectionViews[0];
+    expect(v).toMatchObject({ name: '10-100 A→Z', active: true, sort: 'name', dir: 'asc' });
+    expect(v.filter.tags).toEqual(['10-100']);
+    extra = {};
   });
 });

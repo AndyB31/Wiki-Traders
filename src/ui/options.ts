@@ -13,7 +13,9 @@ import { catalogPriceOf, type CatalogPriceEntry } from '../lib/autotag';
 import { roundTo } from '../lib/pricing';
 import { clampPrice, DEFAULT_CALC, defaultTiers, inheritCalc, newTier, PRIORITIES, simplePrice, tierLabel } from '../lib/salecalc';
 import { DEFAULT_CRITERIA, SORT_KEYS } from '../lib/sorting';
-import type { DurationRule, FamilyTag, PriceCalc, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
+import { applyView, newView, viewHref, viewSummary, VIEW_SORTS, type CollectionView, type TriState, type ViewContext, type ViewSortKey } from '../lib/views';
+import { familiesOf, familyIndex } from '../lib/families';
+import type { DurationRule, FamilyTag, PriceCalc, Rarity, PriceCalcMode, PriceTier, Settings, SortCriterion, SortKey, StoreShape, TagRule } from '../lib/types';
 import { DEFAULT_SELECTORS } from '../content/parsers/selectors';
 import { downloadJson, fmtDate, h, mount } from './dom';
 import { updatePanel } from './update-panel';
@@ -62,13 +64,14 @@ const RISK_TEXT = 'Les règles de WikiMasters (section 3) interdisent les outils
 // Onglets
 // ---------------------------------------------------------------------------
 
-type TabId = 'accueil' | 'ventes' | 'etiquettes' | 'familles' | 'site' | 'acces' | 'avance';
+type TabId = 'accueil' | 'ventes' | 'etiquettes' | 'familles' | 'interface' | 'site' | 'acces' | 'avance';
 
 const TABS: [id: TabId, label: string][] = [
   ['accueil', 'Accueil'],
   ['ventes', 'Ventes'],
   ['etiquettes', 'Étiquettes'],
   ['familles', 'Familles'],
+  ['interface', 'Interface'],
   ['site', 'Sur le site'],
   ['acces', 'Accès au site'],
   ['avance', 'Avancé'],
@@ -104,6 +107,7 @@ const ui = {
   priceTiers: null as unknown as HTMLElement,
   saleTags: null as unknown as HTMLElement,
   familyTags: null as unknown as HTMLElement,
+  views: null as unknown as HTMLElement,
   priority: null as unknown as HTMLElement,
   preview: null as unknown as HTMLElement,
   tierTitles: [] as { el: HTMLElement; tier: PriceTier }[],
@@ -1889,6 +1893,233 @@ function familiesPanel() {
 }
 
 // ---------------------------------------------------------------------------
+// Interface : barre latérale et vues de la collection
+// ---------------------------------------------------------------------------
+
+const TRI_OPTIONS: [TriState, string][] = [
+  ['any', 'Indifférent'],
+  ['yes', 'Oui'],
+  ['no', 'Non'],
+];
+
+/** Contexte des vues pour l'aperçu : prix et taux de vente du cache, familles enregistrées. */
+function viewPreviewContext(): ViewContext {
+  const price = catalogPriceOf(cardPrices);
+  const rate = sellRateOfCache(cardPrices);
+  const idx = familyIndex(store.myFamilies ?? []);
+  return {
+    price: (c) => price(c) ?? c.sitePrice,
+    rate: (c) => rate(c)?.pct ?? null,
+    families: (c) => familiesOf(idx, c.siteId ?? null, c.name).map((f) => f.name),
+  };
+}
+
+/** « 12 cartes de ta collection » (et le début de la liste), mis à jour à chaque saisie. */
+function viewCountText(v: CollectionView): string {
+  const cards = Object.values(store.cards);
+  if (!cards.length) return 'Ta collection n\'est pas encore relevée : ouvre-la une fois sur le site.';
+  const list = applyView(cards, v, viewPreviewContext());
+  if (!list.length) return 'Aucune carte de ta collection ne correspond.';
+  const first = list.slice(0, 4).map((c) => c.name).join(', ');
+  return `${list.length} carte${list.length > 1 ? 's' : ''} de ta collection : ${first}${list.length > 4 ? '…' : ''}`;
+}
+
+/** Choix multiple en pastilles (étiquettes, raretés). */
+function chipPicker(options: { value: string; label: string }[], selected: () => string[], set: (list: string[]) => void, label: string) {
+  const box = h('div', { class: 'tag-chips', role: 'group', 'aria-label': label });
+  const draw = () => {
+    const sel = selected();
+    const has = (v: string) => sel.some((x) => x.toLowerCase() === v.toLowerCase());
+    mount(
+      box,
+      options.map((o) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            class: `tag-chip${has(o.value) ? ' is-on' : ''}`,
+            'aria-pressed': String(has(o.value)),
+            onclick: () => {
+              set(has(o.value) ? selected().filter((x) => x.toLowerCase() !== o.value.toLowerCase()) : [...selected(), o.value]);
+              draw();
+              onEdit();
+            },
+          },
+          has(o.value) ? `✓ ${o.label}` : o.label,
+        ),
+      ),
+    );
+  };
+  draw();
+  return box;
+}
+
+function selectOf<T extends string>(options: [T, string][], value: T, onchange: (v: T) => void, label: string) {
+  return h(
+    'select',
+    { 'aria-label': label, onchange: (e: Event) => onchange((e.target as HTMLSelectElement).value as T) },
+    options.map(([v, l]) => h('option', { value: v, selected: v === value }, l)),
+  );
+}
+
+function numberInput(value: number | null, onchange: (v: number | null) => void, label: string) {
+  return h('input', { type: 'number', min: '0', step: '1', value: value ?? '', placeholder: '—', 'aria-label': label, oninput: (e: Event) => onchange(num((e.target as HTMLInputElement).value)) });
+}
+
+function viewCard(v: CollectionView, i: number) {
+  const list = settings.collectionViews;
+  const f = v.filter;
+  const summary = h('span', { class: 'muted small' }, viewSummary(v));
+  const count = h('span', { class: 'small view-count' }, viewCountText(v));
+  // Résumé et nombre de cartes suivent chaque saisie, sans redessiner les champs (le focus reste).
+  const edited = () => {
+    summary.textContent = viewSummary(v);
+    count.textContent = viewCountText(v);
+    onEdit();
+  };
+  const tags = knownTags();
+  const tagOptions = [...new Set([...tags, ...f.tags, ...f.excludeTags])].map((t) => ({ value: t, label: t }));
+  const families = familyNames();
+  const sortDef = () => VIEW_SORTS.find((s) => s.key === v.sort) ?? VIEW_SORTS[0];
+  const dirSelect = h('select', { 'aria-label': 'Sens du tri', onchange: (e: Event) => ((v.dir = (e.target as HTMLSelectElement).value as 'asc' | 'desc'), edited()) });
+  const drawDir = () =>
+    mount(dirSelect, h('option', { value: 'asc', selected: v.dir === 'asc' }, sortDef().asc), h('option', { value: 'desc', selected: v.dir === 'desc' }, sortDef().desc));
+  drawDir();
+  const move = (step: number) => {
+    const j = i + step;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    renderViews();
+    onEdit();
+  };
+  const siteLink = embedded ? h('a', { href: viewHref(v.id), target: '_top', class: 'small' }, 'Ouvrir sur le site →') : h('a', { href: `${SITE_ORIGIN}${viewHref(v.id)}`, target: '_blank', rel: 'noopener', class: 'small' }, 'Ouvrir sur le site →');
+  return h(
+    'div',
+    { class: `rule-card view-card${v.active ? '' : ' inactive'}` },
+    h(
+      'div',
+      { class: 'row wrap rule-head' },
+      switchInput(v.active, (box) => ((v.active = box.checked), box.closest('.view-card')?.classList.toggle('inactive', !box.checked), onEdit()), `Afficher « ${v.name} » dans la barre latérale`),
+      h('input', { class: 'view-name', value: v.name, maxlength: 40, placeholder: 'Nom du menu (ex. 10-100 A→Z)', 'aria-label': 'Nom de la vue', oninput: (e: Event) => ((v.name = (e.target as HTMLInputElement).value), edited()) }),
+      h('span', { class: 'grow' }),
+      siteLink,
+      h('button', { type: 'button', class: 'small', title: 'Monter', 'aria-label': 'Monter', disabled: i === 0, onclick: () => move(-1) }, '↑'),
+      h('button', { type: 'button', class: 'small', title: 'Descendre', 'aria-label': 'Descendre', disabled: i === list.length - 1, onclick: () => move(1) }, '↓'),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'small',
+          title: 'Dupliquer',
+          onclick: () => {
+            list.splice(i + 1, 0, { ...structuredClone(v), id: `v-${Date.now()}-${++idSeq}`, name: `${v.name} (copie)` });
+            renderViews();
+            onEdit();
+          },
+        },
+        'Dupliquer',
+      ),
+      h('button', { type: 'button', class: 'danger small', 'aria-label': `Supprimer la vue ${v.name}`, onclick: () => (list.splice(i, 1), renderViews(), onEdit()) }, '✕'),
+    ),
+    h('div', { class: 'row wrap' }, summary),
+    h(
+      'div',
+      { class: 'grid' },
+      field('Nom ou catégorie contient', h('input', { type: 'search', value: f.q, placeholder: 'ex. roi, peintre', oninput: (e: Event) => ((f.q = (e.target as HTMLInputElement).value), edited()) }), 'Plusieurs mots séparés par des virgules : l\'un d\'eux suffit. Sans accents ni majuscules.'),
+      field(
+        'Tri',
+        h(
+          'span',
+          { class: 'row' },
+          selectOf(VIEW_SORTS.map((s) => [s.key, s.label] as [ViewSortKey, string]), v.sort, (k) => ((v.sort = k), drawDir(), edited()), 'Trier par'),
+          dirSelect,
+        ),
+        'Les cartes sans valeur (prix pas encore lu, pas de catégorie…) passent à la fin.',
+      ),
+    ),
+    h('h4', { class: 'view-h' }, 'Étiquettes'),
+    tagOptions.length
+      ? chipPicker(tagOptions, () => f.tags, (l) => ((f.tags = l), edited()), 'Étiquettes demandées')
+      : h('p', { class: 'muted small' }, 'Aucune étiquette connue : ouvre ta collection sur le site pour que Wiki-Traders la relève.'),
+    h(
+      'div',
+      { class: 'row wrap' },
+      selectOf<'any' | 'all'>([['any', 'Au moins une de ces étiquettes'], ['all', 'Toutes ces étiquettes']], f.tagMode, (m) => ((f.tagMode = m), edited()), 'Mode des étiquettes'),
+      toggleField('Seulement les cartes sans étiquette', f.untagged, (box) => ((f.untagged = box.checked), edited())),
+    ),
+    tagOptions.length
+      ? h('details', { class: 'fine', open: f.excludeTags.length > 0 }, h('summary', null, 'Exclure des étiquettes'), chipPicker(tagOptions, () => f.excludeTags, (l) => ((f.excludeTags = l), edited()), 'Étiquettes exclues'))
+      : null,
+    h('h4', { class: 'view-h' }, 'Rareté'),
+    chipPicker(
+      (Object.keys(RARITIES) as Rarity[]).map((r) => ({ value: r, label: RARITIES[r].label })),
+      () => f.rarities,
+      (l) => ((f.rarities = l as Rarity[]), edited()),
+      'Raretés',
+    ),
+    h(
+      'div',
+      { class: 'grid' },
+      field('Favoris', selectOf(TRI_OPTIONS, f.favorite, (t) => ((f.favorite = t), edited()), 'Favoris')),
+      field('Brillantes', selectOf(TRI_OPTIONS, f.shiny, (t) => ((f.shiny = t), edited()), 'Brillantes')),
+      field(
+        'Famille',
+        selectOf<string>([['', 'Toutes les cartes'], ...[...new Set([...families, ...(f.family ? [f.family] : [])])].map((n) => [n, n] as [string, string])], f.family, (n) => ((f.family = n), edited()), 'Famille'),
+      ),
+      field('Exemplaires', h('span', { class: 'row' }, 'de', numberInput(f.minQty, (n) => ((f.minQty = n), edited()), 'Exemplaires minimum'), 'à', numberInput(f.maxQty, (n) => ((f.maxQty = n), edited()), 'Exemplaires maximum'))),
+      field('Prix moyen (W)', h('span', { class: 'row' }, 'de', numberInput(f.minPrice, (n) => ((f.minPrice = n), edited()), 'Prix minimum'), 'à', numberInput(f.maxPrice, (n) => ((f.maxPrice = n), edited()), 'Prix maximum')), 'Vide = sans limite. Une carte sans prix connu est écartée dès qu\'une limite est posée.'),
+    ),
+    count,
+  );
+}
+
+function renderViews(): void {
+  const list = settings.collectionViews;
+  mount(
+    ui.views,
+    list.length ? h('div', { class: 'rule-cards' }, list.map(viewCard)) : h('p', { class: 'muted' }, 'Aucune vue. Crée par exemple « 10-100 A→Z » : étiquette 10-100, tri par nom.'),
+    h(
+      'div',
+      { class: 'row wrap', style: 'margin-top:8px' },
+      h(
+        'button',
+        {
+          type: 'button',
+          onclick: () => {
+            list.push(newView(`v-${Date.now()}-${++idSeq}`, `Vue ${list.length + 1}`));
+            renderViews();
+            onEdit();
+          },
+        },
+        '+ Nouvelle vue',
+      ),
+    ),
+  );
+}
+
+function interfacePanel() {
+  ui.views = h('div');
+  renderViews();
+  return panel(
+    'interface',
+    section('affichage', 'Barre latérale', 'Ce que Wiki-Traders ajoute dans la mise en page de WikiMasters.', [
+      h(
+        'div',
+        { class: 'toggles' },
+        settingToggle('siteIntegration', 'Intégration au site', 'Résumé et menu Wiki-Traders dans la barre latérale, onglet dans Paramètres.'),
+        settingToggle('compactNav', 'Barre latérale compacte', 'Menus regroupés (Collection, Marché, Social, Progression) pour faire de la place.'),
+      ),
+    ]),
+    section(
+      'vues',
+      'Vues de la collection',
+      'Tes propres menus sous « Collection » dans la barre latérale : chaque vue garde un filtre et un tri. Un clic ouvre ta collection avec seulement ces cartes, dans cet ordre. Crée-en autant que tu veux.',
+      [ui.views],
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sur le site : intégration, fonctionnalités, notifications
 // ---------------------------------------------------------------------------
 
@@ -1917,14 +2148,6 @@ function sitePanel() {
   const groups = (Object.keys(FEATURE_GROUPS) as FeatureGroup[]).filter((g) => g !== 'automation');
   return panel(
     'site',
-    section('affichage', 'Intégration au site', 'Ce que Wiki-Traders ajoute dans la mise en page de WikiMasters.', [
-      h(
-        'div',
-        { class: 'toggles' },
-        settingToggle('siteIntegration', 'Intégration au site', 'Résumé et menu Wiki-Traders dans la barre latérale, onglet dans Paramètres.'),
-        settingToggle('compactNav', 'Barre latérale compacte', 'Menus regroupés (Social, Progression) pour faire de la place.'),
-      ),
-    ]),
     section('fonctionnalites', 'Fonctionnalités', 'Ajouts aux pages du site, à activer ou couper selon tes goûts.', [groups.map((g) => featureGroup(g, g === 'packs' ? packSettings() : null))]),
     section('notifications', 'Notifications', 'Wiki-Traders te prévient quand une enchère se termine ou qu\'un slot se libère.', [
       h('div', { class: 'toggles' }, settingToggle('notifications', 'Notifications', 'Alertes du navigateur pour tes ventes.')),
@@ -2252,7 +2475,7 @@ function render(): void {
   ui.status = h('span', { class: 'status muted', role: 'status', 'aria-live': 'polite' });
   ui.undoBtn = h('button', { type: 'button', class: 'small', hidden: true, title: 'Revenir à l\'état d\'avant tes dernières modifications', onclick: () => void undo() }, 'Annuler') as HTMLButtonElement;
   const tabs = tabBar();
-  const panels = [homePanel(), salesPanel(), tagsPanel(), familiesPanel(), sitePanel(), panel('acces', accessSection()), advancedPanel()];
+  const panels = [homePanel(), salesPanel(), tagsPanel(), familiesPanel(), interfacePanel(), sitePanel(), panel('acces', accessSection()), advancedPanel()];
   renderRules();
   mount(
     app,
