@@ -307,10 +307,22 @@ describe('page Réglages : vues de la collection', () => {
     type(view.querySelector<HTMLInputElement>('.view-name')!, '10-100 A→Z');
     [...view.querySelectorAll<HTMLButtonElement>('.tag-chip')].find((x) => x.textContent === '10-100')!.click();
     expect(view.querySelector('.view-count')!.textContent).toBe('2 cartes de ta collection : Balzac, Zola');
-    // Icône : l'entonnoir par défaut, une autre au choix.
+    // Icône : l'entonnoir par défaut ; un clic sur l'icône à côté du nom ouvre le choix, choisir le referme.
+    const iconButton = view.querySelector<HTMLButtonElement>('button.view-icon')!;
+    const picker = view.querySelector<HTMLElement>('.icon-picks')!;
+    expect(picker.hidden).toBe(true);
+    iconButton.click();
+    expect(picker.hidden).toBe(false);
+    expect(iconButton.getAttribute('aria-expanded')).toBe('true');
     expect(view.querySelector('.icon-pick.is-on')!.getAttribute('aria-label')).toBe('Filtre');
     view.querySelector<HTMLButtonElement>('.icon-pick[aria-label="Étoile"]')!.click();
+    expect(picker.hidden).toBe(true);
     expect(view.querySelector('.icon-pick.is-on')!.getAttribute('aria-label')).toBe('Étoile');
+    expect(iconButton.getAttribute('aria-label')).toBe('Icône du menu : Étoile (changer)');
+    // Échap referme le choix sans rien changer.
+    iconButton.click();
+    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(picker.hidden).toBe(true);
     await ctrlS();
     const v = saved.at(-1)!.settings!.collectionViews[0];
     expect(v).toMatchObject({ name: '10-100 A→Z', active: true, icon: 'star', sort: 'name', dir: 'asc' });

@@ -24,6 +24,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-27',
+    title: 'Icône des vues : un clic pour la choisir',
+    sections: [
+      {
+        title: 'Interface',
+        items: [
+          {
+            title: 'Choisir l\'icône d\'une vue',
+            text: 'Clique sur l\'icône à côté du nom de la vue : la liste des icônes s\'ouvre juste en dessous, un clic choisit et referme (Échap pour fermer sans changer).',
+            where: 'Réglages → Interface → Vues de la collection.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-26c',
     title: 'Étiquetage automatique : des conditions « ou »',
     sections: [
