@@ -2056,10 +2056,33 @@ function viewCard(v: CollectionView, i: number) {
     dirSelect.hidden = SITE_ONLY_SORTS.includes(v.sort);
   };
   drawDir();
-  // Icône du menu : aperçu dans la tête de la carte, choix en pastilles.
-  const headIcon = h('span', { class: 'view-icon', 'aria-hidden': 'true' });
-  headIcon.innerHTML = viewIconSvg(v.icon, 20);
-  const iconPicker = h('div', { class: 'icon-picks', role: 'radiogroup', 'aria-label': 'Icône du menu' });
+  // Icône du menu : un clic sur l'icône à côté du nom ouvre le choix, juste en dessous ; choisir le referme.
+  const iconPicker = h('div', { class: 'icon-picks', role: 'radiogroup', 'aria-label': 'Icône du menu', hidden: true });
+  const headIcon = h('button', {
+    type: 'button',
+    class: 'view-icon',
+    title: 'Changer l\'icône du menu',
+    'aria-label': `Icône du menu : ${VIEW_ICONS[v.icon ?? DEFAULT_VIEW_ICON]?.label ?? 'Filtre'} (changer)`,
+    'aria-expanded': 'false',
+    onclick: () => showPicker(iconPicker.hidden !== false),
+  });
+  const drawHead = () => {
+    headIcon.innerHTML = `${viewIconSvg(v.icon, 20)}<span class="view-icon-caret" aria-hidden="true">▾</span>`;
+    headIcon.setAttribute('aria-label', `Icône du menu : ${VIEW_ICONS[v.icon ?? DEFAULT_VIEW_ICON]?.label ?? 'Filtre'} (changer)`);
+  };
+  const showPicker = (open: boolean) => {
+    iconPicker.hidden = !open;
+    headIcon.setAttribute('aria-expanded', String(open));
+    headIcon.classList.toggle('is-open', open);
+    if (open) iconPicker.querySelector<HTMLButtonElement>('.icon-pick.is-on')?.focus();
+  };
+  iconPicker.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    showPicker(false);
+    headIcon.focus();
+  });
+  drawHead();
   const drawIcons = () =>
     mount(
       iconPicker,
@@ -2074,8 +2097,10 @@ function viewCard(v: CollectionView, i: number) {
           'aria-label': def.label,
           onclick: () => {
             v.icon = key;
-            headIcon.innerHTML = viewIconSvg(key, 20);
+            drawHead();
             drawIcons();
+            showPicker(false);
+            headIcon.focus();
             onEdit();
           },
         });
@@ -2121,8 +2146,8 @@ function viewCard(v: CollectionView, i: number) {
       ),
       h('button', { type: 'button', class: 'danger small', 'aria-label': `Supprimer la vue ${v.name}`, onclick: () => (list.splice(i, 1), renderViews(), onEdit()) }, '✕'),
     ),
+    iconPicker,
     h('div', { class: 'row wrap' }, summary),
-    h('details', { class: 'fine' }, h('summary', null, 'Icône du menu'), iconPicker),
     h(
       'div',
       { class: 'grid' },

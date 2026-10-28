@@ -70,7 +70,7 @@ Une **vue** est un menu de la barre latérale qui ouvre ta collection avec un fi
 
 - **Filtres** (tous facultatifs, ils se cumulent) : nom ou catégorie contient (plusieurs mots séparés par des virgules : l'un d'eux suffit) ; étiquettes (au moins une / toutes), étiquettes exclues, seulement les cartes sans étiquette ; raretés ; favoris (oui / non / indifférent) ; brillantes ; famille ; nombre d'exemplaires ; prix moyen (une carte sans prix connu est écartée dès qu'une limite est posée).
 - **Tri** : nom, prix moyen, valeur (prix × exemplaires), rareté, exemplaires, taux de vente, nombre de ventes, catégorie, étiquette, favoris, date d'ajout ; dans un sens ou dans l'autre. Rareté, Nom (A → Z), Favoris et Date d'ajout passent par le tri du site (toutes les pages) ; les autres rangent la page affichée. Les cartes sans valeur (prix pas encore lu…) passent à la fin.
-- **Icône du menu** : entonnoir par défaut, ou étoile, cœur, couronne, flamme, gemme, trophée…
+- **Icône du menu** : clique sur l'icône à côté du nom de la vue pour choisir parmi 21 icônes (entonnoir par défaut, étoile, cœur, couronne, flamme, gemme, trophée…) ; Échap referme le choix.
 - À l'ouverture, la vue remplit les filtres du site (recherche, étiquette, raretés, tri) ; le reste est filtré sur la page affichée.
 - Sous la vue, le nombre de cartes de ta collection qui y correspondent, et les premières.
 

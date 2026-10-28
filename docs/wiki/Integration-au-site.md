@@ -31,7 +31,7 @@ Les liens du site ne sont pas déplacés : ils sont masqués et reproduits dans 
 
 ## Vues de la collection
 
-Dans **Réglages → Interface → Vues de la collection**, crée tes propres menus : chaque vue a un nom, une icône (entonnoir par défaut), un filtre (nom, étiquettes, rareté, favoris, brillantes, famille, exemplaires, prix moyen) et un tri (nom, prix, valeur, rareté, exemplaires, taux de vente, ventes, catégorie, étiquette). Elles apparaissent sous **Ma collection** dans le menu *Collection* (sous le lien *Collection* si la barre n'est pas compacte), dans l'ordre choisi.
+Dans **Réglages → Interface → Vues de la collection**, crée tes propres menus : chaque vue a un nom, une icône (entonnoir par défaut ; un clic sur l'icône à côté du nom pour la changer), un filtre (nom, étiquettes, rareté, favoris, brillantes, famille, exemplaires, prix moyen) et un tri (nom, prix, valeur, rareté, exemplaires, taux de vente, ventes, catégorie, étiquette). Elles apparaissent sous **Ma collection** dans le menu *Collection* (sous le lien *Collection* si la barre n'est pas compacte), dans l'ordre choisi.
 
 Un clic ouvre la collection (`/collection?wview=…`) et **remplit les filtres du site** : recherche (un seul texte), étiquette (une seule, ou « Sans étiquette »), pastilles de rareté et tri (Rareté, Nom A → Z, Favoris, Date d'ajout). La collection du site est paginée : ce sont ses filtres qui mettent les bonnes cartes sur toutes ses pages. Un bandeau au-dessus des cartes rappelle la vue, ce qui est réglé sur le site et le nombre de cartes, avec **Modifier** (les réglages) et **✕ Quitter la vue** (filtres du site remis à zéro).
 
