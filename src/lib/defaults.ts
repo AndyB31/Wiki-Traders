@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   siteIntegration: true,
   compactNav: true,
   collectionViews: [],
+  viewsMode: 'app',
   features: {},
 };
 

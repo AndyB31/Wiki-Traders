@@ -139,6 +139,7 @@ const CSS = `
 .wf-acts button { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; cursor: pointer; background: rgba(15,15,18,.82); color: #fff; }
 .wf-acts button:hover { background: var(--wf-accent, #f97316); }
 .wf-acts button.danger:hover { background: #dc2626; }
+.wf-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; opacity: .7; }
 .wf-more { display: flex; justify-content: center; padding: 8px; }
 
 /* ajout de cartes */
@@ -229,6 +230,10 @@ export interface CardView {
   owned: number;
   price: number | null;
   cover?: boolean;
+  /** Carte favorite (étoile en haut à droite, comme la couverture d'une famille). */
+  favorite?: boolean;
+  /** Texte court en bas à droite (ex. étiquettes). */
+  note?: string;
   /** Boutons d'action (data-act) au survol. */
   actions?: { act: string; title: string; icon: string; danger?: boolean }[];
 }
@@ -248,8 +253,9 @@ export function cardHtml(v: CardView): string {
     + `<span class="wf-rar" style="background:${rarityColor(r)}">${r}</span>`
     + `<span class="wf-own${v.owned ? '' : ' no'}">${v.owned ? (v.owned > 1 ? `×${v.owned}` : '✓') : '✗'}</span>`
     + (v.cover ? `<span class="wf-cover-mark" title="Couverture">${icon('star', 14)}</span>` : '')
+    + (v.favorite ? `<span class="wf-cover-mark" title="Favori">${icon('star', 14)}</span>` : '')
     + acts
-    + `<div class="wf-text"><h3>${esc(c.title)}</h3><p>${esc(c.category)}</p><div class="wf-foot"><span>${v.price != null ? `≈ ${money(v.price)}` : '<span style="opacity:.55">sans prix</span>'}</span></div></div>`
+    + `<div class="wf-text"><h3>${esc(c.title)}</h3><p>${esc(c.category)}</p><div class="wf-foot"><span>${v.price != null ? `≈ ${money(v.price)}` : '<span style="opacity:.55">sans prix</span>'}</span>${v.note ? `<span class="wf-note" title="${esc(v.note)}">${esc(v.note)}</span>` : ''}</div></div>`
     + '</div>';
 }
 

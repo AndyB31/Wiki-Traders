@@ -1,5 +1,6 @@
 /**
- * Vues de la collection (Réglages → Interface) : /collection?wview=<id>.
+ * Vues de la collection (Réglages → Interface) : /collection?wview=<id>, avec le réglage « filtres du site »
+ * (sinon, page dessinée par Wiki-Traders : views-page.ts).
  *
  *  1. Les champs du site sont remplis (recherche, étiquette, raretés, tri : collection-controls.ts) : sa collection
  *     est paginée, c'est ce qui met les bonnes cartes sur ses pages. Ils sont remis à zéro en quittant la vue.
@@ -120,7 +121,8 @@ export function goToView(id: string | null): void {
   window.dispatchEvent(new CustomEvent('wiky-view-change'));
 }
 
-function viewContext(): ViewContext {
+/** Prix, taux de vente, ventes et familles des cartes (filtre et tri des vues). */
+export function viewContext(): ViewContext {
   const idx = getFamilyIndex();
   return {
     price: (c) => knownCardPrice(c) ?? c.sitePrice ?? (c.siteId ? undefined : null),
@@ -265,7 +267,8 @@ function render(ctx: FeatureContext): void {
 
 registerFeature({
   keys: [],
-  when: (ctx) => (ctx.settings.collectionViews?.length ?? 0) > 0,
+  // Réglage « filtres du site » seulement ; sinon la vue a sa propre page (views-page.ts).
+  when: (ctx) => (ctx.settings.collectionViews?.length ?? 0) > 0 && ctx.settings.viewsMode === 'native',
   render,
   cleanup: () => {
     clearView();

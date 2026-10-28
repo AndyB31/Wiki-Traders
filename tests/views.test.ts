@@ -92,9 +92,10 @@ function mountCollection(titles: string[]) {
   document.body.innerHTML = `<main><div class="flex-1"><div class="flex items-center"><h1>Collection</h1></div><div class="grid">${titles.map((t) => nativeCard(t)).join('')}</div></div></main>`;
 }
 
-function settingsWith(views: CollectionView[]): Settings {
+/** Réglages avec ces vues ; par défaut, affichage « filtres du site » (celui de ces tests-là). */
+function settingsWith(views: CollectionView[], viewsMode: Settings['viewsMode'] = 'native'): Settings {
   const features = Object.fromEntries(FEATURES.map((f) => [f.key, false])) as FeatureFlags;
-  return { ...DEFAULT_SETTINGS, apiRead: false, features, collectionViews: views };
+  return { ...DEFAULT_SETTINGS, apiRead: false, features, collectionViews: views, viewsMode };
 }
 
 const cells = () => [...document.querySelectorAll<HTMLElement>('.grid > .group')];
@@ -291,5 +292,86 @@ describe('champs de la collection du site', () => {
     CARDS[0].tags = ['10-100'];
     document.querySelector<HTMLButtonElement>('[data-act="quit"]')!.click();
     await vi.waitFor(() => expect([site.tag(), site.sort()]).toEqual(['Toutes les étiquettes', 'Rareté']));
+  });
+});
+
+// ---------------------------------------------------------------- page Wiki-Traders
+
+describe('vue en page Wiki-Traders (réglage par défaut)', () => {
+  const NAV = readFileSync(resolve(import.meta.dirname, 'fixtures/site-nav.html'), 'utf8');
+  const v = view({ id: 'v1', name: '10-100 A→Z' }, { tags: ['10-100'] });
+  const open = (views: CollectionView[] = [v], over: Partial<Settings> = {}) => {
+    const settings = { ...settingsWith(views, 'app'), ...over };
+    renderSiteUi({ ...input({ settings }), meta: DEFAULT_META, bidsCache: null }, { refresh: () => {} });
+    runFeatures(makeContext(settings, cardsById(...CARDS), []));
+  };
+  const titles = () => [...document.querySelectorAll('[data-wiky="view-page"] .wf-card h3')].map((h) => h.textContent);
+
+  beforeEach(() => {
+    document.body.innerHTML = `<div class="flex">${NAV}<main><div class="flex-1"><h1>Collection</h1><div class="grid">${nativeCard('Hugo')}</div></div></main></div>`;
+    history.replaceState(null, '', `/collection?wview=${v.id}`);
+    sessionStorage.clear();
+  });
+
+  it('par défaut : page propre avec toutes les cartes de la vue (pas seulement celles de la page du site)', () => {
+    expect(DEFAULT_SETTINGS.viewsMode).toBe('app');
+    expect(migrateSettings({ viewsMode: 'autre' } as unknown as Partial<Settings>).viewsMode).toBe('app');
+    open();
+    expect(document.documentElement.getAttribute('data-wiky-route')).toBe('view');
+    expect(document.querySelector('#wiky-page h1')!.textContent).toBe('10-100 A→Z');
+    // La collection du site n'a qu'Hugo sur sa page : la vue montre quand même Balzac et Zola, par nom.
+    expect(titles()).toEqual(['Balzac', 'Zola']);
+    expect(document.querySelector('[data-part="info"]')!.textContent).toContain('2 cartes');
+    // Rien n'est masqué ni réordonné dans la collection du site, aucun bandeau.
+    expect(document.querySelectorAll('[data-wiky-vhide], [data-wiky="view-bar"]')).toHaveLength(0);
+    // Favori et étiquettes visibles sur la carte.
+    const balzac = document.querySelector('[data-wiky="view-page"] .wf-card')!;
+    expect(balzac.querySelector('[title="Favori"]')).not.toBeNull();
+    expect(balzac.textContent).toContain('#Garder');
+  });
+
+  it('affiner sur place : raretés, recherche, étiquette, tri ; « Réinitialiser »', async () => {
+    open([view({ id: 'v1', name: 'Tout' })]);
+    const page = document.querySelector<HTMLElement>('[data-wiky="view-page"]')!;
+    expect(titles()).toEqual(['Balzac', 'Hugo', 'Molière', 'Zola']);
+    page.querySelector<HTMLElement>('[data-act="rarity"][data-r="L"]')!.click();
+    page.querySelector<HTMLElement>('[data-act="rarity"][data-r="UR"]')!.click();
+    expect(titles()).toEqual(['Hugo', 'Molière']);
+    const sort = page.querySelector<HTMLSelectElement>('[data-in="sort"]')!;
+    sort.value = 'name:desc';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(titles()).toEqual(['Molière', 'Hugo']);
+    page.querySelector<HTMLElement>('[data-act="reset"]')!.click();
+    expect(titles()).toHaveLength(4);
+
+    const tag = page.querySelector<HTMLSelectElement>('[data-in="tag"]')!;
+    expect([...tag.options].map((o) => o.textContent)).toEqual(['Toutes les étiquettes', 'Sans étiquette', '#10-100 (2)', '#100+ (1)', '#Garder (1)']);
+    tag.value = 'none';
+    tag.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(titles()).toEqual(['Hugo']);
+    tag.value = '';
+    tag.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const q = page.querySelector<HTMLInputElement>('[data-in="q"]')!;
+    q.value = 'dramaturge';
+    q.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => expect(titles()).toEqual(['Molière']));
+  });
+
+  it('clic sur une carte : la collection du site, recherche remplie avec son nom', () => {
+    open();
+    document.querySelector<HTMLElement>('[data-wiky="view-page"] .wf-card h3')!.click();
+    expect(location.pathname + location.search).toBe('/collection');
+    expect(sessionStorage.getItem('wiky-view-site-search')).toBe('Balzac');
+  });
+
+  it('aucune carte : message ; réglage « filtres du site » : pas de page, la collection du site est filtrée', () => {
+    open([view({ id: 'v1' }, { rarities: ['PC'] })]);
+    expect(document.querySelector('[data-wiky="view-page"] .wf-empty')!.textContent).toContain('Aucune carte');
+
+    open([v], { viewsMode: 'native' });
+    expect(document.getElementById('wiky-page')).toBeNull();
+    expect(document.documentElement.hasAttribute('data-wiky-route')).toBe(false);
+    expect(document.querySelector('[data-wiky="view-bar"]')).not.toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 
 > Copilote d'enchères pour [WikiMasters](https://www.wiki-masters.com) : une extension navigateur qui garde tes slots d'enchères remplis avec tes meilleures cartes, calcule le bon prix… et te laisse cliquer.
 
-![Version](https://img.shields.io/badge/version-1.3.1-orange)
+![Version](https://img.shields.io/badge/version-1.4.0-orange)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178c6)
 

@@ -24,6 +24,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-28',
+    title: 'Vues de la collection : leur propre page',
+    intro: 'Une vue n\'affichait parfois rien : elle filtrait par-dessus la page de la collection du site, qui ne montre que 50 cartes à la fois. Elle a maintenant sa propre page, comme Familles.',
+    sections: [
+      {
+        title: 'Collection',
+        items: [
+          {
+            title: 'Une page Wiki-Traders pour chaque vue',
+            text: 'Un clic sur une vue affiche d\'un coup toutes les cartes de ta collection qui lui correspondent, dans l\'ordre de son tri, sans dépendre des pages du site. Recherche, étiquette, raretés et tri permettent d\'affiner sur place. Un clic sur une carte l\'ouvre dans la collection du site (fiche, vente, étiquettes), et le bouton dossier l\'ajoute à une famille.',
+            where: 'Barre latérale → Collection → tes vues.',
+          },
+          {
+            title: 'Ou les filtres du site, au choix',
+            text: 'Pour retrouver l\'ancien fonctionnement, où les champs de la collection du site sont remplis, choisis « Filtres du site ».',
+            where: 'Réglages → Interface → Vues de la collection → Affichage d\'une vue.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-10-27',
     title: 'Icône des vues : un clic pour la choisir',
     sections: [
