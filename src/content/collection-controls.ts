@@ -103,7 +103,8 @@ async function setRarities(wanted: Rarity[]): Promise<Rarity[]> {
   return [...rarityChips()].filter(([, c]) => chipOn(c)).map(([r]) => r);
 }
 
-async function setSearch(q: string): Promise<string> {
+/** Remplit la recherche du site (ex. « Voir dans la collection » depuis la page d'une vue). */
+export async function setSearch(q: string): Promise<string> {
   const input = searchInput();
   if (!input) return '';
   if (input.value !== q) fillInput(input, q);

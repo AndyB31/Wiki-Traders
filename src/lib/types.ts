@@ -272,6 +272,11 @@ export interface Settings {
   compactNav: boolean;
   /** Vues de la collection (filtre + tri) affichées sous « Collection » dans la barre latérale (voir lib/views.ts). */
   collectionViews: import('./views').CollectionView[];
+  /**
+   * Affichage d'une vue : `app` = page dessinée par Wiki-Traders depuis toute ma collection (comme Familles) ;
+   * `native` = champs de la collection du site remplis, puis filtre en plus sur la page affichée.
+   */
+  viewsMode: 'app' | 'native';
   /** Fonctionnalités reprises de « Prix moyen collection » (voir lib/features.ts) ; absentes = valeur par défaut. */
   features: Partial<import('./features').FeatureFlags>;
 }

@@ -24,7 +24,10 @@ export interface SiteUiActions {
   refresh: () => void;
 }
 
-type View = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'families' | 'tags' | 'tools' | 'news';
+type View = 'sell' | 'running' | 'bids' | 'sold' | 'cards' | 'families' | 'tags' | 'tools' | 'news' | 'view';
+
+/** Vues de la collection, et leur affichage (page Wiki-Traders ou champs du site) : relus à chaque passage. */
+let pageViews: { mode: 'app' | 'native'; list: CollectionView[] } = { mode: 'app', list: [] };
 
 const ICONS: Record<string, string> = {
   coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
@@ -415,8 +418,8 @@ function buildGroup(
     if ('views' in entry) {
       for (const v of views) {
         if (!v.active) continue;
-        active ||= !route && v.id === viewId;
-        items.push(viewSub(v, route ? null : viewId));
+        active ||= (!route || route === 'view') && v.id === viewId;
+        items.push(viewSub(v, route && route !== 'view' ? null : viewId));
       }
       continue;
     }
@@ -684,9 +687,17 @@ function statusHtml(s: SiteSummary, now: number, toggle = true, bidsRow = true):
       <span class="wiky-refresh" role="button" tabindex="0" data-act="refresh" title="Actualiser mes ventes et mes mises">${icon('refresh', 12)}</span></div>`;
 }
 
+/** Vue ouverte dessinée par Wiki-Traders (réglage « page Wiki-Traders »), sinon null. */
+function appView(): CollectionView | null {
+  if (pageViews.mode !== 'app' || new URLSearchParams(location.search).has('wiky')) return null;
+  const id = activeViewId();
+  return id ? pageViews.list.find((v) => v.id === id) ?? null : null;
+}
+
 function currentRoute(): View | 'settings' | null {
   const wiky = new URLSearchParams(location.search).get('wiky');
   if (wiky === 'settings' && location.pathname === '/settings') return 'settings';
+  if (appView()) return 'view';
   return ITEMS.find((i) => i.page && i.view === wiky)?.view ?? null;
 }
 
@@ -809,16 +820,28 @@ function renderPage(): void {
     return;
   }
   if (document.documentElement.getAttribute('data-wiky-route') !== route) document.documentElement.setAttribute('data-wiky-route', route);
+  const view = route === 'view' ? appView() : null;
   if (page?.dataset.route === route) {
     if (page.parentElement !== main) main.append(page);
+    // Autre vue (ou vue renommée) : seul l'en-tête change, la page reste en place.
+    if (view) {
+      const head = page.querySelector<HTMLElement>(':scope > .wiky-page-head');
+      const key = JSON.stringify([view.name, view.icon]);
+      if (head && head.dataset.key !== key) {
+        head.dataset.key = key;
+        head.querySelector('.wiky-ico')!.innerHTML = viewIconSvg(view.icon, 20);
+        head.querySelector('h1')!.textContent = view.name || 'Vue';
+      }
+    }
     return;
   }
   page?.remove();
   page = el('section', { id: 'wiky-page', 'data-wiky': 'page', 'data-route': route });
   const item = ITEMS.find((i) => i.view === route);
-  const title = route === 'settings' ? 'Paramètres' : item!.title;
-  const head = el('div', { class: 'wiky-page-head' }, `<span class="wiky-ico">${icon(route === 'settings' ? 'sliders' : item!.icon, 20)}</span><h1 class="text-2xl md:text-3xl font-bold"></h1>`);
+  const title = route === 'settings' ? 'Paramètres' : view ? view.name || 'Vue' : item!.title;
+  const head = el('div', { class: 'wiky-page-head' }, `<span class="wiky-ico">${view ? viewIconSvg(view.icon, 20) : icon(route === 'settings' ? 'sliders' : item!.icon, 20)}</span><h1 class="text-2xl md:text-3xl font-bold"></h1>`);
   head.querySelector('h1')!.textContent = title;
+  if (view) head.dataset.key = JSON.stringify([view.name, view.icon]);
   page.append(head);
   if (route === 'settings') {
     const tabs = el('div', { class: 'wiky-tabs', role: 'tablist' });
@@ -826,7 +849,7 @@ function renderPage(): void {
     tabs.append(el('span', { class: 'wiky-tab is-active', role: 'tab', 'aria-selected': 'true' }, 'Wiki-Traders'));
     page.append(tabs);
   }
-  if (item?.native) {
+  if (item?.native || view) {
     // Rempli par le module de la fonctionnalité (features/), à la relecture suivante.
     page.append(el('div', { 'data-wiky-mount': route }));
     main.append(page);
@@ -881,8 +904,11 @@ function renderSettingsEntry(): void {
 
 export function renderSiteUi(store: SiteUiStore, actions: SiteUiActions): void {
   const { siteIntegration, compactNav } = store.settings;
+  pageViews = { mode: store.settings.viewsMode ?? 'app', list: store.settings.collectionViews ?? [] };
   const nav = siteNav();
-  if (!siteIntegration) {
+  // La page d'une vue s'affiche même sans l'intégration au site (on y arrive par la barre latérale).
+  const viewPage = currentRoute() === 'view';
+  if (!siteIntegration && !viewPage) {
     nav?.querySelector('[data-wiky="nav-wiky"]')?.remove();
     nav?.querySelector('[data-wiky="nav-recap"]')?.remove();
     document.querySelector('[data-wiky="settings-entry"]')?.remove();
@@ -890,7 +916,7 @@ export function renderSiteUi(store: SiteUiStore, actions: SiteUiActions): void {
     document.documentElement.removeAttribute('data-wiky-route');
     closeModal();
   }
-  if (!siteIntegration && !compactNav && !store.settings.collectionViews?.some((v) => v.active) && !document.getElementById('wiky-site-style')) return;
+  if (!siteIntegration && !compactNav && !viewPage && !store.settings.collectionViews?.some((v) => v.active) && !document.getElementById('wiky-site-style')) return;
   ensureStyle();
   if (nav) {
     if (compactNav) {
@@ -904,8 +930,6 @@ export function renderSiteUi(store: SiteUiStore, actions: SiteUiActions): void {
       if (siteIntegration) renderWikySection(nav, store, actions);
     }
   }
-  if (siteIntegration) {
-    renderPage();
-    renderSettingsEntry();
-  }
+  if (siteIntegration || viewPage) renderPage();
+  if (siteIntegration) renderSettingsEntry();
 }

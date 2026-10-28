@@ -915,6 +915,9 @@ async function main(): Promise<void> {
     drawSiteUi();
   });
   setInterval(drawSiteUi, 30_000);
+  // Vue ouverte ou quittée sur place (sans changement de page) : la page de la vue s'affiche tout de suite.
+  window.addEventListener('wiky-view-change', drawSiteUi);
+  window.addEventListener('popstate', () => setTimeout(drawSiteUi, 0));
   // Mise à jour disponible : signalée dans le récapitulatif de la barre latérale.
   const readUpdate = async () => {
     try {

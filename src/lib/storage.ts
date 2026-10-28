@@ -53,6 +53,7 @@ export function migrateSettings(stored: LegacySettings | undefined, rules?: Lega
       .map((r) => ({ id: `ft-${r.id}`, active: r.active, family: r.when!.family.trim(), tag: r.tag.trim() }));
   }
   s.collectionViews = Array.isArray(s.collectionViews) ? s.collectionViews.filter((v) => v && typeof v.id === 'string').map(normalizeView) : [];
+  s.viewsMode = s.viewsMode === 'native' ? 'native' : 'app';
   delete s.sortPrice;
   delete s.sellRateRules;
   delete s.sellRateTiersOn;

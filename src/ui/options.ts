@@ -2223,6 +2223,54 @@ function renderViews(): void {
   );
 }
 
+const VIEWS_MODES: { mode: Settings['viewsMode']; label: string; help: string }[] = [
+  {
+    mode: 'app',
+    label: 'Page Wiki-Traders',
+    help: 'Une page dessinée par Wiki-Traders avec toute ta collection, comme Familles : le filtre s\'applique d\'un coup à toutes tes cartes, avec recherche, étiquette, raretés et tri pour affiner. Un clic sur une carte l\'ouvre dans la collection du site.',
+  },
+  {
+    mode: 'native',
+    label: 'Filtres du site',
+    help: 'Ta collection du site, dont Wiki-Traders remplit les champs (recherche, étiquette, raretés, tri) ; ce que le site ne sait pas filtrer (prix, favoris, plusieurs étiquettes…) est filtré en plus sur la page affichée, page par page.',
+  },
+];
+
+/** Affichage des vues : page Wiki-Traders ou champs de la collection du site. */
+function viewsModeField() {
+  const box = h('div');
+  const draw = () =>
+    mount(
+      box,
+      h(
+        'div',
+        { class: 'segmented', role: 'radiogroup', 'aria-label': 'Affichage des vues' },
+        VIEWS_MODES.map((m) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              role: 'radio',
+              'aria-checked': String(settings.viewsMode === m.mode),
+              class: settings.viewsMode === m.mode ? 'is-on' : undefined,
+              onclick: () => {
+                if (settings.viewsMode === m.mode) return;
+                settings.viewsMode = m.mode;
+                draw();
+                onEdit();
+              },
+            },
+            m.label,
+          ),
+        ),
+      ),
+      h('p', { class: 'muted small' }, VIEWS_MODES.find((m) => m.mode === settings.viewsMode)?.help ?? ''),
+    );
+  draw();
+  // Pas de <label> : un clic sur son texte activerait le premier bouton.
+  return h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Affichage d\'une vue'), box);
+}
+
 function interfacePanel() {
   ui.views = h('div');
   renderViews();
@@ -2239,8 +2287,8 @@ function interfacePanel() {
     section(
       'vues',
       'Vues de la collection',
-      'Tes propres menus sous « Collection » dans la barre latérale : chaque vue garde un filtre, un tri et une icône. Un clic ouvre ta collection et remplit ses champs (recherche, étiquette, raretés, tri) : toutes les pages ne montrent plus que ces cartes. Ce que le site ne sait pas filtrer (prix, favoris, plusieurs étiquettes…) est filtré en plus sur la page affichée. Crée-en autant que tu veux.',
-      [ui.views],
+      'Tes propres menus sous « Collection » dans la barre latérale : chaque vue garde un filtre, un tri et une icône, et un clic n\'affiche que ses cartes. Crée-en autant que tu veux.',
+      [viewsModeField(), ui.views],
     ),
   );
 }
